@@ -44,130 +44,287 @@ class CockMatchShellScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentTab = ref.watch(currentTabProvider);
+    final currentClub = ref.watch(currentClubProvider);
+    final activeSession = ref.watch(sessionProvider);
 
     return Scaffold(
+      key: AppTheme.rootScaffoldKey,
       backgroundColor: AppTheme.background,
+      drawer: _buildAppDrawer(
+        context: context,
+        ref: ref,
+        currentTab: currentTab,
+        clubName: currentClub.clubName,
+        sessionTitle: activeSession?.title,
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
-          child: Stack(
-            children: [
-              // 메인 화면
-              IndexedStack(
-                index: currentTab,
-                children: _screens,
-              ),
-
-              // 참조 이미지 스타일의 플로팅 알약(Pill) 네비게이션 바
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 16,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.95),
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildNavPillItem(
-                          ref: ref,
-                          currentTab: currentTab,
-                          index: 0,
-                          icon: Icons.people_alt_rounded,
-                          label: '회원명부',
-                        ),
-                        const SizedBox(width: 8),
-                        _buildNavPillItem(
-                          ref: ref,
-                          currentTab: currentTab,
-                          index: 1,
-                          icon: Icons.checklist_rtl_rounded,
-                          label: '출석부',
-                        ),
-                        const SizedBox(width: 8),
-                        _buildNavPillItem(
-                          ref: ref,
-                          currentTab: currentTab,
-                          index: 2,
-                          icon: Icons.sports_tennis_rounded,
-                          label: '대진표',
-                        ),
-                        const SizedBox(width: 8),
-                        _buildNavPillItem(
-                          ref: ref,
-                          currentTab: currentTab,
-                          index: 3,
-                          icon: Icons.visibility_rounded,
-                          label: '웹뷰어',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          child: IndexedStack(
+            index: currentTab,
+            children: _screens,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildNavPillItem({
+  Widget _buildAppDrawer({
+    required BuildContext context,
+    required WidgetRef ref,
+    required int currentTab,
+    required String clubName,
+    required String? sessionTitle,
+  }) {
+    return Drawer(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      width: 280,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 드로어 상단 클럽 헤더
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryDark,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryMint.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: Text('🏸', style: TextStyle(fontSize: 20)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '콕매치 (CockMatch)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.primaryMint,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              clubName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (sessionTitle != null && sessionTitle.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.fiber_manual_record_rounded,
+                            size: 10,
+                            color: AppTheme.primaryMint,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '진행 모임: $sessionTitle',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 12, 24, 6),
+              child: Text(
+                '메뉴 이동',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textMuted,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+
+            _buildDrawerMenuItem(
+              context: context,
+              ref: ref,
+              currentTab: currentTab,
+              index: 0,
+              icon: Icons.people_alt_rounded,
+              label: '회원명부',
+              subtitle: '회원정보 및 급수·회비 관리',
+            ),
+            _buildDrawerMenuItem(
+              context: context,
+              ref: ref,
+              currentTab: currentTab,
+              index: 1,
+              icon: Icons.checklist_rtl_rounded,
+              label: '출석부',
+              subtitle: '당일 출석 체크 및 회비 수납',
+            ),
+            _buildDrawerMenuItem(
+              context: context,
+              ref: ref,
+              currentTab: currentTab,
+              index: 2,
+              icon: Icons.sports_tennis_rounded,
+              label: '대진표',
+              subtitle: '코트 배정 및 실시간 점수 기록',
+            ),
+            _buildDrawerMenuItem(
+              context: context,
+              ref: ref,
+              currentTab: currentTab,
+              index: 3,
+              icon: Icons.visibility_rounded,
+              label: '웹뷰어',
+              subtitle: '실시간 전광판 및 종합 리포트',
+            ),
+
+            const Spacer(),
+            const Divider(height: 1, indent: 20, endIndent: 20),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.touch_app_rounded, size: 16, color: AppTheme.textMuted),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '회원 카드 탭: 상세·통화·문자 / 길게 누르기: 단체 문자',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textMuted.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerMenuItem({
+    required BuildContext context,
     required WidgetRef ref,
     required int currentTab,
     required int index,
     required IconData icon,
     required String label,
+    required String subtitle,
   }) {
     final isSelected = currentTab == index;
 
-    return InkWell(
-      onTap: () {
-        ref.read(currentTabProvider.notifier).setTab(index);
-      },
-      borderRadius: BorderRadius.circular(24),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 16 : 12,
-          vertical: 10,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryDark : Colors.transparent,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected ? Colors.white : AppTheme.textMuted,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          ref.read(currentTabProvider.notifier).setTab(index);
+          Navigator.of(context).pop();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.pastelMint.withValues(alpha: 0.65) : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? AppTheme.primaryMint.withValues(alpha: 0.4) : Colors.transparent,
             ),
-            if (isSelected) ...[
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: isSelected ? AppTheme.primaryDark : AppTheme.surfaceGrey,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: isSelected ? Colors.white : AppTheme.textDark,
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.primaryDark,
+                  size: 20,
+                ),
             ],
-          ],
+          ),
         ),
       ),
     );

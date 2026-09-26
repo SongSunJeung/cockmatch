@@ -34,6 +34,31 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
   AttendanceSortBy _selectedSortBy = AttendanceSortBy.tierDesc;
   bool _isMatchHistoryExpanded = false;
 
+  // 롱프레스 다중 선택 문자 발송 모드 상태
+  bool _isMultiSelectMode = false;
+  final Set<String> _selectedAttendeeIds = {};
+
+  void _toggleMultiSelectMember(String memberId) {
+    setState(() {
+      if (_selectedAttendeeIds.contains(memberId)) {
+        _selectedAttendeeIds.remove(memberId);
+        if (_selectedAttendeeIds.isEmpty) {
+          _isMultiSelectMode = false;
+        }
+      } else {
+        _selectedAttendeeIds.add(memberId);
+        _isMultiSelectMode = true;
+      }
+    });
+  }
+
+  void _exitMultiSelectMode() {
+    setState(() {
+      _isMultiSelectMode = false;
+      _selectedAttendeeIds.clear();
+    });
+  }
+
   bool get _hasActiveFilters =>
       _selectedTier != null ||
       _selectedGrade != null ||
@@ -203,6 +228,73 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     }
   }
 
+  /// 다중 선택된 회원(N명)에게 일괄 SMS 발송 (sms:)
+  Future<void> _sendBulkSmsToSelectedAttendees(
+    BuildContext context,
+    GameSession session,
+    List<Member> attendeeMembers,
+  ) async {
+    final targetMembers = attendeeMembers
+        .where((m) => _selectedAttendeeIds.contains(m.id))
+        .toList();
+    if (targetMembers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('문자를 발송할 회원을 1명 이상 선택해 주세요.')),
+      );
+      return;
+    }
+
+    final phones = targetMembers
+        .map((m) => (m.phoneNumber ?? '').replaceAll(RegExp(r'[^0-9+]'), ''))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    final defaultMsg = '[콕매치 공지] 안녕하세요! \'${session.displayTitle}\' 모임 관련 안내드립니다.';
+
+    if (phones.isEmpty) {
+      await Clipboard.setData(ClipboardData(text: defaultMsg));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.pastelRoseDark,
+            content: Text('선택한 회원(${targetMembers.length}명)의 등록된 전화번호가 없어 안내 문구를 복사했습니다.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    final recipients = phones.join(',');
+    final smsUri = Uri.parse('sms:$recipients?body=${Uri.encodeComponent(defaultMsg)}');
+
+    try {
+      final launched = await launchUrl(smsUri, mode: LaunchMode.externalApplication);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.primaryDark,
+            content: Text(
+              launched
+                  ? '선택한 회원(${targetMembers.length}명)에게 단체 문자 앱을 열었습니다. (sms:)'
+                  : '선택한 회원(${targetMembers.length}명) 수신 번호($recipients)로 문자 연결을 준비했습니다. (sms:)',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: '$recipients\n$defaultMsg'));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.primaryDark,
+            content: Text('선택한 회원(${targetMembers.length}명) 번호가 클립보드에 복사되었습니다. (sms:$recipients)'),
+          ),
+        );
+      }
+    }
+
+    _exitMultiSelectMode();
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
@@ -220,19 +312,29 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               // 상단 헤더
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 20, 8),
                   child: Row(
                     children: [
+                      IconButton(
+                        onPressed: () => AppTheme.openDrawer(context),
+                        tooltip: '메뉴 열기',
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
+                      ),
+                      const SizedBox(width: 10),
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
                           color: AppTheme.pastelMint,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(13),
                         ),
-                        child: const Icon(Icons.edit_calendar_rounded, color: AppTheme.pastelMintDark, size: 22),
+                        child: const Icon(Icons.edit_calendar_rounded, color: AppTheme.pastelMintDark, size: 20),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -562,16 +664,30 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               ],
             ),
 
-            // 6. 하단 플로팅 액션 바 [출전 가능 N명 · 대진표 설정 및 이동]
+            // 6. 하단 플로팅 액션 바 (다중 선택 문자 발송 바 + 대진표 설정 및 이동 바)
             Positioned(
               left: 20,
               right: 20,
-              bottom: 84, // 메인 알약 네비게이션 바 위
-              child: _buildBottomConfirmBar(
-                context: context,
-                ref: ref,
-                session: session,
-                activeCount: activeCount,
+              bottom: 16,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isMultiSelectMode) ...[
+                    _buildMultiSelectSmsBar(
+                      context: context,
+                      session: session,
+                      attendeeMembers: attendeeMembers,
+                      displayedMembers: displayedMembers,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  _buildBottomConfirmBar(
+                    context: context,
+                    ref: ref,
+                    session: session,
+                    activeCount: activeCount,
+                  ),
+                ],
               ),
             ),
           ],
@@ -846,13 +962,13 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     );
   }
 
-  /// 1. 상단 모임 헤더 (모임 타이틀 편집, 참가비 정보, 모임 목록 전환 및 영구 삭제 메뉴)
+  /// 1. 상단 모임 헤더 (좌측 햄버거 메뉴, 모임 타이틀 편집, 참가비 정보, 모임 목록 전환 및 영구 삭제 메뉴)
   Widget _buildSessionHeader(BuildContext context, GameSession session, Club currentClub) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -863,24 +979,17 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
       ),
       child: Row(
         children: [
-          InkWell(
-            onTap: () => ref.read(sessionProvider.notifier).closeSessionView(),
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: session.isCompleted ? AppTheme.pastelPeriwinkle : AppTheme.pastelMint,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                session.isCompleted ? Icons.history_rounded : Icons.edit_calendar_rounded,
-                color: session.isCompleted ? AppTheme.pastelPeriwinkleDark : AppTheme.pastelMintDark,
-                size: 21,
-              ),
+          IconButton(
+            onPressed: () => AppTheme.openDrawer(context),
+            tooltip: '메뉴 열기',
+            visualDensity: VisualDensity.compact,
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.background,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
+            icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 21),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1194,7 +1303,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     return '${_formatWon(amount)}원';
   }
 
-  /// 2. Bento Grid: 모임 통계 및 회비 수납 현황 카드 ([미납자 안내 문자 발송] 버튼 포함)
+  /// 2. 슬림 요약 바: 당일 출석 인원 및 회비 수납 현황 (모바일 화면 1~2줄 컴팩트 요약 바)
   Widget _buildBentoSummaryGrid(
     BuildContext context, {
     required GameSession session,
@@ -1209,204 +1318,159 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     required int unpaidCount,
     required int exemptCount,
   }) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 카드 1: 출석 및 출전 상태 현황
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.025),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.how_to_reg_rounded, size: 16, color: AppTheme.primaryMint),
-                      SizedBox(width: 6),
-                      Text('당일 출석 인원', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        '$attendeeCount',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textDark),
-                      ),
-                      const Text('명', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.pastelMint,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '출전 $activeCount',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppTheme.pastelMintDark),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '휴식 $restingCount명 · 조퇴 $withdrawnCount명',
-                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                  ),
-                ],
-              ),
-            ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          const SizedBox(width: 12),
-
-          // 카드 2: 회비 수납 현황 요약 (면제자 별도 집계 + [미납자 안내 문자 발송] 버튼)
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.025),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1줄: 당일 출석 인원 요약
+          Row(
+            children: [
+              const Icon(Icons.how_to_reg_rounded, size: 15, color: AppTheme.primaryMint),
+              const SizedBox(width: 5),
+              const Text(
+                '당일 출석 인원',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppTheme.textMuted),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.account_balance_wallet_rounded, size: 16, color: AppTheme.pastelYellowDark),
-                      SizedBox(width: 6),
-                      Text('회비 수납 현황', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _formatCompactFee(totalPaidFee),
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.textDark),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+              const SizedBox(width: 6),
+              Text(
+                '$attendeeCount',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppTheme.textDark),
+              ),
+              const Text('명', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.pastelMint,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '출전 $activeCount',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppTheme.pastelMintDark),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '휴식 $restingCount명 · 조퇴 $withdrawnCount명',
+                  style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 12),
+          // 2줄: 회비 수납 현황 요약 + [미납자 안내 문자 발송] 버튼
+          Row(
+            children: [
+              const Icon(Icons.account_balance_wallet_rounded, size: 15, color: AppTheme.pastelYellowDark),
+              const SizedBox(width: 5),
+              const Text(
+                '회비 수납 현황',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppTheme.textMuted),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _formatCompactFee(totalPaidFee),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppTheme.textDark),
+              ),
+              Text(
+                ' / ${_formatCompactFee(totalExpectedFee)}',
+                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 3,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: unpaidCount > 0 ? AppTheme.pastelRose : AppTheme.pastelMint,
+                        borderRadius: BorderRadius.circular(5),
                       ),
-                      Flexible(
-                        child: Text(
-                          ' / ${_formatCompactFee(totalExpectedFee)}',
-                          style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 5,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: unpaidCount > 0 ? AppTheme.pastelRose : AppTheme.pastelMint,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          unpaidCount > 0 ? '미납 $unpaidCount명' : '전원 수납완료!',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: unpaidCount > 0 ? AppTheme.pastelRoseDark : AppTheme.pastelMintDark,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '완납 $paidCount명',
-                        style: const TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: AppTheme.pastelPeriwinkle.withValues(alpha: 0.65),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(
-                          '면제 $exemptCount명',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.pastelPeriwinkleDark,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // [미납자 안내 문자 발송] 버튼
-                  SizedBox(
-                    width: double.infinity,
-                    child: InkWell(
-                      onTap: () => _sendUnpaidGuideSms(context, session, attendeeMembers),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: unpaidCount > 0 ? AppTheme.pastelRose : AppTheme.background,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: unpaidCount > 0
-                                ? AppTheme.pastelRoseDark.withValues(alpha: 0.35)
-                                : Colors.grey.shade300,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.sms_outlined,
-                              size: 13,
-                              color: unpaidCount > 0 ? AppTheme.pastelRoseDark : AppTheme.textMuted,
-                            ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                '미납자 안내 문자 발송',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: unpaidCount > 0 ? AppTheme.pastelRoseDark : AppTheme.textMuted,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                      child: Text(
+                        unpaidCount > 0 ? '미납 $unpaidCount명' : '전원 수납완료!',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: unpaidCount > 0 ? AppTheme.pastelRoseDark : AppTheme.pastelMintDark,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    Text(
+                      '완납 $paidCount명',
+                      style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppTheme.pastelPeriwinkle.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        '면제 $exemptCount명',
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.pastelPeriwinkleDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(width: 6),
+              InkWell(
+                onTap: () => _sendUnpaidGuideSms(context, session, attendeeMembers),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4.5),
+                  decoration: BoxDecoration(
+                    color: unpaidCount > 0 ? AppTheme.pastelRose : AppTheme.background,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: unpaidCount > 0
+                          ? AppTheme.pastelRoseDark.withValues(alpha: 0.35)
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.sms_outlined,
+                        size: 12,
+                        color: unpaidCount > 0 ? AppTheme.pastelRoseDark : AppTheme.textMuted,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '미납자 안내 문자 발송',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: unpaidCount > 0 ? AppTheme.pastelRoseDark : AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1570,7 +1634,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     );
   }
 
-  /// 3. 빠른 액션 바 ([회원 불러오기], [게스트 즉시 추가], [선택 문자 발송])
+  /// 3. 빠른 액션 바 ([회원 불러오기], [게스트 즉시 추가])
   Widget _buildQuickActionRow(
     BuildContext context,
     WidgetRef ref,
@@ -1619,207 +1683,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             onPressed: () => _showAddGuestDialog(context, ref, session.clubId),
           ),
         ),
-        const SizedBox(width: 8),
-
-        // [선택 문자 발송] (출석부 내 회원을 선택하여 개별/단체 문자 발송)
-        OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppTheme.textDark,
-            side: BorderSide(color: Colors.grey.shade300, width: 1.2),
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-          icon: const Icon(Icons.sms_rounded, size: 16, color: AppTheme.pastelPeriwinkleDark),
-          label: const Text(
-            '문자 발송',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: AppTheme.textDark),
-          ),
-          onPressed: () => _showAttendanceSmsDialog(context, session, attendeeMembers),
-        ),
       ],
-    );
-  }
-
-  /// 출석부 참석자 선택 문자 발송(sms:) 모달
-  void _showAttendanceSmsDialog(
-    BuildContext context,
-    GameSession session,
-    List<Member> attendeeMembers,
-  ) {
-    final smsTargets = attendeeMembers
-        .where((m) => (m.phoneNumber ?? '').trim().isNotEmpty)
-        .toList();
-    final Set<String> selectedIds = smsTargets.map((m) => m.id).toSet();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return Container(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    const Icon(Icons.sms_rounded, color: AppTheme.pastelPeriwinkleDark, size: 22),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        '출석부 회원 선택 문자 발송',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setModalState(() {
-                          final unpaidIds = smsTargets
-                              .where((m) => session.getAttendeeFeeStatus(m) == FeeStatus.unpaid)
-                              .map((m) => m.id)
-                              .toSet();
-                          selectedIds
-                            ..clear()
-                            ..addAll(unpaidIds);
-                        });
-                      },
-                      child: const Text('미납자만 선택', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.pastelRoseDark)),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setModalState(() {
-                          if (selectedIds.length == smsTargets.length) {
-                            selectedIds.clear();
-                          } else {
-                            selectedIds.addAll(smsTargets.map((m) => m.id));
-                          }
-                        });
-                      },
-                      child: Text(
-                        selectedIds.length == smsTargets.length ? '전체 해제' : '전체 선택',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: smsTargets.isEmpty
-                      ? const Center(
-                          child: Text(
-                            '전화번호가 등록된 출석 회원이 없습니다.',
-                            style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: smsTargets.length,
-                          itemBuilder: (ctx, idx) {
-                            final m = smsTargets[idx];
-                            final isChecked = selectedIds.contains(m.id);
-                            final feeSt = session.getAttendeeFeeStatus(m);
-                            return CheckboxListTile(
-                              value: isChecked,
-                              activeColor: AppTheme.primaryMint,
-                              dense: true,
-                              onChanged: (val) {
-                                setModalState(() {
-                                  if (val == true) {
-                                    selectedIds.add(m.id);
-                                  } else {
-                                    selectedIds.remove(m.id);
-                                  }
-                                });
-                              },
-                              title: Row(
-                                children: [
-                                  Text(m.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: feeSt == FeeStatus.unpaid ? AppTheme.pastelRose : AppTheme.pastelMint,
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: Text(
-                                      feeSt.label,
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: feeSt == FeeStatus.unpaid ? AppTheme.pastelRoseDark : AppTheme.pastelMintDark,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              subtitle: InkWell(
-                                onTap: () => _callMember(context, m),
-                                child: Text(
-                                  m.phoneNumber ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    color: AppTheme.textDark,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryDark,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    icon: const Icon(Icons.sms_rounded, size: 18),
-                    label: Text(
-                      '선택한 ${selectedIds.length}명에게 문자 앱 열기 (sms:)',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                    ),
-                    onPressed: selectedIds.isEmpty
-                        ? null
-                        : () async {
-                            final chosen = smsTargets.where((m) => selectedIds.contains(m.id)).toList();
-                            final phones = chosen
-                                .map((m) => (m.phoneNumber ?? '').replaceAll(RegExp(r'[^0-9+]'), ''))
-                                .where((p) => p.isNotEmpty)
-                                .join(',');
-                            Navigator.pop(ctx);
-                            final smsUri = Uri.parse('sms:$phones');
-                            try {
-                              await launchUrl(smsUri, mode: LaunchMode.externalApplication);
-                            } catch (_) {
-                              await Clipboard.setData(ClipboardData(text: phones));
-                            }
-                          },
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 
@@ -2356,7 +2220,11 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     );
   }
 
-  /// 5. 참석자 카드 (전화번호 텍스트 클릭 시 즉시 전화 걸기 tel: & 개별 문자 발송 sms: 지원)
+  /// 5. 참석자 카드
+  /// - 동그란 남/여 아이콘 제거, 성별에 따라 카드 배경·테두리 컬러 구분 (남: 은은한 블루톤 / 여: 은은한 핑크·코랄톤)
+  /// - 회비 납부 상태 단일 순환 뱃지 (완납 → 미납 → 면제 → 완납)
+  /// - 짧게 탭(Tap): 상세 정보 팝업(전화 걸기 / 문자 보내기 포함)
+  /// - 길게 누르기(Long Press): 다중 선택 체크 모드 전환 및 일괄 문자 발송 연동
   Widget _buildAttendeeCard({
     required BuildContext context,
     required WidgetRef ref,
@@ -2368,6 +2236,8 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     final tierBg = AppTheme.getTierBgColor(member.tier);
     final tierText = AppTheme.getTierTextColor(member.tier);
     final hasPhone = (member.phoneNumber ?? '').trim().isNotEmpty;
+    final isWithdrawn = status == AttendanceStatus.withdrawn;
+    final isSelected = _selectedAttendeeIds.contains(member.id);
 
     // 출전 상태에 따른 스타일 정의
     Color statusBg;
@@ -2395,212 +2265,457 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: AppTheme.getGenderCardBg(member.gender, isDimmed: isWithdrawn),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.getGenderCardBorder(
+            member.gender,
+            isSelected: isSelected,
+            isDimmed: isWithdrawn,
+          ),
+          width: isSelected ? 1.8 : 1.2,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
+            blurRadius: 5,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            // 번호
-            SizedBox(
-              width: 20,
-              child: Text(
-                '$index',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
-              ),
-            ),
-
-            // 성별 아바타
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: member.gender == Gender.female ? AppTheme.pastelRose : AppTheme.pastelPeriwinkle,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  member.gender == Gender.female ? '여' : '남',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: member.gender == Gender.female ? AppTheme.pastelRoseDark : AppTheme.pastelPeriwinkleDark,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            if (_isMultiSelectMode) {
+              _toggleMultiSelectMember(member.id);
+            } else {
+              _showAttendeeDetailDialog(
+                context: context,
+                ref: ref,
+                member: member,
+                session: session,
+                status: status,
+              );
+            }
+          },
+          onLongPress: () => _toggleMultiSelectMember(member.id),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                // 다중 선택 모드일 때 체크박스 표시, 기본 모드일 때 순번 + 성별 포인트 바 표시
+                if (_isMultiSelectMode) ...[
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: isSelected,
+                      activeColor: AppTheme.primaryDark,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                      onChanged: (_) => _toggleMultiSelectMember(member.id),
+                    ),
                   ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // 이름 및 소속/게스트/급수 뱃지 + 전화번호 텍스트 탭(tel:)
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          member.name,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: status == AttendanceStatus.withdrawn ? Colors.grey : AppTheme.textDark,
-                            decoration: status == AttendanceStatus.withdrawn ? TextDecoration.lineThrough : null,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      if (member.isGuest)
-                        Container(
-                          margin: const EdgeInsets.only(right: 4),
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: AppTheme.pastelYellow,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text('게스트', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.pastelYellowDark)),
-                        ),
-                      // 급수 뱃지
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: tierBg,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          member.tier.label,
-                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: tierText),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 8),
+                ] else ...[
+                  Container(
+                    width: 4,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: AppTheme.getGenderAccentColor(member.gender),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
-                  const SizedBox(height: 2),
-                  Row(
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 20,
+                    child: Text(
+                      '$index',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ),
+                ],
+
+                // 이름 및 소속/게스트/급수 뱃지 + 전화번호 텍스트 탭(tel:)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (!member.isGuest &&
-                          (member.role != MemberRole.member ||
-                              (member.customRoleTitle != null &&
-                                  member.customRoleTitle!.trim().isNotEmpty))) ...[
-                        Text(
-                          '${member.displayRoleLabel} · ',
-                          style: const TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
-                        ),
-                      ],
-                      if (hasPhone)
-                        Flexible(
-                          child: InkWell(
-                            onTap: () => _callMember(context, member),
-                            borderRadius: BorderRadius.circular(4),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 1),
-                              child: Text(
-                                member.phoneNumber!,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.textDark,
-                                  decoration: TextDecoration.underline,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              member.name,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: isWithdrawn ? Colors.grey : AppTheme.textDark,
+                                decoration: isWithdrawn ? TextDecoration.lineThrough : null,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          if (member.isGuest)
+                            Container(
+                              margin: const EdgeInsets.only(right: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppTheme.pastelYellow,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                '게스트',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.pastelYellowDark,
                                 ),
+                              ),
+                            ),
+                          // 급수 뱃지
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: tierBg,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              member.tier.label,
+                              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: tierText),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          if (!member.isGuest &&
+                              (member.role != MemberRole.member ||
+                                  (member.customRoleTitle != null &&
+                                      member.customRoleTitle!.trim().isNotEmpty))) ...[
+                            Text(
+                              '${member.displayRoleLabel} · ',
+                              style: const TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                            ),
+                          ],
+                          if (hasPhone)
+                            Flexible(
+                              child: InkWell(
+                                onTap: () => _callMember(context, member),
+                                borderRadius: BorderRadius.circular(4),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 1),
+                                  child: Text(
+                                    member.phoneNumber!,
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textDark,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Flexible(
+                              child: Text(
+                                member.isGuest ? (member.homeClub ?? '일회성 게스트') : '전화번호 미등록',
+                                style: const TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ),
-                        )
-                      else
-                        Flexible(
-                          child: Text(
-                            member.isGuest ? (member.homeClub ?? '일회성 게스트') : '전화번호 미등록',
-                            style: const TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
-                            overflow: TextOverflow.ellipsis,
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+
+                // [회비 수납 상태 단일 순환 뱃지: 완납 → 미납 → 면제 → 완납]
+                _buildFeeStatusSegment(ref, session, member),
+                const SizedBox(width: 6),
+
+                // [참여 상태 토글 버튼 (출전 대기 / 일시 휴식 / 조퇴)]
+                InkWell(
+                  onTap: () => _showStatusSelectModal(context, ref, member, status),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: statusBg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(statusIcon, size: 12, color: statusText),
+                        const SizedBox(width: 3),
+                        Text(
+                          status.label,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: statusText,
                           ),
                         ),
-                    ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 회비 상태 순환 순서: 완납(paid) → 미납(unpaid) → 면제(exempt) → 완납(paid)
+  FeeStatus _getNextFeeStatus(FeeStatus current) {
+    switch (current) {
+      case FeeStatus.paid:
+        return FeeStatus.unpaid;
+      case FeeStatus.unpaid:
+        return FeeStatus.exempt;
+      case FeeStatus.exempt:
+        return FeeStatus.paid;
+    }
+  }
+
+  /// 참석자별 회비 납부 상태 단일 순환 뱃지 (터치 시 완납 → 미납 → 면제 → 완납 순환)
+  Widget _buildFeeStatusSegment(WidgetRef ref, GameSession session, Member member) {
+    final currentFeeStatus = session.getAttendeeFeeStatus(member);
+
+    Color activeBg;
+    Color activeText;
+    Color borderColor;
+    switch (currentFeeStatus) {
+      case FeeStatus.paid:
+        activeBg = AppTheme.pastelMint;
+        activeText = AppTheme.pastelMintDark;
+        borderColor = AppTheme.primaryMint.withValues(alpha: 0.35);
+        break;
+      case FeeStatus.unpaid:
+        activeBg = AppTheme.pastelRose;
+        activeText = AppTheme.pastelRoseDark;
+        borderColor = AppTheme.pastelRoseDark.withValues(alpha: 0.35);
+        break;
+      case FeeStatus.exempt:
+        activeBg = AppTheme.pastelPeriwinkle;
+        activeText = AppTheme.pastelPeriwinkleDark;
+        borderColor = AppTheme.pastelPeriwinkleDark.withValues(alpha: 0.35);
+        break;
+    }
+
+    return InkWell(
+      onTap: () {
+        final nextStatus = _getNextFeeStatus(currentFeeStatus);
+        ref.read(membersProvider.notifier).updateFeeStatus(member.id, nextStatus);
+        ref.read(sessionProvider.notifier).updateAttendeeFeeStatus(member.id, nextStatus);
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: activeBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              currentFeeStatus.label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+                color: activeText,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.sync_rounded,
+              size: 11,
+              color: activeText.withValues(alpha: 0.8),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 참석자 카드 짧게 클릭(Tap) 시 호출되는 상세 정보 팝업 (전화 걸기 / 문자 보내기 / 정보 수정 / 출석 취소 제공)
+  void _showAttendeeDetailDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required Member member,
+    required GameSession session,
+    required AttendanceStatus status,
+  }) {
+    final feeStatus = session.getAttendeeFeeStatus(member);
+    final hasPhone = (member.phoneNumber ?? '').trim().isNotEmpty;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: const EdgeInsets.fromLTRB(22, 20, 16, 8),
+        contentPadding: const EdgeInsets.fromLTRB(22, 8, 22, 16),
+        title: Row(
+          children: [
+            Container(
+              width: 10,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppTheme.getGenderAccentColor(member.gender),
+                borderRadius: BorderRadius.circular(5),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                member.name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textDark,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.getTierBgColor(member.tier),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                member.tier.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.getTierTextColor(member.tier),
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              icon: const Icon(Icons.close_rounded, size: 20, color: AppTheme.textMuted),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.getGenderCardBg(member.gender),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.getGenderCardBorder(member.gender)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '구분: ${member.gender.label} · ${member.isGuest ? "게스트 (${member.homeClub ?? "일반"})" : member.displayRoleLabel}',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppTheme.textDark),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '연락처: ${hasPhone ? member.phoneNumber! : "전화번호 미등록"}',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppTheme.textDark),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '당일 상태: ${status.label} · 회비 ${feeStatus.label}',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 6),
-
-            // [회비 납부 상태 3단계 버튼: 완납 / 미납 / 면제]
-            _buildFeeStatusSegment(ref, session, member),
-            const SizedBox(width: 6),
-
-            // [참여 상태 토글 버튼 (출전 대기 / 일시 휴식 / 조퇴)]
-            InkWell(
-              onTap: () => _showStatusSelectModal(context, ref, member, status),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(statusIcon, size: 12, color: statusText),
-                    const SizedBox(width: 3),
-                    Text(
-                      status.label,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: statusText,
-                      ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryMint,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-            // 더보기 (개별 문자 발송 sms: / 출석 취소)
-            PopupMenuButton<String>(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              icon: const Icon(Icons.more_vert_rounded, size: 18, color: AppTheme.textMuted),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              onSelected: (val) {
-                if (val == 'sms') {
-                  final isUnpaid = session.getAttendeeFeeStatus(member) == FeeStatus.unpaid;
-                  final body = isUnpaid
-                      ? '[클릭콕 회비 안내] ${member.name}님, \'${session.displayTitle}\' 모임 회비 입금 안내드립니다. 감사합니다!'
-                      : null;
-                  _sendIndividualSms(context, member, defaultBody: body);
-                } else if (val == 'remove') {
-                  ref.read(sessionProvider.notifier).removeAttendee(member.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${member.name} 님이 오늘 출석부에서 제외되었습니다.')),
-                  );
-                }
-              },
-              itemBuilder: (ctx) => [
-                const PopupMenuItem(
-                  value: 'sms',
-                  child: Row(
-                    children: [
-                      Icon(Icons.sms_outlined, size: 16, color: AppTheme.pastelPeriwinkleDark),
-                      SizedBox(width: 8),
-                      Text('개별 문자 보내기 (sms:)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    ],
+                    icon: const Icon(Icons.call_rounded, size: 17),
+                    label: const Text('전화 걸기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      _callMember(context, member);
+                    },
                   ),
                 ),
-                const PopupMenuItem(
-                  value: 'remove',
-                  child: Row(
-                    children: [
-                      Icon(Icons.person_remove_rounded, size: 16, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('출석 취소', style: TextStyle(color: Colors.red, fontSize: 13)),
-                    ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryDark,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.sms_rounded, size: 17),
+                    label: const Text('문자 보내기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      final isUnpaid = feeStatus == FeeStatus.unpaid;
+                      final body = isUnpaid
+                          ? '[클릭콕 회비 안내] ${member.name}님, \'${session.displayTitle}\' 모임 회비 입금 안내드립니다. 감사합니다!'
+                          : null;
+                      _sendIndividualSms(context, member, defaultBody: body);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(dialogCtx);
+                    ref.read(currentTabProvider.notifier).setTab(0);
+                  },
+                  icon: const Icon(Icons.edit_note_rounded, size: 17, color: AppTheme.textDark),
+                  label: const Text(
+                    '회원명부에서 정보 수정',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textDark),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(dialogCtx);
+                    ref.read(sessionProvider.notifier).removeAttendee(member.id);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${member.name} 님이 오늘 출석부에서 제외되었습니다.')),
+                    );
+                  },
+                  icon: const Icon(Icons.person_remove_rounded, size: 16, color: Colors.red),
+                  label: const Text(
+                    '출석 취소',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.red),
                   ),
                 ),
               ],
@@ -2611,62 +2726,80 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     );
   }
 
-  /// 참석자별 회비 납부 상태 3단계([완납] / [미납] / [면제]) 세그먼트 컨트롤
-  Widget _buildFeeStatusSegment(WidgetRef ref, GameSession session, Member member) {
-    final currentFeeStatus = session.getAttendeeFeeStatus(member);
+  /// 롱프레스 다중 선택 시 노출되는 ["선택한 회원(N명) 문자 발송"] 액션 바
+  Widget _buildMultiSelectSmsBar({
+    required BuildContext context,
+    required GameSession session,
+    required List<Member> attendeeMembers,
+    required List<Member> displayedMembers,
+  }) {
+    final selectedCount = _selectedAttendeeIds.length;
+    final allDisplayedSelected = displayedMembers.isNotEmpty &&
+        displayedMembers.every((m) => _selectedAttendeeIds.contains(m.id));
+
     return Container(
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppTheme.background,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.primaryMint, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: FeeStatus.values.map((option) {
-          final isSelected = currentFeeStatus == option;
-
-          Color activeBg;
-          Color activeText;
-          switch (option) {
-            case FeeStatus.paid:
-              activeBg = AppTheme.pastelMint;
-              activeText = AppTheme.pastelMintDark;
-              break;
-            case FeeStatus.unpaid:
-              activeBg = AppTheme.pastelRose;
-              activeText = AppTheme.pastelRoseDark;
-              break;
-            case FeeStatus.exempt:
-              activeBg = AppTheme.pastelPeriwinkle;
-              activeText = AppTheme.pastelPeriwinkleDark;
-              break;
-          }
-
-          return InkWell(
-            onTap: () {
-              ref.read(membersProvider.notifier).updateFeeStatus(member.id, option);
-              ref.read(sessionProvider.notifier).updateAttendeeFeeStatus(member.id, option);
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 140),
-              padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 3.5),
-              decoration: BoxDecoration(
-                color: isSelected ? activeBg : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                option.label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                  color: isSelected ? activeText : AppTheme.textMuted,
-                ),
-              ),
+        children: [
+          TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-          );
-        }).toList(),
+            onPressed: () {
+              setState(() {
+                if (allDisplayedSelected) {
+                  _selectedAttendeeIds.clear();
+                  _isMultiSelectMode = false;
+                } else {
+                  _selectedAttendeeIds.addAll(displayedMembers.map((m) => m.id));
+                }
+              });
+            },
+            child: Text(
+              allDisplayedSelected ? '전체해제' : '전체선택',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.textDark),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryMint,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.sms_rounded, size: 16),
+              label: Text(
+                '선택한 회원($selectedCount명) 문자 발송',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5),
+              ),
+              onPressed: () => _sendBulkSmsToSelectedAttendees(context, session, attendeeMembers),
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: '선택 모드 닫기',
+            onPressed: _exitMultiSelectMode,
+            icon: const Icon(Icons.close_rounded, size: 20, color: AppTheme.textMuted),
+          ),
+        ],
       ),
     );
   }

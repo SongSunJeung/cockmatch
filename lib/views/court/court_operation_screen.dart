@@ -28,21 +28,32 @@ class CourtOperationScreen extends ConsumerWidget {
             children: [
               // 1. 상단 앱바 & 헤더
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                padding: const EdgeInsets.fromLTRB(16, 14, 20, 8),
                 child: Row(
                   children: [
+                    IconButton(
+                      onPressed: () => AppTheme.openDrawer(context),
+                      tooltip: '메뉴 열기',
+                      visualDensity: VisualDensity.compact,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
+                    ),
+                    const SizedBox(width: 10),
                     Container(
-                      width: 44,
-                      height: 44,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: AppTheme.pastelMint,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Center(
-                        child: Text('🏸', style: TextStyle(fontSize: 22)),
+                        child: Text('🏸', style: TextStyle(fontSize: 20)),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,15 +237,26 @@ class CourtOperationScreen extends ConsumerWidget {
             // 1. 상단 앱바 & 헤더
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                padding: const EdgeInsets.fromLTRB(16, 14, 20, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
+                        IconButton(
+                          onPressed: () => AppTheme.openDrawer(context),
+                          tooltip: '메뉴 열기',
+                          visualDensity: VisualDensity.compact,
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
+                        ),
+                        const SizedBox(width: 10),
                         Container(
-                          width: 44,
-                          height: 44,
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
                             color: AppTheme.pastelPeriwinkle,
                             shape: BoxShape.circle,
@@ -243,11 +265,11 @@ class CourtOperationScreen extends ConsumerWidget {
                           child: const Center(
                             child: Text(
                               '⚡',
-                              style: TextStyle(fontSize: 20),
+                              style: TextStyle(fontSize: 18),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

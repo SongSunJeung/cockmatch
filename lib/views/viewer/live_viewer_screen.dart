@@ -358,29 +358,40 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     required bool isCompletedView,
   }) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      padding: const EdgeInsets.fromLTRB(16, 14, 20, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 클럽명 & 라이브/완료 상태 헤더
           Row(
             children: [
+              IconButton(
+                onPressed: () => AppTheme.openDrawer(context),
+                tooltip: '메뉴 열기',
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
+              ),
+              const SizedBox(width: 10),
               Container(
-                width: 44,
-                height: 44,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: isCompletedView ? AppTheme.pastelPeriwinkle : AppTheme.pastelMint,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(
                   child: Icon(
                     isCompletedView ? Icons.emoji_events_rounded : Icons.live_tv_rounded,
                     color: isCompletedView ? AppTheme.pastelPeriwinkleDark : AppTheme.pastelMintDark,
-                    size: 22,
+                    size: 20,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

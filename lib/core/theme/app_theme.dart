@@ -76,6 +76,59 @@ class AppTheme {
     }
   }
 
+  // 전역 루트 Scaffold Key (좌측 사이드바 Drawer 제어용)
+  static final GlobalKey<ScaffoldState> rootScaffoldKey = GlobalKey<ScaffoldState>();
+
+  /// 어느 화면에서나 좌측 사이드바(Drawer)를 여는 헬퍼
+  static void openDrawer([BuildContext? context]) {
+    final rootState = rootScaffoldKey.currentState;
+    if (rootState != null) {
+      rootState.openDrawer();
+      return;
+    }
+    if (context != null) {
+      Scaffold.maybeOf(context)?.openDrawer();
+    }
+  }
+
+  // 성별 카드 구분 컬러 (남성: 은은한 블루톤 / 여성: 은은한 핑크·코랄톤)
+  static const Color maleCardBg = Color(0xFFF2F6FF);
+  static const Color maleCardBorder = Color(0xFFD2E0FB);
+  static const Color maleCardAccent = Color(0xFF3B6FD8);
+
+  static const Color femaleCardBg = Color(0xFFFFF3F5);
+  static const Color femaleCardBorder = Color(0xFFFAD0D9);
+  static const Color femaleCardAccent = Color(0xFFDE5475);
+
+  static Color getGenderCardBg(Gender gender, {bool isDimmed = false}) {
+    if (isDimmed) {
+      return gender == Gender.male
+          ? const Color(0xFFF6F8FC)
+          : const Color(0xFFFCF6F7);
+    }
+    return gender == Gender.male ? maleCardBg : femaleCardBg;
+  }
+
+  static Color getGenderCardBorder(
+    Gender gender, {
+    bool isSelected = false,
+    bool isDimmed = false,
+  }) {
+    if (isSelected) {
+      return gender == Gender.male ? maleCardAccent : femaleCardAccent;
+    }
+    if (isDimmed) {
+      return gender == Gender.male
+          ? maleCardBorder.withValues(alpha: 0.55)
+          : femaleCardBorder.withValues(alpha: 0.55);
+    }
+    return gender == Gender.male ? maleCardBorder : femaleCardBorder;
+  }
+
+  static Color getGenderAccentColor(Gender gender) {
+    return gender == Gender.male ? maleCardAccent : femaleCardAccent;
+  }
+
   // 상태별 컬러
   static const Color statusPending = Color(0xFF94A3B8);
   static const Color statusPlaying = Color(0xFFE28B15);

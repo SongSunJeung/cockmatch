@@ -13,24 +13,28 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // 1. 앱 실행 시 초기(기본) 화면: 출석부 탭 (Index 1) & [진행 모임] / [지난 모임] 히스토리 표시 확인
-    expect(find.text('출석부'), findsOneWidget);
+    // 1. 앱 실행 시 초기(기본) 화면: 출석부 탭 (Index 1) & 좌측 햄버거 메뉴 아이콘 노출 확인
+    expect(find.byIcon(Icons.menu_rounded), findsWidgets);
     expect(find.text('오늘 모임 & 출석부'), findsOneWidget);
     expect(find.text('+ 새 모임 시작하기'), findsOneWidget);
     expect(find.text('[진행 모임]'), findsOneWidget);
     expect(find.text('[지난 모임]'), findsOneWidget);
     expect(find.text('2026.09.22 화요 정기 모임'), findsOneWidget);
 
-    // [지난 모임] 카드를 탭하여 이전 모임의 출석부, 회비 정산 내역, 경기 전적 조회 확인
+    // [지난 모임] 카드를 탭하여 이전 모임의 출석부, 슬림 요약 바, 경기 전적 조회 확인
     final archivedCard = find.text('2026.09.22 화요 정기 모임');
     await tester.ensureVisible(archivedCard);
     await tester.pumpAndSettle();
     await tester.tap(archivedCard);
     await tester.pumpAndSettle();
 
+    expect(find.text('당일 출석 인원'), findsOneWidget);
     expect(find.text('회비 수납 현황'), findsOneWidget);
     expect(find.text('미납자 안내 문자 발송'), findsOneWidget);
     expect(find.textContaining('모임 경기 전적'), findsOneWidget);
+    // '게스트 즉시 추가' 옆 개별 '문자 발송' 버튼이 제거되었는지 확인
+    expect(find.text('게스트 즉시 추가'), findsOneWidget);
+    expect(find.text('문자 발송'), findsNothing);
 
     // 출석부 상단 필터 & 정렬(기본값: 급수순 A -> 초심) 확인
     expect(find.text('⇅ 급수순 (A -> 초심)'), findsOneWidget);
@@ -44,11 +48,32 @@ void main() {
     expect(find.text('완납'), findsWidgets);
     expect(find.text('면제'), findsWidgets);
 
-    // 아래로 스크롤하여 출석부 참석자 리스트 렌더링 후 별도 전화기 아이콘 없이 전화번호 텍스트가 표시되는지 확인
+    // 아래로 스크롤하여 출석부 참석자 리스트 렌더링 후 확인:
+    // - 동그란 '남'/'여' 뱃지 아이콘 제거 확인
+    // - 회비 수납 단일 순환 뱃지(완납 -> 미납 -> 면제 -> 완납) 동작 확인
+    // - 회원 카드 탭(상세 정보 팝업: 전화 걸기 / 문자 보내기) & 롱프레스(다중 선택 문자 발송 바) 확인
     await tester.drag(find.byType(CustomScrollView).first, const Offset(0, -250));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.phone_in_talk_rounded), findsNothing);
+    expect(find.text('남'), findsNothing);
+    expect(find.text('여'), findsNothing);
     expect(find.text('010-1111-2222'), findsWidgets);
+
+    // 회원 카드 짧게 탭(Tap) -> 상세 정보 팝업(전화 걸기, 문자 보내기) 확인
+    await tester.tap(find.text('안세영').first);
+    await tester.pumpAndSettle();
+    expect(find.text('전화 걸기'), findsOneWidget);
+    expect(find.text('문자 보내기'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded).first);
+    await tester.pumpAndSettle();
+
+    // 회원 카드 길게 누르기(Long Press) -> 다중 선택 체크 모드 & "선택한 회원(1명) 문자 발송" 액션 바 확인
+    await tester.longPress(find.text('안세영').first);
+    await tester.pumpAndSettle();
+    expect(find.text('선택한 회원(1명) 문자 발송'), findsOneWidget);
+    await tester.tap(find.byTooltip('선택 모드 닫기'));
+    await tester.pumpAndSettle();
+    expect(find.text('선택한 회원(1명) 문자 발송'), findsNothing);
 
     // 출석부 정렬 옵션 변경: [급수순 (A -> 초심)] -> [회비 상태순 (미납자 최우선 정렬)] -> [급수순 (A -> 초심)]
     await tester.tap(find.text('⇅ 급수순 (A -> 초심)'));
@@ -104,10 +129,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('2026.09.22 화요 정기 모임'), findsOneWidget);
 
-    // 2. 0번 탭: 회원명부 (기본 회원 DB 관리 & 전화번호 텍스트 탭/단체문자 기능 & 정렬 기본값 이름 가나다순)
-    final memberTabIcon = find.byIcon(Icons.people_alt_rounded);
-    expect(memberTabIcon, findsOneWidget);
-    await tester.tap(memberTabIcon);
+    // 2. 좌측 햄버거 메뉴(Drawer)를 열어 0번 메뉴: [회원명부]로 이동
+    await tester.tap(find.byTooltip('메뉴 열기').first);
+    await tester.pumpAndSettle();
+    expect(find.text('회원명부'), findsOneWidget);
+    await tester.tap(find.text('회원명부'));
     await tester.pumpAndSettle();
 
     // 회원명부 화면: 기본 정렬 '⇅ 이름순 (가나다)' 및 가나다순 최상단 회원(강호동: 010-6666-7777, 가족할인 20,000원 뱃지) 노출 확인
@@ -262,14 +288,14 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
 
-    // 3. 2번 탭: 대진표 (코트 배정 및 실시간 점수 기록)
-    final bracketTabIcon = find.byIcon(Icons.sports_tennis_rounded);
-    expect(bracketTabIcon, findsOneWidget);
-    await tester.tap(bracketTabIcon);
+    // 3. 좌측 햄버거 메뉴(Drawer)를 열어 2번 메뉴: [대진표]로 이동
+    await tester.tap(find.byTooltip('메뉴 열기').first);
+    await tester.pumpAndSettle();
+    expect(find.text('대진표'), findsOneWidget);
+    await tester.tap(find.text('대진표'));
     await tester.pumpAndSettle();
 
     // 대진표 화면 (세션 미시작 상태)
-    expect(find.text('대진표'), findsOneWidget);
     expect(find.text('진행 중인 모임 세션이 없습니다'), findsWidgets);
     final startFromAttendanceBtn = find.text('출석부에서 새 모임 시작하기');
     expect(startFromAttendanceBtn, findsOneWidget);
@@ -279,10 +305,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('오늘 모임 & 출석부'), findsOneWidget);
 
-    // 4. 3번 탭(4번째 탭): 웹뷰어 (라이브 전광판 & 완료 리포트)
-    final viewerTabIcon = find.byIcon(Icons.visibility_rounded);
-    expect(viewerTabIcon, findsOneWidget);
-    await tester.tap(viewerTabIcon);
+    // 4. 좌측 햄버거 메뉴(Drawer)를 열어 3번 메뉴: [웹뷰어]로 이동
+    await tester.tap(find.byTooltip('메뉴 열기').first);
+    await tester.pumpAndSettle();
+    expect(find.text('웹뷰어'), findsOneWidget);
+    await tester.tap(find.text('웹뷰어'));
     await tester.pumpAndSettle();
 
     // 상단 공유 버튼 확인: [웹 링크 복사] & [결과 요약 텍스트 복사]

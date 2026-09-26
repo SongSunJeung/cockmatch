@@ -23,6 +23,31 @@ class ClubMemberPoolScreen extends ConsumerStatefulWidget {
 class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
   final TextEditingController _searchController = TextEditingController();
 
+  // 롱프레스 다중 선택 문자 발송 모드 상태
+  bool _isMultiSelectMode = false;
+  final Set<String> _selectedMemberIds = {};
+
+  void _toggleMultiSelectMember(String memberId) {
+    setState(() {
+      if (_selectedMemberIds.contains(memberId)) {
+        _selectedMemberIds.remove(memberId);
+        if (_selectedMemberIds.isEmpty) {
+          _isMultiSelectMode = false;
+        }
+      } else {
+        _selectedMemberIds.add(memberId);
+        _isMultiSelectMode = true;
+      }
+    });
+  }
+
+  void _exitMultiSelectMode() {
+    setState(() {
+      _isMultiSelectMode = false;
+      _selectedMemberIds.clear();
+    });
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -46,25 +71,20 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                 // 1. 컴팩트 상단 헤더 & 빠른 액션
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 14, 4),
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
                     child: Row(
                       children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: AppTheme.pastelCoral,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
+                        IconButton(
+                          onPressed: () => AppTheme.openDrawer(context),
+                          tooltip: '메뉴 열기',
+                          visualDensity: VisualDensity.compact,
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Center(
-                            child: Text(
-                              '🏸',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                          ),
+                          icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: InkWell(
                             onTap: () => _showClubSwitchBottomSheet(context, ref),
@@ -503,7 +523,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 2, 20, 96), // 하단 쉘 네비게이션 바 공간 확보
+                    padding: const EdgeInsets.fromLTRB(20, 2, 20, 88),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -516,6 +536,17 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   ),
               ],
             ),
+            if (_isMultiSelectMode)
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 16,
+                child: _buildMultiSelectMemberSmsBar(
+                  context: context,
+                  clubMembers: clubMembers,
+                  filteredMembers: filteredMembers,
+                ),
+              ),
           ],
         ),
       ),
@@ -691,7 +722,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     );
   }
 
-  /// 회원 명부 카드 (순수 회원 정보, 휴면/회비 혜택 뱃지 표시 및 탭 시 수정 다이얼로그 호출)
+  /// 회원 명부 카드
+  /// - 동그란 남/여 아이콘 제거, 성별에 따라 카드 배경·테두리 컬러 구분 (남: 은은한 블루톤 / 여: 은은한 핑크·코랄톤)
+  /// - 짧게 클릭(Tap): 상세 정보 팝업(전화 걸기 / 문자 보내기 / 회원 정보 수정 진입 포함) 호출
+  /// - 길게 누르기(Long Press): 다중 선택 체크 모드 전환 및 ["선택한 회원(N명) 문자 발송"] 액션 바 노출
   Widget _buildMemberCard(
     BuildContext context,
     WidgetRef ref,
@@ -701,6 +735,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     final tierText = AppTheme.getTierTextColor(member.tier);
     final hasCustomRole =
         member.customRoleTitle != null && member.customRoleTitle!.trim().isNotEmpty;
+    final isSelected = _selectedMemberIds.contains(member.id);
 
     // 등급/직책 배지 스타일
     final Color roleBadgeBg;
@@ -725,13 +760,18 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: member.isResting
-            ? Colors.white.withValues(alpha: 0.92)
-            : Colors.white,
+        color: AppTheme.getGenderCardBg(member.gender, isDimmed: member.isResting),
         borderRadius: BorderRadius.circular(18),
-        border: member.isResting
-            ? Border.all(color: AppTheme.pastelYellowDark.withValues(alpha: 0.35), width: 1.2)
-            : null,
+        border: Border.all(
+          color: member.isResting && !isSelected
+              ? AppTheme.pastelYellowDark.withValues(alpha: 0.45)
+              : AppTheme.getGenderCardBorder(
+                  member.gender,
+                  isSelected: isSelected,
+                  isDimmed: member.isResting,
+                ),
+          width: isSelected ? 1.8 : 1.2,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -740,270 +780,602 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
           ),
         ],
       ),
-      child: InkWell(
-        onTap: () => _showEditMemberDialog(context, ref, member),
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              // 성별 아바타
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: member.isResting
-                      ? Colors.grey.shade200
-                      : (member.gender == Gender.female
-                          ? AppTheme.pastelRose
-                          : AppTheme.pastelPeriwinkle),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    member.gender == Gender.female ? '여' : '남',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            if (_isMultiSelectMode) {
+              _toggleMultiSelectMember(member.id);
+            } else {
+              _showMemberDetailPopup(context, ref, member);
+            }
+          },
+          onLongPress: () => _toggleMultiSelectMember(member.id),
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                if (_isMultiSelectMode) ...[
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: isSelected,
+                      activeColor: AppTheme.primaryDark,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                      onChanged: (_) => _toggleMultiSelectMember(member.id),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ] else ...[
+                  Container(
+                    width: 4,
+                    height: 34,
+                    decoration: BoxDecoration(
                       color: member.isResting
-                          ? AppTheme.textMuted
-                          : (member.gender == Gender.female
-                              ? AppTheme.pastelRoseDark
-                              : AppTheme.pastelPeriwinkleDark),
+                          ? AppTheme.pastelYellowDark
+                          : AppTheme.getGenderAccentColor(member.gender),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+
+                // 회원 정보 (이름, 등급/직책, 휴면/회비 혜택 뱃지, 연락처)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            member.name,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: member.isResting ? AppTheme.textMuted : AppTheme.textDark,
+                            ),
+                          ),
+                          // 1) 직책/등급 뱃지 (커스텀 직책 포함)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: roleBadgeBg,
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              member.displayRoleLabel,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: roleBadgeText,
+                              ),
+                            ),
+                          ),
+                          // 2) 휴면 상태 뱃지: 예 [휴면 (복귀 예정 26.11.30)]
+                          if (restingBadge != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: AppTheme.pastelYellow,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: AppTheme.pastelYellowDark.withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.pause_circle_filled_rounded,
+                                    size: 10.5,
+                                    color: AppTheme.pastelYellowDark,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    restingBadge,
+                                    style: const TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.pastelYellowDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          // 3) 회비 혜택/면제 뱃지: 예 [면제 (~26.12.31)], [가족할인 20,000원], [휴회 면제]
+                          if (feePolicyBadge != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: member.feePolicy == FeePolicyType.discounted && !member.isResting
+                                    ? AppTheme.pastelCoral.withValues(alpha: 0.7)
+                                    : AppTheme.pastelPeriwinkle.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                feePolicyBadge,
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: member.feePolicy == FeePolicyType.discounted && !member.isResting
+                                      ? AppTheme.pastelCoralDark
+                                      : AppTheme.pastelPeriwinkleDark,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: () => _callMember(context, ref, member),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 1.5),
+                              child: Text(
+                                member.phoneNumber ?? '연락처 미등록 (탭하여 등록)',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: member.phoneNumber != null ? FontWeight.w700 : FontWeight.normal,
+                                  color: member.phoneNumber != null ? AppTheme.pastelMintDark : AppTheme.textMuted,
+                                  decoration: member.phoneNumber != null ? TextDecoration.underline : null,
+                                  decorationColor: AppTheme.primaryMint.withValues(alpha: 0.45),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (member.isResting &&
+                              member.restingReason != null &&
+                              member.restingReason!.trim().isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.pastelRose.withValues(alpha: 0.45),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '휴면사유: ${member.restingReason!}',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.pastelRoseDark,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ] else if (member.memo != null && member.memo!.trim().isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  member.memo!,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 급수 뱃지 (파스텔 캡슐 - 급수 명칭만 깔끔하게 노출)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: tierBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    member.tier.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: tierText,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 14),
+                const SizedBox(width: 4),
 
-              // 회원 정보 (이름, 등급/직책, 휴면/회비 혜택 뱃지, 연락처)
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 5,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          member.name,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: member.isResting ? AppTheme.textMuted : AppTheme.textDark,
-                          ),
-                        ),
-                        // 1) 직책/등급 뱃지 (커스텀 직책 포함)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: roleBadgeBg,
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            member.displayRoleLabel,
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              color: roleBadgeText,
-                            ),
-                          ),
-                        ),
-                        // 2) 휴면 상태 뱃지: 예 [휴면 (복귀 예정 26.11.30)]
-                        if (restingBadge != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: AppTheme.pastelYellow,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: AppTheme.pastelYellowDark.withValues(alpha: 0.35),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.pause_circle_filled_rounded,
-                                  size: 10.5,
-                                  color: AppTheme.pastelYellowDark,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  restingBadge,
-                                  style: const TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.pastelYellowDark,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        // 3) 회비 혜택/면제 뱃지: 예 [면제 (~26.12.31)], [가족할인 20,000원], [휴회 면제]
-                        if (feePolicyBadge != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: member.feePolicy == FeePolicyType.discounted && !member.isResting
-                                  ? AppTheme.pastelCoral.withValues(alpha: 0.7)
-                                  : AppTheme.pastelPeriwinkle.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              feePolicyBadge,
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                                color: member.feePolicy == FeePolicyType.discounted && !member.isResting
-                                    ? AppTheme.pastelCoralDark
-                                    : AppTheme.pastelPeriwinkleDark,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        InkWell(
-                          onTap: () => _callMember(context, ref, member),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 1.5),
-                            child: Text(
-                              member.phoneNumber ?? '연락처 미등록 (탭하여 등록)',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: member.phoneNumber != null ? FontWeight.w700 : FontWeight.normal,
-                                color: member.phoneNumber != null ? AppTheme.pastelMintDark : AppTheme.textMuted,
-                                decoration: member.phoneNumber != null ? TextDecoration.underline : null,
-                                decorationColor: AppTheme.primaryMint.withValues(alpha: 0.45),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (member.isResting &&
-                            member.restingReason != null &&
-                            member.restingReason!.trim().isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: AppTheme.pastelRose.withValues(alpha: 0.45),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '휴면사유: ${member.restingReason!}',
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.pastelRoseDark,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ] else if (member.memo != null && member.memo!.trim().isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                member.memo!,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  color: AppTheme.textMuted,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
+                // 더보기 메뉴 (전화 / 문자 / 수정 / 삭제)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 18, color: AppTheme.textMuted),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  onSelected: (val) {
+                    if (val == 'call') {
+                      _callMember(context, ref, member);
+                    } else if (val == 'sms') {
+                      _sendMemberSms(context, member);
+                    } else if (val == 'edit') {
+                      _showEditMemberDialog(context, ref, member);
+                    } else if (val == 'delete') {
+                      ref.read(membersProvider.notifier).deleteMember(member.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${member.name} 회원이 삭제되었습니다.')),
+                      );
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'call',
+                      child: Row(
+                        children: [
+                          Icon(Icons.phone_rounded, size: 16, color: AppTheme.primaryMint),
+                          SizedBox(width: 8),
+                          Text('전화 걸기', style: TextStyle(color: AppTheme.textDark, fontSize: 13)),
                         ],
-                      ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'sms',
+                      child: Row(
+                        children: [
+                          Icon(Icons.sms_rounded, size: 16, color: AppTheme.pastelPeriwinkleDark),
+                          SizedBox(width: 8),
+                          Text('문자 보내기', style: TextStyle(color: AppTheme.textDark, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined, size: 16, color: AppTheme.primaryDark),
+                          SizedBox(width: 8),
+                          Text('회원 정보 수정', style: TextStyle(color: AppTheme.textDark, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('회원 삭제', style: TextStyle(color: Colors.red, fontSize: 13)),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-
-              // 급수 뱃지 (파스텔 캡슐 - 급수 명칭만 깔끔하게 노출)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: tierBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  member.tier.label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: tierText,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-
-              // 더보기 메뉴 (수정 / 삭제)
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, size: 18, color: AppTheme.textMuted),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                onSelected: (val) {
-                  if (val == 'call') {
-                    _callMember(context, ref, member);
-                  } else if (val == 'edit') {
-                    _showEditMemberDialog(context, ref, member);
-                  } else if (val == 'delete') {
-                    ref.read(membersProvider.notifier).deleteMember(member.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${member.name} 회원이 삭제되었습니다.')),
-                    );
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  const PopupMenuItem(
-                    value: 'call',
-                    child: Row(
-                      children: [
-                        Icon(Icons.phone_rounded, size: 16, color: AppTheme.primaryMint),
-                        SizedBox(width: 8),
-                        Text('전화 걸기', style: TextStyle(color: AppTheme.textDark, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit_outlined, size: 16, color: AppTheme.primaryDark),
-                        SizedBox(width: 8),
-                        Text('회원 정보 수정', style: TextStyle(color: AppTheme.textDark, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('회원 삭제', style: TextStyle(color: Colors.red, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// 회원 카드 짧게 클릭(Tap) 시 호출되는 상세 정보 팝업 (전화 걸기 / 문자 보내기 / 정보 수정 진입 포함)
+  void _showMemberDetailPopup(BuildContext context, WidgetRef ref, Member member) {
+    final hasPhone = member.phoneNumber != null && member.phoneNumber!.trim().isNotEmpty;
+    final restingBadge = member.restingBadgeText;
+    final feePolicyBadge = member.feePolicyBadgeText;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: const EdgeInsets.fromLTRB(22, 20, 16, 8),
+        contentPadding: const EdgeInsets.fromLTRB(22, 8, 22, 16),
+        title: Row(
+          children: [
+            Container(
+              width: 10,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppTheme.getGenderAccentColor(member.gender),
+                borderRadius: BorderRadius.circular(5),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                member.name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textDark,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.getTierBgColor(member.tier),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                member.tier.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.getTierTextColor(member.tier),
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              icon: const Icon(Icons.close_rounded, size: 20, color: AppTheme.textMuted),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.getGenderCardBg(member.gender),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.getGenderCardBorder(member.gender)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '구분: ${member.gender.label} · ${member.displayRoleLabel}',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppTheme.textDark),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '연락처: ${hasPhone ? member.phoneNumber! : "연락처 미등록"}',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppTheme.textDark),
+                  ),
+                  if (restingBadge != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '활동 상태: $restingBadge${member.restingReason != null ? " (${member.restingReason})" : ""}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.pastelYellowDark),
+                    ),
+                  ],
+                  if (feePolicyBadge != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '회비 정책: $feePolicyBadge',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.pastelPeriwinkleDark),
+                    ),
+                  ],
+                  if (member.memo != null && member.memo!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '메모: ${member.memo!}',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryMint,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.call_rounded, size: 17),
+                    label: const Text('전화 걸기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      _callMember(context, ref, member);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryDark,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.sms_rounded, size: 17),
+                    label: const Text('문자 보내기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      _sendMemberSms(context, member);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.textDark,
+                  side: BorderSide(color: Colors.grey.shade300),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.edit_outlined, size: 17, color: AppTheme.textDark),
+                label: const Text(
+                  '회원 정보 수정',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.textDark),
+                ),
+                onPressed: () {
+                  Navigator.pop(dialogCtx);
+                  _showEditMemberDialog(context, ref, member);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 개별 회원 문자 보내기 (sms:)
+  Future<void> _sendMemberSms(BuildContext context, Member member) async {
+    final rawPhone = (member.phoneNumber ?? '').trim();
+    if (rawPhone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.pastelRoseDark,
+          content: Text('${member.name} 님의 등록된 전화번호가 없습니다.'),
+        ),
+      );
+      return;
+    }
+
+    final cleanPhone = rawPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final smsUri = Uri.parse('sms:$cleanPhone');
+
+    try {
+      final launched = await launchUrl(smsUri, mode: LaunchMode.externalApplication);
+      if (!launched && context.mounted) {
+        await Clipboard.setData(ClipboardData(text: rawPhone));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${member.name} 님 번호($rawPhone)로 문자 앱 연결을 요청했습니다. (sms:)')),
+          );
+        }
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: rawPhone));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${member.name} 님의 번호($rawPhone)를 복사했습니다. (sms:$cleanPhone)')),
+        );
+      }
+    }
+  }
+
+  /// 롱프레스 다중 선택 시 노출되는 ["선택한 회원(N명) 문자 발송"] 액션 바
+  Widget _buildMultiSelectMemberSmsBar({
+    required BuildContext context,
+    required List<Member> clubMembers,
+    required List<Member> filteredMembers,
+  }) {
+    final selectedCount = _selectedMemberIds.length;
+    final allFilteredSelected = filteredMembers.isNotEmpty &&
+        filteredMembers.every((m) => _selectedMemberIds.contains(m.id));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.primaryMint, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: () {
+              setState(() {
+                if (allFilteredSelected) {
+                  _selectedMemberIds.clear();
+                  _isMultiSelectMode = false;
+                } else {
+                  _selectedMemberIds.addAll(filteredMembers.map((m) => m.id));
+                }
+              });
+            },
+            child: Text(
+              allFilteredSelected ? '전체해제' : '전체선택',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.textDark),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryMint,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.sms_rounded, size: 16),
+              label: Text(
+                '선택한 회원($selectedCount명) 문자 발송',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5),
+              ),
+              onPressed: () async {
+                final targets = clubMembers
+                    .where((m) => _selectedMemberIds.contains(m.id))
+                    .toList();
+                final phones = targets
+                    .map((m) => (m.phoneNumber ?? '').replaceAll(RegExp(r'[^0-9+]'), ''))
+                    .where((p) => p.isNotEmpty)
+                    .toList();
+                if (phones.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('선택한 회원의 등록된 전화번호가 없습니다.')),
+                  );
+                  return;
+                }
+                final recipients = phones.join(',');
+                final smsUri = Uri.parse('sms:$recipients');
+                try {
+                  await launchUrl(smsUri, mode: LaunchMode.externalApplication);
+                } catch (_) {
+                  await Clipboard.setData(ClipboardData(text: recipients));
+                }
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppTheme.primaryDark,
+                      content: Text('선택한 회원(${targets.length}명)에게 단체 문자 앱을 열었습니다. (sms:)'),
+                    ),
+                  );
+                }
+                _exitMultiSelectMode();
+              },
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: '선택 모드 닫기',
+            onPressed: _exitMultiSelectMode,
+            icon: const Icon(Icons.close_rounded, size: 20, color: AppTheme.textMuted),
+          ),
+        ],
       ),
     );
   }
