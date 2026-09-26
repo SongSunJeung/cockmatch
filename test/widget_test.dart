@@ -119,6 +119,13 @@ void main() {
     expect(find.text('⇅ 이름순 (가나다)'), findsOneWidget);
     expect(find.text('010-6666-7777'), findsOneWidget);
     expect(find.text('가족할인 20,000원'), findsOneWidget);
+    // 회원 명부 카드 우측 급수 뱃지: 내부 점수 표기 없이 급수 명칭만 깔끔하게 노출되는지 확인
+    expect(find.text('A조 (5점)'), findsNothing);
+    expect(find.text('B조 (4점)'), findsNothing);
+    expect(find.text('C조 (3점)'), findsNothing);
+    expect(find.text('D조 (2점)'), findsNothing);
+    expect(find.text('초심 (1점)'), findsNothing);
+    expect(find.text('A조'), findsWidgets);
 
     // 신규 회원 등록 모달 오픈 -> [회원 활동 상태], [회원 등급 / 직책] 커스텀 직접 추가, [회비 부과 기준] UI 검증
     await tester.tap(find.byTooltip('신규 회원 직접 등록'));
@@ -391,4 +398,94 @@ void main() {
     expect(find.text('복식 페어 편성 목록'), findsNothing);
     expect(find.text('+ 특정 고정 페어 추가'), findsOneWidget);
   });
+
+  testWidgets('대진표 탭: 실시간 코트 증감([+ 코트 추가] / [- 코트 축소]), 빈 코트 슬롯 생성 및 축소 확인 다이얼로그 검증', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: CockMatchApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. [+ 새 모임 시작하기]로 모임 생성 후 1라운드 대진 시작
+    await tester.tap(find.text('+ 새 모임 시작하기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('다음: 모임 정보 설정'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('다음: 참석자 등록'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('모임 시작 & 출석부 열기'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('대진 설정 & 이동'));
+    await tester.pumpAndSettle();
+
+    final balanceModeOption = find.text('통합 밸런스 매칭');
+    await tester.ensureVisible(balanceModeOption);
+    await tester.pumpAndSettle();
+    await tester.tap(balanceModeOption);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('start_session_and_generate_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('오늘 모임 세션 & 대진 설정'), findsNothing);
+    expect(find.textContaining('운영 코트 5면'), findsOneWidget);
+
+    // 2. 대진표 화면 상단 [+ 코트 추가] / [- 코트 축소] 제어 버튼 표시 확인
+    final increaseBtn = find.byKey(const Key('increase_court_button'));
+    final decreaseBtn = find.byKey(const Key('decrease_court_button'));
+    expect(increaseBtn, findsOneWidget);
+    expect(decreaseBtn, findsOneWidget);
+    expect(find.text('+ 코트 추가'), findsOneWidget);
+    expect(find.text('- 코트 축소'), findsOneWidget);
+
+    // 3. [+ 코트 추가] 클릭 -> 새 빈 코트 슬롯 생성 확인
+    await tester.tap(increaseBtn);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('운영 코트 6면'), findsOneWidget);
+    expect(find.text('빈 코트 1면'), findsOneWidget);
+
+    // 아래로 스크롤하여 새로 생성된 '빈 코트 슬롯' 카드 노출 확인
+    final courtScrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('빈 코트 슬롯'),
+      350.0,
+      scrollable: courtScrollable,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('빈 코트 슬롯'), findsOneWidget);
+    expect(find.text('배정된 경기가 없는 빈 코트 슬롯입니다'), findsOneWidget);
+
+    // 다시 상단으로 스크롤하여 [- 코트 축소] 클릭 -> 빈 코트가 우선 제거되는지 확인
+    await tester.scrollUntilVisible(
+      decreaseBtn,
+      -350.0,
+      scrollable: courtScrollable,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(decreaseBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('빈 코트 1면'), findsNothing);
+    expect(find.textContaining('운영 코트 5면'), findsOneWidget);
+
+    // 4. 빈 코트가 없는 상태에서 [- 코트 축소] 클릭 -> 진행/배정 중인 코트 축소 확인 다이얼로그 호출 확인
+    await tester.tap(decreaseBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('진행/배정 중인 코트 축소 확인'), findsOneWidget);
+    expect(
+      find.text('이전 완료된 라운드 및 완료된 경기 기록은 손실 없이 안전하게 보존됩니다.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('reduce_court_to_waiting_button')), findsOneWidget);
+    expect(find.byKey(const Key('reduce_court_move_slot_button')), findsOneWidget);
+
+    // [대기 인원으로 전환 후 축소] 클릭 시 코트가 축소되고 대기(휴식) 인원으로 전환되는지 확인
+    await tester.tap(find.byKey(const Key('reduce_court_to_waiting_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('진행/배정 중인 코트 축소 확인'), findsNothing);
+    expect(find.textContaining('운영 코트 4면'), findsOneWidget);
+    expect(find.text('현재 휴식 중: '), findsOneWidget);
+  });
 }
+

@@ -934,7 +934,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                 ),
               ),
 
-              // 급수 뱃지 (파스텔 캡슐)
+              // 급수 뱃지 (파스텔 캡슐 - 급수 명칭만 깔끔하게 노출)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -942,7 +942,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${member.tier.label} (${member.tierWeight}점)',
+                  member.tier.label,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -1319,7 +1319,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                       initialValue: selectedTier,
                       decoration: const InputDecoration(labelText: '급수'),
                       items: Tier.values
-                          .map((t) => DropdownMenuItem(value: t, child: Text('${t.label} (${t.weight}점)')))
+                          .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
                           .toList(),
                       onChanged: (val) {
                         if (val != null) setModalState(() => selectedTier = val);

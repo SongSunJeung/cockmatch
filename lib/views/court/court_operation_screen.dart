@@ -201,6 +201,22 @@ class CourtOperationScreen extends ConsumerWidget {
 
     final startCourt = session.startCourtNumber;
     final endCourt = startCourt + session.courtCount - 1;
+    final activeCourtNumbers = List.generate(session.courtCount, (i) => startCourt + i);
+    final occupiedCourtNumbers = roundMatches.map((m) => m.courtNumber).toSet();
+    final emptyCourtNumbers = activeCourtNumbers
+        .where((c) => !occupiedCourtNumbers.contains(c))
+        .toList();
+
+    // 이전 완료된 라운드인지 여부 (과거 완료 라운드는 빈 슬롯을 강제로 표시하지 않고 당시 경기 기록만 보존 표시)
+    final maxRound = existingRounds.isEmpty ? 1 : existingRounds.last;
+    final isPastCompletedRound = selectedRound < maxRound &&
+        roundMatches.isNotEmpty &&
+        roundMatches.every((m) => m.isFinished);
+
+    // 현재 라운드에 표시할 코트 번호 목록 (운영 코트 범위 + 범위 밖 특별 매치 코트 번호 합집합, 오름차순 정렬)
+    final displayCourtNumbers = isPastCompletedRound
+        ? (roundMatches.map((m) => m.courtNumber).toSet().toList()..sort())
+        : (<int>{...activeCourtNumbers, ...roundMatches.map((m) => m.courtNumber)}.toList()..sort());
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -211,82 +227,207 @@ class CourtOperationScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppTheme.pastelPeriwinkle,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          '⚡',
-                          style: TextStyle(fontSize: 20),
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppTheme.pastelPeriwinkle,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '⚡',
+                              style: TextStyle(fontSize: 20),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      currentClub.clubName,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppTheme.textDark,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.pastelMint,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      '실시간 대진',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.pastelMintDark,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '코트 $startCourt~$endCourt번(${session.courtCount}면) · ${session.matchFormat.label} · ${session.matchMode.label}${session.partnerMode == PartnerMode.fixedAll ? ' · 전원 고정 페어' : session.fixedPairs.isNotEmpty ? ' · 고정 페어 ${session.fixedPairs.length}팀' : ''}',
+                                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.leaderboard_rounded, color: AppTheme.textDark),
+                          tooltip: '실시간 랭킹 순위표',
+                          onPressed: () => _showRankingsDialog(context, ref, allMatches, allMembers),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.share_rounded, color: AppTheme.textDark),
+                          tooltip: '일반 회원용 웹 링크 복사',
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(text: 'https://cockmatch.web.app/viewer/${session.id}'),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('일반 회원용 실시간 웹 뷰어 링크가 복사되었습니다!')),
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 10),
+                    // 1-2. 진행 중 세션 실시간 코트 수 증감 제어 바 ([+ 코트 추가] / [- 코트 축소])
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Flexible(
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.pastelYellow,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                                 child: Text(
-                                  currentClub.clubName,
+                                  '운영 코트 ${session.courtCount}면 ($startCourt~$endCourt번)',
                                   style: const TextStyle(
-                                    fontSize: 18,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w800,
-                                    color: AppTheme.textDark,
+                                    color: AppTheme.pastelYellowDark,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (!isPastCompletedRound && emptyCourtNumbers.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.pastelMint,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '빈 코트 ${emptyCourtNumbers.length}면',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.pastelMintDark,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              OutlinedButton.icon(
+                                key: const Key('decrease_court_button'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: session.courtCount > 1
+                                      ? AppTheme.pastelCoralDark
+                                      : Colors.grey,
+                                  side: BorderSide(
+                                    color: session.courtCount > 1
+                                        ? AppTheme.pastelCoralDark.withValues(alpha: 0.45)
+                                        : Colors.grey.shade300,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  minimumSize: const Size(0, 32),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.remove_circle_outline_rounded, size: 15),
+                                label: const Text(
+                                  '- 코트 축소',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+                                ),
+                                onPressed: () => _handleDecreaseCourt(
+                                  context: context,
+                                  ref: ref,
+                                  session: session,
+                                  selectedRound: selectedRound,
+                                  roundMatches: roundMatches,
+                                  emptyCourtNumbers: emptyCourtNumbers,
+                                  memberMap: memberMap,
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.pastelMint,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  '실시간 대진',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.pastelMintDark,
+                              ElevatedButton.icon(
+                                key: const Key('increase_court_button'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primaryMint,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  minimumSize: const Size(0, 32),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
+                                ),
+                                icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
+                                label: const Text(
+                                  '+ 코트 추가',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+                                ),
+                                onPressed: () => _handleIncreaseCourt(
+                                  context: context,
+                                  ref: ref,
+                                  session: session,
                                 ),
                               ),
                             ],
                           ),
-                          Text(
-                            '코트 $startCourt~$endCourt번(${session.courtCount}면) · ${session.matchFormat.label} · ${session.matchMode.label}${session.partnerMode == PartnerMode.fixedAll ? ' · 전원 고정 페어' : session.fixedPairs.isNotEmpty ? ' · 고정 페어 ${session.fixedPairs.length}팀' : ''}',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                          ),
                         ],
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.leaderboard_rounded, color: AppTheme.textDark),
-                      tooltip: '실시간 랭킹 순위표',
-                      onPressed: () => _showRankingsDialog(context, ref, allMatches, allMembers),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.share_rounded, color: AppTheme.textDark),
-                      tooltip: '일반 회원용 웹 링크 복사',
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(text: 'https://cockmatch.web.app/viewer/${session.id}'),
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('일반 회원용 실시간 웹 뷰어 링크가 복사되었습니다!')),
-                        );
-                      },
                     ),
                   ],
                 ),
@@ -392,7 +533,7 @@ class CourtOperationScreen extends ConsumerWidget {
                           _buildMetricItem(
                             '출전 인원',
                             '${playingPlayerIds.length}명',
-                            '코트 ${roundMatches.length}개',
+                            '배정 ${roundMatches.length}/${session.courtCount}코트',
                           ),
                           if (isTournament)
                             _buildMetricItem(
@@ -589,8 +730,8 @@ class CourtOperationScreen extends ConsumerWidget {
                 ),
               ),
 
-            // 5. 코트별 경기 카드 목록 (인라인 점수 입력 & 원터치 완료 토글)
-            if (roundMatches.isEmpty)
+            // 5. 코트별 경기 카드 목록 (배정된 코트 매치 카드 + 빈 코트 슬롯 카드)
+            if (roundMatches.isEmpty && displayCourtNumbers.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
@@ -652,22 +793,647 @@ class CourtOperationScreen extends ConsumerWidget {
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final match = roundMatches[index];
-                      return CourtMatchCard(
-                        key: ValueKey(match.id),
-                        match: match,
-                        memberMap: memberMap,
-                        restingMembers: restingMembers,
-                        roundMatches: roundMatches,
-                        isTournament: isTournament,
+                      final courtNum = displayCourtNumbers[index];
+                      final matchesOnCourt = roundMatches
+                          .where((m) => m.courtNumber == courtNum)
+                          .toList();
+
+                      if (matchesOnCourt.isEmpty) {
+                        return _buildEmptyCourtSlotCard(
+                          context: context,
+                          ref: ref,
+                          session: session,
+                          selectedRound: selectedRound,
+                          courtNumber: courtNum,
+                          roundMatches: roundMatches,
+                          allMembers: allMembers,
+                          restingMembers: restingMembers,
+                          isTournament: isTournament,
+                        );
+                      }
+
+                      return Column(
+                        children: matchesOnCourt
+                            .map(
+                              (match) => CourtMatchCard(
+                                key: ValueKey(match.id),
+                                match: match,
+                                memberMap: memberMap,
+                                restingMembers: restingMembers,
+                                roundMatches: roundMatches,
+                                isTournament: isTournament,
+                              ),
+                            )
+                            .toList(),
                       );
                     },
-                    childCount: roundMatches.length,
+                    childCount: displayCourtNumbers.length,
                   ),
                 ),
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// [+ 코트 추가] 핸들러:
+  /// - 현재 라운드에 새 빈 코트 슬롯을 즉시 생성
+  /// - 다음 라운드 자동 생성 시 늘어난 코트 수에 맞춰 출전 인원 자동 확대
+  void _handleIncreaseCourt({
+    required BuildContext context,
+    required WidgetRef ref,
+    required GameSession session,
+  }) {
+    if (session.courtCount >= 15) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('최대 15개 코트까지만 운영할 수 있습니다.')),
+      );
+      return;
+    }
+
+    final newCourtNumber = ref.read(matchesProvider.notifier).addCourtSlot();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppTheme.primaryDark,
+        content: Text(
+          '✅ $newCourtNumber번 빈 코트 슬롯이 추가되었습니다! (현재 총 ${session.courtCount + 1}면 · 다음 라운드부터 출전 인원 자동 확대)',
+        ),
+      ),
+    );
+  }
+
+  /// [- 코트 축소] 핸들러:
+  /// - 배정된 경기가 없는 빈 코트가 있으면 우선적으로 즉시 제거
+  /// - 모든 코트에 진행/배정 중인 경기가 있으면 확인 다이얼로그를 띄워 대기 인원 전환 또는 다른 빈 슬롯으로 이동 유도
+  /// - 이전 완료된 라운드의 경기 기록은 손실 없이 안전하게 보존
+  void _handleDecreaseCourt({
+    required BuildContext context,
+    required WidgetRef ref,
+    required GameSession session,
+    required int selectedRound,
+    required List<GameMatch> roundMatches,
+    required List<int> emptyCourtNumbers,
+    required Map<String, Member> memberMap,
+  }) {
+    if (session.courtCount <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('⚠️ 최소 1개 이상의 운영 코트가 유지되어야 합니다.')),
+      );
+      return;
+    }
+
+    // 1. 배정된 경기가 없는 빈 코트가 있으면 우선적으로 제거
+    if (emptyCourtNumbers.isNotEmpty) {
+      final removedCourt = ref.read(matchesProvider.notifier).removeEmptyCourtSlot(
+            currentRound: selectedRound,
+          );
+      if (removedCourt != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.primaryDark,
+            content: Text(
+              '✅ 배정된 경기가 없는 빈 $removedCourt번 코트가 우선 제거되었습니다. (현재 ${session.courtCount - 1}면 운영)',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    // 2. 현재 라운드의 미완료(진행/배정 중) 경기 확인
+    final activeMatches = roundMatches.where((m) => !m.isFinished).toList()
+      ..sort((a, b) => a.courtNumber.compareTo(b.courtNumber));
+
+    // 현재 라운드의 모든 경기가 이미 완료(finished)된 경우: 완료 기록은 보존하고 코트 수만 축소
+    if (activeMatches.isEmpty) {
+      final nextCount = session.courtCount - 1;
+      ref.read(sessionProvider.notifier).updateCourtCount(nextCount);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.primaryDark,
+          content: Text(
+            '✅ 완료된 라운드 경기 기록은 안전하게 보존되며, 운영 코트가 $nextCount면으로 축소되었습니다.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // 3. 진행/배정 중인 경기가 있는 코트를 닫을 경우 확인 다이얼로그 호출
+    _showReduceCourtConfirmDialog(
+      context: context,
+      ref: ref,
+      session: session,
+      selectedRound: selectedRound,
+      activeMatches: activeMatches,
+      roundMatches: roundMatches,
+      memberMap: memberMap,
+    );
+  }
+
+  /// 진행/배정 중인 경기가 있는 코트를 축소할 때 띄우는 확인 다이얼로그
+  /// - [대기 인원으로 전환 후 코트 축소] 또는 [다른 빈 슬롯으로 이동] 선택 지원
+  void _showReduceCourtConfirmDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required GameSession session,
+    required int selectedRound,
+    required List<GameMatch> activeMatches,
+    required List<GameMatch> roundMatches,
+    required Map<String, Member> memberMap,
+  }) {
+    String selectedMatchId = activeMatches.last.id;
+    final occupiedCourts = roundMatches.map((m) => m.courtNumber).toSet();
+    final startCourt = session.startCourtNumber;
+    final endCourt = startCourt + session.courtCount - 1;
+
+    // 이동 가능한 빈 코트 번호 후보 계산 (1번 ~ endCourt + 2 중 현재 점유되지 않은 번호)
+    final candidateEmptyCourts = <int>[];
+    for (int c = 1; c <= endCourt + 2; c++) {
+      if (!occupiedCourts.contains(c)) {
+        candidateEmptyCourts.add(c);
+      }
+    }
+    int targetEmptyCourt = candidateEmptyCourts.isNotEmpty
+        ? candidateEmptyCourts.first
+        : endCourt + 1;
+
+    String formatTeams(GameMatch m) {
+      final teamA = m.teamA.map((id) => memberMap[id]?.name ?? '선수').join('·');
+      final teamB = m.teamB.map((id) => memberMap[id]?.name ?? '선수').join('·');
+      return '$teamA vs $teamB';
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final targetMatch = activeMatches.firstWhere(
+            (m) => m.id == selectedMatchId,
+            orElse: () => activeMatches.last,
+          );
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: AppTheme.pastelCoralDark, size: 22),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '진행/배정 중인 코트 축소 확인',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 430,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '현재 모든 운영 코트에 경기가 배정되어 있습니다.\n닫을 코트를 선택하고 배정된 선수 처리 방식을 선택해 주세요.',
+                      style: TextStyle(fontSize: 12.5, height: 1.45, color: AppTheme.textDark),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.pastelMint.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.verified_user_outlined, size: 15, color: AppTheme.pastelMintDark),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '이전 완료된 라운드 및 완료된 경기 기록은 손실 없이 안전하게 보존됩니다.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.pastelMintDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      '축소(닫기) 대상 코트 선택',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.textDark),
+                    ),
+                    const SizedBox(height: 6),
+                    ...activeMatches.map((m) {
+                      final isSelected = m.id == targetMatch.id;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => setDialogState(() => selectedMatchId = m.id),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppTheme.pastelCoral.withValues(alpha: 0.35)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppTheme.pastelCoralDark
+                                    : Colors.grey.shade300,
+                                width: isSelected ? 1.5 : 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected
+                                      ? Icons.radio_button_checked_rounded
+                                      : Icons.radio_button_unchecked_rounded,
+                                  size: 16,
+                                  color: isSelected ? AppTheme.pastelCoralDark : AppTheme.textMuted,
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.pastelYellow,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '${m.courtNumber}번 코트',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.pastelYellowDark,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    formatTeams(m),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textDark,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              '다른 빈 코트 슬롯으로 경기 이동 시 코트 번호:',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textDark,
+                              ),
+                            ),
+                          ),
+                          DropdownButton<int>(
+                            value: targetEmptyCourt,
+                            isDense: true,
+                            underline: const SizedBox.shrink(),
+                            items: candidateEmptyCourts
+                                .map(
+                                  (c) => DropdownMenuItem<int>(
+                                    value: c,
+                                    child: Text(
+                                      '빈 $c번 코트',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppTheme.primaryDark,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDialogState(() => targetEmptyCourt = val);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('취소'),
+              ),
+              OutlinedButton.icon(
+                key: const Key('reduce_court_move_slot_button'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primaryDark,
+                  side: const BorderSide(color: AppTheme.primaryDark),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.swap_calls_rounded, size: 16),
+                label: Text('빈 $targetEmptyCourt번 슬롯으로 이동'),
+                onPressed: () {
+                  final oldCourt = targetMatch.courtNumber;
+                  ref.read(matchesProvider.notifier).moveMatchToEmptyCourtAndReduce(
+                        matchId: targetMatch.id,
+                        targetEmptyCourt: targetEmptyCourt,
+                      );
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppTheme.primaryDark,
+                      content: Text(
+                        '✅ $oldCourt번 코트 경기가 빈 $targetEmptyCourt번 슬롯으로 이동되고 코트가 축소되었습니다.',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ElevatedButton.icon(
+                key: const Key('reduce_court_to_waiting_button'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.pastelCoralDark,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.pause_circle_outline_rounded, size: 16),
+                label: const Text('대기 인원으로 전환 후 축소'),
+                onPressed: () {
+                  final closedCourt = targetMatch.courtNumber;
+                  ref.read(matchesProvider.notifier).cancelMatchAndReduceCourt(
+                        matchId: targetMatch.id,
+                        reduceCourtCount: true,
+                      );
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppTheme.primaryDark,
+                      content: Text(
+                        '✅ $closedCourt번 코트가 축소되고 배정되었던 선수 4명이 대기(휴식) 인원으로 전환되었습니다.',
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// 빈 코트 슬롯 카드 위젯 (코트 추가(+) 등으로 현재 라운드에 비어 있는 코트 슬롯)
+  Widget _buildEmptyCourtSlotCard({
+    required BuildContext context,
+    required WidgetRef ref,
+    required GameSession session,
+    required int selectedRound,
+    required int courtNumber,
+    required List<GameMatch> roundMatches,
+    required List<Member> allMembers,
+    required List<Member> restingMembers,
+    required bool isTournament,
+  }) {
+    final canAutoAssignWaiting = !isTournament && restingMembers.length >= 4;
+
+    return Container(
+      key: ValueKey('empty_court_${selectedRound}_$courtNumber'),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: AppTheme.primaryMint.withValues(alpha: 0.45),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.pastelMint,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$courtNumber번 코트',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.pastelMintDark,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.pastelYellow.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '빈 코트 슬롯',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.pastelYellowDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (session.courtCount > 1)
+                InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () {
+                    final removed = ref.read(matchesProvider.notifier).removeEmptyCourtSlot(
+                          currentRound: selectedRound,
+                          targetEmptyCourt: courtNumber,
+                        );
+                    if (removed != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('빈 $courtNumber번 코트 슬롯이 닫혔습니다. (현재 ${session.courtCount - 1}면 운영)'),
+                        ),
+                      );
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.close_rounded, size: 13, color: AppTheme.textMuted),
+                        SizedBox(width: 3),
+                        Text(
+                          '빈 코트 닫기',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_box_outlined, size: 18, color: AppTheme.pastelMintDark),
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        '배정된 경기가 없는 빈 코트 슬롯입니다',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  canAutoAssignWaiting
+                      ? '수동 매치를 직접 추가하거나 현재 휴식 중인 대기 인원(${restingMembers.length}명)에서 4명을 자동 배정할 수 있습니다.'
+                      : '수동 매치를 직접 추가할 수 있으며, 다음 라운드 대진 자동 생성 시에는 이 코트에도 경기가 자동 배정됩니다.',
+                  style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted, height: 1.4),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      key: ValueKey('empty_court_manual_add_$courtNumber'),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppTheme.primaryDark,
+                        side: const BorderSide(color: AppTheme.primaryDark),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      icon: const Icon(Icons.person_add_alt_1_rounded, size: 15),
+                      label: Text(
+                        '$courtNumber번 코트 수동 매치 추가',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                      ),
+                      onPressed: () => _showAddCustomMatchModal(
+                        context,
+                        ref,
+                        session,
+                        selectedRound,
+                        roundMatches,
+                        allMembers,
+                        initialCourtNumber: courtNumber,
+                      ),
+                    ),
+                    if (!isTournament)
+                      ElevatedButton.icon(
+                        key: ValueKey('empty_court_auto_assign_$courtNumber'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: canAutoAssignWaiting
+                              ? AppTheme.primaryMint
+                              : Colors.grey.shade300,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        icon: const Icon(Icons.auto_awesome_rounded, size: 15),
+                        label: Text(
+                          '대기 인원 4명 자동 배정 (${restingMembers.length}명 대기)',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        ),
+                        onPressed: canAutoAssignWaiting
+                            ? () {
+                                final assigned = ref
+                                    .read(matchesProvider.notifier)
+                                    .autoAssignWaitingToEmptyCourt(
+                                      round: selectedRound,
+                                      courtNumber: courtNumber,
+                                    );
+                                if (assigned != null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: AppTheme.primaryDark,
+                                      content: Text(
+                                        '✅ 빈 $courtNumber번 코트에 대기 인원 4명이 즉시 배정되었습니다!',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            : null,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -752,8 +1518,9 @@ class CourtOperationScreen extends ConsumerWidget {
     GameSession session,
     int selectedRound,
     List<GameMatch> roundMatches,
-    List<Member> allMembers,
-  ) {
+    List<Member> allMembers, {
+    int? initialCourtNumber,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -763,6 +1530,7 @@ class CourtOperationScreen extends ConsumerWidget {
         selectedRound: selectedRound,
         roundMatches: roundMatches,
         allMembers: allMembers,
+        initialCourtNumber: initialCourtNumber,
       ),
     );
   }
@@ -2237,12 +3005,14 @@ class _AddCustomMatchSheet extends ConsumerStatefulWidget {
   final int selectedRound;
   final List<GameMatch> roundMatches;
   final List<Member> allMembers;
+  final int? initialCourtNumber;
 
   const _AddCustomMatchSheet({
     required this.session,
     required this.selectedRound,
     required this.roundMatches,
     required this.allMembers,
+    this.initialCourtNumber,
   });
 
   @override
@@ -2257,11 +3027,23 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
   @override
   void initState() {
     super.initState();
-    // 기존 코트 번호의 최댓값 + 1
-    final existingCourtNums = widget.roundMatches.map((m) => m.courtNumber).toList();
-    _courtNumber = existingCourtNums.isEmpty
-        ? 1
-        : existingCourtNums.reduce((a, b) => a > b ? a : b) + 1;
+    if (widget.initialCourtNumber != null) {
+      _courtNumber = widget.initialCourtNumber!;
+    } else {
+      final existingCourtNums = widget.roundMatches.map((m) => m.courtNumber).toSet();
+      final activeCourts = List.generate(
+        widget.session.courtCount,
+        (i) => widget.session.startCourtNumber + i,
+      );
+      final emptyCourts = activeCourts.where((c) => !existingCourtNums.contains(c)).toList();
+      if (emptyCourts.isNotEmpty) {
+        _courtNumber = emptyCourts.first;
+      } else {
+        _courtNumber = existingCourtNums.isEmpty
+            ? widget.session.startCourtNumber
+            : existingCourtNums.reduce((a, b) => a > b ? a : b) + 1;
+      }
+    }
   }
 
   @override

@@ -3483,26 +3483,31 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(ctx).size.height * 0.92,
             ),
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -4556,83 +4561,87 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 6. 세션 시작 및 대진표 화면으로 바로 이동 버튼 (하단 고정)
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              key: const Key('start_session_and_generate_button'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryMint,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
+              ),
+              onPressed: () {
+                // [전원 고정 페어] 모드에서 미편성 인원이 남아있을 경우 자동으로 2인 페어 보완
+                List<List<String>> finalFixedPairs = List<List<String>>.from(fixedPairs);
+                if (partnerMode == PartnerMode.fixedAll && unpairedMembers.length >= 2) {
+                  final autoPairs = ref.read(matchGeneratorServiceProvider).autoPairByTier(
+                        members: unpairedMembers,
+                        matchMode: matchMode,
+                        matchType: matchType,
+                      );
+                  finalFixedPairs = [...finalFixedPairs, ...autoPairs];
+                }
 
-                  // 6. 세션 시작 및 대진표 화면으로 바로 이동 버튼
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryMint,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
-                      ),
-                      onPressed: () {
-                        // [전원 고정 페어] 모드에서 미편성 인원이 남아있을 경우 자동으로 2인 페어 보완
-                        List<List<String>> finalFixedPairs = List<List<String>>.from(fixedPairs);
-                        if (partnerMode == PartnerMode.fixedAll && unpairedMembers.length >= 2) {
-                          final autoPairs = ref.read(matchGeneratorServiceProvider).autoPairByTier(
-                                members: unpairedMembers,
-                                matchMode: matchMode,
-                                matchType: matchType,
-                              );
-                          finalFixedPairs = [...finalFixedPairs, ...autoPairs];
-                        }
+                // 새 세션 시작 및 1라운드 대진 생성 (대진표 화면 자동 전환 포함)
+                ref.read(matchesProvider.notifier).startNewSessionAndGenerate(
+                      attendeeIds: selectedIds,
+                      courtCount: courtCount,
+                      startCourtNumber: startCourtNumber,
+                      matchMode: matchMode,
+                      matchFormat: matchFormat,
+                      matchType: matchType,
+                      partnerMode: partnerMode,
+                      fixedPairs: finalFixedPairs,
+                    );
 
-                        // 새 세션 시작 및 1라운드 대진 생성 (대진표 화면 자동 전환 포함)
-                        ref.read(matchesProvider.notifier).startNewSessionAndGenerate(
-                              attendeeIds: selectedIds,
-                              courtCount: courtCount,
-                              startCourtNumber: startCourtNumber,
-                              matchMode: matchMode,
-                              matchFormat: matchFormat,
-                              matchType: matchType,
-                              partnerMode: partnerMode,
-                              fixedPairs: finalFixedPairs,
-                            );
+                Navigator.pop(ctx);
 
-                        Navigator.pop(ctx);
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: AppTheme.primaryDark,
-                            content: Row(
-                              children: [
-                                const Icon(Icons.check_circle_rounded, color: AppTheme.primaryMint, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '[${matchFormat.label} · ${matchMode.label}] ${selectedIds.length}명 출전 · $startCourtNumber~$endCourtNumber번($courtCount코트) 대진표가 생성되었습니다!',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ),
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: AppTheme.primaryDark,
+                    content: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: AppTheme.primaryMint, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '[${matchFormat.label} · ${matchMode.label}] ${selectedIds.length}명 출전 · $startCourtNumber~$endCourtNumber번($courtCount코트) 대진표가 생성되었습니다!',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                        );
-                      },
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.rocket_launch_rounded, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            '세션 시작 & 대진 생성',
-                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
+                  ),
+                );
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.rocket_launch_rounded, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    '세션 시작 & 대진 생성',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                   ),
                 ],
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
+  },
+),
+);
   }
 
   /// [선수 매칭 모드 (급수 기준)] 3단 선택 카드 빌더

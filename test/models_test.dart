@@ -727,7 +727,119 @@ void main() {
       expect(resetState.fixedPairs, isEmpty);
     });
   });
+
+  group('Real-Time Court Addition & Reduction Tests', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('1. 코트 추가(+) 시 빈 코트 슬롯 생성, 대기 인원 자동 배정, 다음 라운드 출전 인원 자동 확대 검증', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // 12명의 참석자로 2개 코트(8명 출전, 4명 휴식) 세션 시작
+      final members = container.read(currentClubMembersProvider).where((m) => !m.isResting).take(12).toList();
+      final attendeeIds = members.map((m) => m.id).toList();
+
+      container.read(sessionProvider.notifier).createSession(
+            clubId: 'club_mega',
+            title: '실시간 코트 증감 테스트',
+            memberFee: 5000,
+            guestFee: 10000,
+            attendeeIds: attendeeIds,
+            courtCount: 2,
+            startCourtNumber: 1,
+            matchMode: MatchMode.all,
+          );
+      container.read(matchesProvider.notifier).generateMatchesForRound(1);
+
+      expect(container.read(sessionProvider)!.courtCount, equals(2));
+      final r1MatchesBefore = container.read(matchesProvider).where((m) => m.round == 1).toList();
+      expect(r1MatchesBefore.length, equals(2)); // 1번, 2번 코트 (8명 출전)
+
+      // [+ 코트 추가] 실행 -> 3번 빈 코트 슬롯 추가 (운영 코트 3면)
+      final newCourt = container.read(matchesProvider.notifier).addCourtSlot();
+      expect(newCourt, equals(3));
+      expect(container.read(sessionProvider)!.courtCount, equals(3));
+
+      // 다음 라운드(2R) 대진 자동 생성 시 늘어난 3개 코트에 맞춰 출전 인원이 12명(3코트)으로 자동 확대됨
+      container.read(matchesProvider.notifier).generateMatchesForRound(2);
+      final r2Matches = container.read(matchesProvider).where((m) => m.round == 2).toList();
+      expect(r2Matches.length, equals(3));
+      expect(r2Matches.expand((m) => m.allPlayerIds).toSet().length, equals(12));
+
+      // 1R의 빈 3번 코트 슬롯에도 대기 인원 4명 즉시 자동 배정 가능 확인
+      final assignedMatch = container.read(matchesProvider.notifier).autoAssignWaitingToEmptyCourt(
+            round: 1,
+            courtNumber: 3,
+          );
+      expect(assignedMatch, isNotNull);
+      expect(assignedMatch!.courtNumber, equals(3));
+      expect(container.read(matchesProvider).where((m) => m.round == 1).length, equals(3));
+    });
+
+    test('2. 코트 축소(-) 시 빈 코트 우선 제거, 진행 중 코트 대기 인원 전환, 이전 완료 라운드 기록 보존 검증', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final members = container.read(currentClubMembersProvider).where((m) => !m.isResting).take(12).toList();
+      final attendeeIds = members.map((m) => m.id).toList();
+
+      container.read(sessionProvider.notifier).createSession(
+            clubId: 'club_mega',
+            title: '코트 축소 보존 테스트',
+            memberFee: 5000,
+            guestFee: 10000,
+            attendeeIds: attendeeIds,
+            courtCount: 3,
+            startCourtNumber: 1,
+          );
+      container.read(matchesProvider.notifier).generateMatchesForRound(1);
+
+      // 1라운드는 3코트 모두 경기 완료 처리
+      final r1Matches = container.read(matchesProvider).where((m) => m.round == 1).toList();
+      expect(r1Matches.length, equals(3));
+      for (final m in r1Matches) {
+        container.read(matchesProvider.notifier).updateScore(
+              m.id,
+              21,
+              15,
+              status: MatchStatus.finished,
+            );
+      }
+
+      // 2라운드 대진 생성 (3코트 배정) 후 코트 1개 추가(+ -> 4면, 4번 코트는 빈 슬롯)
+      container.read(matchesProvider.notifier).generateMatchesForRound(2);
+      container.read(matchesProvider.notifier).addCourtSlot();
+      expect(container.read(sessionProvider)!.courtCount, equals(4));
+
+      // [- 코트 축소] 1차: 배정된 경기가 없는 빈 4번 코트가 우선 제거됨 (3면으로 복귀, 2R 3경기 그대로 유지)
+      final removedEmpty = container.read(matchesProvider.notifier).removeEmptyCourtSlot(currentRound: 2);
+      expect(removedEmpty, equals(4));
+      expect(container.read(sessionProvider)!.courtCount, equals(3));
+      expect(container.read(matchesProvider).where((m) => m.round == 2).length, equals(3));
+
+      // [- 코트 축소] 2차: 진행 중인 2R 3번 코트를 닫아 대기 인원으로 전환 후 코트 축소(3면 -> 2면)
+      final r2Court3Match = container
+          .read(matchesProvider)
+          .firstWhere((m) => m.round == 2 && m.courtNumber == 3);
+      container.read(matchesProvider.notifier).cancelMatchAndReduceCourt(
+            matchId: r2Court3Match.id,
+            reduceCourtCount: true,
+          );
+
+      expect(container.read(sessionProvider)!.courtCount, equals(2));
+      final r2Remaining = container.read(matchesProvider).where((m) => m.round == 2).toList();
+      expect(r2Remaining.length, equals(2)); // 2R은 2코트(8명 출전, 4명 대기 전환)
+
+      // 이전 완료된 1라운드의 3코트 경기 기록은 손실 없이 100% 보존됨을 검증
+      final r1Preserved = container.read(matchesProvider).where((m) => m.round == 1).toList();
+      expect(r1Preserved.length, equals(3));
+      expect(r1Preserved.every((m) => m.isFinished && m.scoreA == 21 && m.scoreB == 15), isTrue);
+    });
+  });
 }
+
 
 
 

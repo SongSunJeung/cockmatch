@@ -498,6 +498,11 @@ class SessionNotifier extends Notifier<GameSession?> {
     return null;
   }
 
+  @override
+  bool updateShouldNotify(GameSession? previous, GameSession? next) {
+    return !identical(previous, next);
+  }
+
   void _syncToHistory(GameSession? updated) {
     if (updated != null) {
       _clubSessionsCache[updated.clubId] = updated;
@@ -1119,6 +1124,142 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
   void addCustomMatch(GameMatch newMatch) {
     state = [...state, newMatch];
     _saveCurrentSessionMatches(state);
+  }
+
+  /// [실시간 코트 증감] 코트 추가(+):
+  /// - 세션 운영 코트 수를 1개 증가시키고 새로 추가된 코트 번호를 반환
+  /// - 현재 라운드에는 새 빈 코트 슬롯이 생성되며, 다음 라운드 생성 시 늘어난 코트 수만큼 자동 배정
+  int addCourtSlot() {
+    final session = ref.read(sessionProvider);
+    if (session == null) return 1;
+    final newCount = (session.courtCount + 1).clamp(1, 15);
+    ref.read(sessionProvider.notifier).updateCourtCount(newCount);
+    return session.startCourtNumber + newCount - 1;
+  }
+
+  /// [실시간 코트 증감] 배정된 경기가 없는 빈 코트 우선 제거(-):
+  /// - 빈 코트를 닫고 세션 코트 수를 1개 축소
+  /// - 만약 중간 번호의 빈 코트가 제거되고 마지막 코트에 경기가 있다면 빈 코트 번호로 당겨서 배정 유지
+  /// - 이전 완료된 라운드의 경기 기록은 손실 없이 안전하게 보존
+  int? removeEmptyCourtSlot({
+    required int currentRound,
+    int? targetEmptyCourt,
+  }) {
+    final session = ref.read(sessionProvider);
+    if (session == null || session.courtCount <= 1) return null;
+
+    final startCourt = session.startCourtNumber;
+    final endCourt = startCourt + session.courtCount - 1;
+    final activeCourts = List.generate(session.courtCount, (i) => startCourt + i);
+    final roundMatches = state.where((m) => m.round == currentRound).toList();
+    final occupiedCourts = roundMatches.map((m) => m.courtNumber).toSet();
+
+    final emptyCourts = activeCourts.where((c) => !occupiedCourts.contains(c)).toList();
+    if (emptyCourts.isEmpty && targetEmptyCourt == null) return null;
+
+    final courtToRemove = targetEmptyCourt ?? emptyCourts.last;
+
+    // 제거 대상 빈 코트가 마지막 코트(endCourt)보다 앞 번호이고 endCourt에 현재 라운드 경기가 있다면 빈 슬롯으로 이동
+    if (courtToRemove < endCourt && occupiedCourts.contains(endCourt)) {
+      state = state.map((m) {
+        if (m.round == currentRound && m.courtNumber == endCourt) {
+          return m.copyWith(courtNumber: courtToRemove);
+        }
+        return m;
+      }).toList();
+      _saveCurrentSessionMatches(state);
+    }
+
+    ref.read(sessionProvider.notifier).updateCourtCount(session.courtCount - 1);
+    return courtToRemove;
+  }
+
+  /// [실시간 코트 증감] 진행/배정 중인 코트를 닫을 때 해당 경기를 취소하여 선수들을 대기 인원으로 전환 후 코트 축소
+  /// - 이전 완료된 라운드(round < target.round) 및 이미 완료된 경기(isFinished)는 절대 삭제되지 않고 보존됨
+  void cancelMatchAndReduceCourt({
+    required String matchId,
+    bool reduceCourtCount = true,
+  }) {
+    final targetIndex = state.indexWhere((m) => m.id == matchId);
+    if (targetIndex == -1) return;
+    final targetMatch = state[targetIndex];
+    if (targetMatch.isFinished) return;
+
+    final session = ref.read(sessionProvider);
+    final updated = state.where((m) => m.id != matchId).toList();
+
+    if (reduceCourtCount && session != null && session.courtCount > 1) {
+      final endCourt = session.startCourtNumber + session.courtCount - 1;
+      if (targetMatch.courtNumber < endCourt) {
+        // 마지막 코트(endCourt)에 있던 현재 라운드 경기를 닫힌 코트 번호로 당겨 코트 범위 유지
+        state = updated.map((m) {
+          if (m.round == targetMatch.round && m.courtNumber == endCourt) {
+            return m.copyWith(courtNumber: targetMatch.courtNumber);
+          }
+          return m;
+        }).toList();
+      } else {
+        state = updated;
+      }
+      ref.read(sessionProvider.notifier).updateCourtCount(session.courtCount - 1);
+    } else {
+      state = updated;
+    }
+
+    _saveCurrentSessionMatches(state);
+  }
+
+  /// [실시간 코트 증감] 진행/배정 중인 코트의 경기를 다른 빈 코트 슬롯으로 이동한 뒤 코트 축소
+  void moveMatchToEmptyCourtAndReduce({
+    required String matchId,
+    required int targetEmptyCourt,
+  }) {
+    updateCourtNumber(matchId, targetEmptyCourt);
+    final session = ref.read(sessionProvider);
+    if (session != null && session.courtCount > 1) {
+      ref.read(sessionProvider.notifier).updateCourtCount(session.courtCount - 1);
+    }
+    _saveCurrentSessionMatches(state);
+  }
+
+  /// 빈 코트 슬롯에 현재 대기(휴식) 중인 인원 4명을 즉시 자동 매칭하여 투입
+  GameMatch? autoAssignWaitingToEmptyCourt({
+    required int round,
+    required int courtNumber,
+  }) {
+    final session = ref.read(sessionProvider);
+    if (session == null) return null;
+
+    final allMembers = ref.read(currentClubMembersProvider);
+    final roundMatches = state.where((m) => m.round == round).toList();
+    final playingIds = roundMatches.expand((m) => m.allPlayerIds).toSet();
+
+    final waitingIds = session.activeAttendees
+        .where((id) => !playingIds.contains(id))
+        .toList();
+    if (waitingIds.length < 4) return null;
+
+    final tempSession = session.copyWith(
+      attendees: waitingIds,
+      courtCount: 1,
+      startCourtNumber: courtNumber,
+    );
+    final generator = ref.read(matchGeneratorServiceProvider);
+    final generated = generator.generateRoundMatches(
+      session: tempSession,
+      allMembers: allMembers,
+      existingMatches: state.where((m) => m.round < round).toList(),
+      targetRound: round,
+    );
+    if (generated.isEmpty) return null;
+
+    final newMatch = generated.first.copyWith(
+      id: 'auto_slot_r${round}_c${courtNumber}_${DateTime.now().millisecondsSinceEpoch}',
+      courtNumber: courtNumber,
+    );
+    state = [...state, newMatch];
+    _saveCurrentSessionMatches(state);
+    return newMatch;
   }
 }
 
