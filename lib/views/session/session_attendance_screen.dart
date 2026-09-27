@@ -2672,11 +2672,15 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       decoration: BoxDecoration(
-        color: AppTheme.primaryDark,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7565E8), Color(0xFF6151D8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: const Color(0xFF6151D8).withValues(alpha: 0.28),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -2691,7 +2695,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.sports_tennis_rounded, size: 16, color: AppTheme.pastelMint),
+                    const Icon(Icons.sports_tennis_rounded, size: 16, color: Colors.white),
                     const SizedBox(width: 6),
                     Text(
                       '출전 $activeCount명',
@@ -2704,17 +2708,17 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   canGenerate
                       ? '최대 $possibleCourts코트 가동 가능 (${activeCount % 4}명 대기)'
                       : '4명 이상 출전 시 대진표 생성 가능',
-                  style: const TextStyle(fontSize: 11, color: Colors.white60),
+                  style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.82)),
                 ),
               ],
             ),
           ),
 
-          // 대진 설정 & 이동 버튼
+          // 대진 설정 & 이동 버튼 (참조 이미지의 화이트 캡슐 CTA 스타일)
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: canGenerate ? AppTheme.primaryMint : Colors.grey.shade700,
-              foregroundColor: Colors.white,
+              backgroundColor: canGenerate ? Colors.white : Colors.white.withValues(alpha: 0.25),
+              foregroundColor: canGenerate ? AppTheme.primaryDark : Colors.white70,
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
@@ -3189,7 +3193,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                                   const Spacer(),
                                   Text(
                                     m.gender == Gender.female ? '여' : '남',
-                                    style: TextStyle(fontSize: 11, color: m.gender == Gender.female ? Colors.pink : Colors.blue),
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.getGenderAccentColor(m.gender)),
                                   ),
                                 ],
                               ),

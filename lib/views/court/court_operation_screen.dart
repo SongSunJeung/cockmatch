@@ -1837,7 +1837,7 @@ class CourtOperationScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Row(
           children: [
-            Icon(Icons.emoji_events_rounded, color: Colors.amber),
+            Icon(Icons.emoji_events_rounded, color: AppTheme.primaryMint),
             SizedBox(width: 8),
             Text('실시간 대회 랭킹 순위표', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ],
@@ -1854,13 +1854,13 @@ class CourtOperationScreen extends ConsumerWidget {
                 dense: true,
                 leading: CircleAvatar(
                   radius: 14,
-                  backgroundColor: r.rank <= 3 ? Colors.amber.shade100 : Colors.grey.shade100,
+                  backgroundColor: r.rank <= 3 ? AppTheme.pastelPeriwinkle : AppTheme.surfaceGrey,
                   child: Text(
                     '${r.rank}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: r.rank <= 3 ? Colors.amber.shade900 : Colors.black54,
+                      color: r.rank <= 3 ? AppTheme.pastelPeriwinkleDark : AppTheme.textMuted,
                     ),
                   ),
                 ),

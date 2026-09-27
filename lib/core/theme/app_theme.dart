@@ -6,73 +6,74 @@ import '../constants/enums.dart';
 class AppTheme {
   AppTheme._();
 
-  // 배경 및 메인 서피스
-  static const Color background = Color(0xFFF8F9FE); // 매우 부드러운 오프화이트/라벤더 그레이
-  static const Color surfaceGrey = Color(0xFFF3F5FA); // 카드 내부 서피스 그레이
+  // 배경 및 메인 서피스 (클린 화이트 & 에어리 쿨 라벤더 베이스)
+  static const Color background = Color(0xFFF6F7FC); // 매우 깨끗한 쿨 라벤더 오프화이트
+  static const Color surfaceGrey = Color(0xFFEEF0F8); // 카드 내부 및 비활성 필 서피스
   static const Color cardWhite = Colors.white;
-  static const Color textDark = Color(0xFF1E2432); // 딥 네이비 슬레이트
-  static const Color textMuted = Color(0xFF8A94A6);
+  static const Color textDark = Color(0xFF22263A); // 딥 인디고 차콜 타이포그래피
+  static const Color textMuted = Color(0xFF8E94AA); // 차분한 쿨 슬레이트 그레이
 
-  // 참조 이미지 기반 파스텔 팔레트 (Bento Card Colors)
-  static const Color pastelCoral = Color(0xFFFFE5E1); // 부드러운 코랄/피치 (Breakfast/IBM 카드)
-  static const Color pastelCoralDark = Color(0xFFE26D5C);
-  static const Color coralRed = Color(0xFFE26D5C);
+  // 통일된 3톤 파스텔 팔레트 (소프트 라벤더 · 스카이 아쿠아 · 소프트 살몬 코랄)
+  static const Color pastelCoral = Color(0xFFFFF0EE); // 소프트 살몬 코랄 (경고/미납/포인트)
+  static const Color pastelCoralDark = Color(0xFFE2665A);
+  static const Color coralRed = Color(0xFFE2665A);
 
-  static const Color pastelPeriwinkle = Color(0xFFE6E8FE); // 소프트 페리윙클/라벤더 (Progress 카드)
-  static const Color pastelPeriwinkleDark = Color(0xFF535EC9);
+  static const Color pastelPeriwinkle = Color(0xFFEEEBFF); // 시그니처 소프트 라벤더 필 (Insight/Journal 톤)
+  static const Color pastelPeriwinkleDark = Color(0xFF5A4AD1);
 
-  static const Color pastelMint = Color(0xFFDCF4EE); // 소프트 민트/아쿠아 (Sleep quality 카드)
-  static const Color pastelMintDark = Color(0xFF2C9E86);
+  static const Color pastelMint = Color(0xFFE6F7FA); // 소프트 스카이 아쿠아 (출전/완납/긍정 상태)
+  static const Color pastelMintDark = Color(0xFF2490A6);
 
-  static const Color pastelYellow = Color(0xFFFEF3D6); // 소프트 버터/오렌지크림 (Sport Data 카드)
-  static const Color pastelYellowDark = Color(0xFFD98A17);
+  // 기존 노란색/핫핑크 난립을 막기 위해 소프트 라벤더 및 소프트 코랄로 톤앤매너 단일화
+  static const Color pastelYellow = Color(0xFFEEEBFF); // 코트 뱃지·휴식 뱃지도 차분한 라벤더 필로 통일
+  static const Color pastelYellowDark = Color(0xFF6353D6);
 
-  static const Color pastelRose = Color(0xFFFFE8F0); // 소프트 로즈
-  static const Color pastelRoseDark = Color(0xFFD9487D);
+  static const Color pastelRose = Color(0xFFFFF0EE); // 소프트 코랄과 단일화하여 색상 충돌 제거
+  static const Color pastelRoseDark = Color(0xFFE2665A);
 
-  // 기본 브랜드 컬러
-  static const Color primaryMint = Color(0xFF2CB69A);
+  // 메인 브랜드 컬러 (참조 이미지의 시그니처 소프트 바이올렛-인디고)
+  static const Color primaryMint = Color(0xFF7565E8); // 메인 퍼플-인디고 (Add Drink / Add Meal / + 버튼 톤)
   static const Color primaryGreen = primaryMint; // 하위 호환
-  static const Color primaryDark = Color(0xFF19202E);
+  static const Color primaryDark = Color(0xFF5A4AD1); // 딥 바이올렛-인디고 (검정색 대신 부드러운 딥 인디고)
 
   static List<BoxShadow> get softShadow => [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.04),
-          blurRadius: 16,
-          offset: const Offset(0, 4),
+          color: const Color(0xFF5A4AD1).withValues(alpha: 0.055),
+          blurRadius: 18,
+          offset: const Offset(0, 5),
         ),
       ];
 
   static Color getTierColor(Tier tier) => getTierTextColor(tier);
 
-  // 급수별 파스텔 매칭 컬러
+  // 급수별 톤앤매너 통일 컬러 (무지개색 충돌을 없애고 바이올렛 -> 페리윙클 -> 스카이 -> 아쿠아 -> 슬레이트 그라데이션 적용)
   static Color getTierBgColor(Tier tier) {
     switch (tier) {
       case Tier.a:
-        return pastelCoral;
+        return const Color(0xFFE5E0FF); // 딥 라벤더
       case Tier.b:
-        return pastelYellow;
+        return const Color(0xFFEEEBFF); // 소프트 페리윙클
       case Tier.c:
-        return pastelPeriwinkle;
+        return const Color(0xFFE6F1FE); // 소프트 스카이 블루
       case Tier.d:
-        return pastelMint;
+        return const Color(0xFFE5F7FA); // 소프트 스카이 아쿠아
       case Tier.novice:
-        return pastelRose;
+        return const Color(0xFFEEF0F8); // 클린 쿨 슬레이트
     }
   }
 
   static Color getTierTextColor(Tier tier) {
     switch (tier) {
       case Tier.a:
-        return pastelCoralDark;
+        return const Color(0xFF4B3BC2);
       case Tier.b:
-        return pastelYellowDark;
+        return const Color(0xFF6857E0);
       case Tier.c:
-        return pastelPeriwinkleDark;
+        return const Color(0xFF3972C2);
       case Tier.d:
-        return pastelMintDark;
+        return const Color(0xFF2490A6);
       case Tier.novice:
-        return pastelRoseDark;
+        return const Color(0xFF646B84);
     }
   }
 
@@ -91,20 +92,18 @@ class AppTheme {
     }
   }
 
-  // 성별 카드 구분 컬러 (남성: 은은한 블루톤 / 여성: 은은한 핑크·코랄톤)
-  static const Color maleCardBg = Color(0xFFF2F6FF);
-  static const Color maleCardBorder = Color(0xFFD2E0FB);
-  static const Color maleCardAccent = Color(0xFF3B6FD8);
+  // 성별 카드 구분 컬러 (화이트 베이스 위에 아주 은은한 라벤더 블루 vs 살몬 피치 보더 & 좌측 포인트 바)
+  static const Color maleCardBg = Color(0xFFFAF9FF);
+  static const Color maleCardBorder = Color(0xFFE6E8F8);
+  static const Color maleCardAccent = Color(0xFF7565E8);
 
-  static const Color femaleCardBg = Color(0xFFFFF3F5);
-  static const Color femaleCardBorder = Color(0xFFFAD0D9);
-  static const Color femaleCardAccent = Color(0xFFDE5475);
+  static const Color femaleCardBg = Color(0xFFFFFBFB);
+  static const Color femaleCardBorder = Color(0xFFF8E6E6);
+  static const Color femaleCardAccent = Color(0xFFF0857B);
 
   static Color getGenderCardBg(Gender gender, {bool isDimmed = false}) {
     if (isDimmed) {
-      return gender == Gender.male
-          ? const Color(0xFFF6F8FC)
-          : const Color(0xFFFCF6F7);
+      return const Color(0xFFF7F8FC);
     }
     return gender == Gender.male ? maleCardBg : femaleCardBg;
   }
@@ -118,9 +117,7 @@ class AppTheme {
       return gender == Gender.male ? maleCardAccent : femaleCardAccent;
     }
     if (isDimmed) {
-      return gender == Gender.male
-          ? maleCardBorder.withValues(alpha: 0.55)
-          : femaleCardBorder.withValues(alpha: 0.55);
+      return const Color(0xFFE8EAF2);
     }
     return gender == Gender.male ? maleCardBorder : femaleCardBorder;
   }
@@ -129,10 +126,10 @@ class AppTheme {
     return gender == Gender.male ? maleCardAccent : femaleCardAccent;
   }
 
-  // 상태별 컬러
-  static const Color statusPending = Color(0xFF94A3B8);
-  static const Color statusPlaying = Color(0xFFE28B15);
-  static const Color statusFinished = Color(0xFF16A34A);
+  // 상태별 컬러 (라벤더/아쿠아 테마 조화)
+  static const Color statusPending = Color(0xFF8E94AA);
+  static const Color statusPlaying = Color(0xFF7565E8);
+  static const Color statusFinished = Color(0xFF38B6C8);
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -141,7 +138,8 @@ class AppTheme {
       fontFamily: 'Pretendard',
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryMint,
-        primary: primaryDark,
+        primary: primaryMint,
+        secondary: const Color(0xFF4AC7D8),
         surface: background,
       ),
       appBarTheme: const AppBarTheme(

@@ -94,8 +94,19 @@ class CockMatchShellScreen extends ConsumerWidget {
               margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppTheme.primaryDark,
-                borderRadius: BorderRadius.circular(20),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF7565E8), Color(0xFF8E7FF2)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7565E8).withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,7 +117,7 @@ class CockMatchShellScreen extends ConsumerWidget {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryMint.withValues(alpha: 0.2),
+                          color: Colors.white.withValues(alpha: 0.22),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Center(
@@ -118,12 +129,12 @@ class CockMatchShellScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               '콕매치 (CockMatch)',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: AppTheme.primaryMint,
+                                color: Colors.white.withValues(alpha: 0.85),
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -146,7 +157,7 @@ class CockMatchShellScreen extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
+                        color: Colors.white.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -154,7 +165,7 @@ class CockMatchShellScreen extends ConsumerWidget {
                           const Icon(
                             Icons.fiber_manual_record_rounded,
                             size: 10,
-                            color: AppTheme.primaryMint,
+                            color: Color(0xFF6EF2FC),
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -274,11 +285,8 @@ class CockMatchShellScreen extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? AppTheme.pastelMint.withValues(alpha: 0.65) : Colors.transparent,
+            color: isSelected ? AppTheme.pastelPeriwinkle : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected ? AppTheme.primaryMint.withValues(alpha: 0.4) : Colors.transparent,
-            ),
           ),
           child: Row(
             children: [
@@ -286,7 +294,7 @@ class CockMatchShellScreen extends ConsumerWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.primaryDark : AppTheme.surfaceGrey,
+                  color: isSelected ? AppTheme.primaryMint : AppTheme.surfaceGrey,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(

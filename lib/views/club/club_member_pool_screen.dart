@@ -749,18 +749,12 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     // 등급/직책 배지 스타일
     final Color roleBadgeBg;
     final Color roleBadgeText;
-    if (member.isExecutive) {
+    if (member.isExecutive || hasCustomRole) {
       roleBadgeBg = AppTheme.pastelPeriwinkle;
       roleBadgeText = AppTheme.pastelPeriwinkleDark;
-    } else if (hasCustomRole) {
-      roleBadgeBg = AppTheme.pastelYellow;
-      roleBadgeText = AppTheme.pastelYellowDark;
-    } else if (member.role == MemberRole.associate) {
-      roleBadgeBg = AppTheme.pastelCoral;
-      roleBadgeText = AppTheme.pastelCoralDark;
     } else {
-      roleBadgeBg = AppTheme.pastelMint.withValues(alpha: 0.5);
-      roleBadgeText = AppTheme.pastelMintDark;
+      roleBadgeBg = AppTheme.surfaceGrey;
+      roleBadgeText = const Color(0xFF5E657E);
     }
 
     final restingBadge = member.restingBadgeText;
