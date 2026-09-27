@@ -1,4 +1,4 @@
-// Cache-busting kill-switch Service Worker (v20260927_1)
+// Cache-busting kill-switch Service Worker (v20260927_2)
 self.addEventListener('install', function(event) {
   self.skipWaiting();
 });
