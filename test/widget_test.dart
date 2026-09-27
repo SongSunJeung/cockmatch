@@ -524,5 +524,34 @@ void main() {
     expect(find.text('운영 코트 4면'), findsOneWidget);
     expect(find.text('현재 휴식 중: '), findsOneWidget);
   });
+
+  testWidgets('출석부 화면: 가상 키보드 오픈(viewInsets.bottom > 0 또는 검색창 포커스) 시 하단 플로팅 바 자동 숨김 검증', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: CockMatchApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. 지난 모임 열기 -> 하단 플로팅 바('대진 설정 & 이동') 기본 노출 확인
+    final archivedCard = find.text('2026.09.22 화요 정기 모임');
+    await tester.ensureVisible(archivedCard);
+    await tester.pumpAndSettle();
+    await tester.tap(archivedCard);
+    await tester.pumpAndSettle();
+
+    expect(find.text('대진 설정 & 이동'), findsOneWidget);
+
+    // 2. 가상 키보드 활성화 시뮬레이션 (viewInsets.bottom = 300) -> 플로팅 바 자동 숨김 확인
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pumpAndSettle();
+    expect(find.text('대진 설정 & 이동'), findsNothing);
+
+    // 3. 가상 키보드 닫힘 시뮬레이션 (viewInsets.bottom = 0) -> 플로팅 바 재노출 확인
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    expect(find.text('대진 설정 & 이동'), findsOneWidget);
+  });
 }
+
 

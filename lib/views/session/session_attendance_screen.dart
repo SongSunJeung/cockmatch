@@ -22,6 +22,7 @@ class SessionAttendanceScreen extends ConsumerStatefulWidget {
 
 class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   // [상단 1단] 인적 속성 드롭다운 필터 (회원명부와 동일 규격: 급수 / 회원 구분 / 성별)
   Tier? _selectedTier;
   MemberGrade? _selectedGrade;
@@ -75,8 +76,20 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     });
   }
 
+  void _onSearchFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _searchFocusNode.addListener(_onSearchFocusChanged);
+  }
+
   @override
   void dispose() {
+    _searchFocusNode.removeListener(_onSearchFocusChanged);
+    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -302,10 +315,15 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     final ongoingSessions = ref.watch(currentClubOngoingSessionsProvider);
     final archivedSessions = ref.watch(currentClubArchivedSessionsProvider);
 
+    final bool isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0 ||
+        View.of(context).viewInsets.bottom > 0 ||
+        _searchFocusNode.hasFocus;
+
     if (session == null) {
       return Scaffold(
         backgroundColor: AppTheme.background,
         body: SafeArea(
+          bottom: false,
           child: CustomScrollView(
             slivers: [
               // 상단 헤더
@@ -455,7 +473,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               // [진행 모임] & [지난 모임] 아카이브 히스토리 섹션
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                   child: _buildSessionArchiveSections(
                     context: context,
                     allMembers: allMembers,
@@ -531,6 +549,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
+        bottom: false,
         child: Stack(
           children: [
             CustomScrollView(
@@ -627,7 +646,12 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 120), // 하단 플로팅 바 여백
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      0,
+                      20,
+                      isKeyboardOpen ? 16 : (_isMultiSelectMode ? 140 : 84),
+                    ), // 하단 플로팅 바 여백
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -649,32 +673,33 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               ],
             ),
 
-            // 6. 하단 플로팅 액션 바 (다중 선택 문자 발송 바 + 대진표 설정 및 이동 바)
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 16,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_isMultiSelectMode) ...[
-                    _buildMultiSelectSmsBar(
+            // 6. 하단 플로팅 액션 바 (가상 키보드 활성화 시 자동 숨김 처리)
+            if (!isKeyboardOpen)
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 16,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isMultiSelectMode) ...[
+                      _buildMultiSelectSmsBar(
+                        context: context,
+                        session: session,
+                        attendeeMembers: attendeeMembers,
+                        displayedMembers: displayedMembers,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    _buildBottomConfirmBar(
                       context: context,
+                      ref: ref,
                       session: session,
-                      attendeeMembers: attendeeMembers,
-                      displayedMembers: displayedMembers,
+                      activeCount: activeCount,
                     ),
-                    const SizedBox(height: 8),
                   ],
-                  _buildBottomConfirmBar(
-                    context: context,
-                    ref: ref,
-                    session: session,
-                    activeCount: activeCount,
-                  ),
-                ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -1545,6 +1570,8 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                 ),
                 child: TextField(
                   controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  onTapOutside: (_) => _searchFocusNode.unfocus(),
                   onChanged: (val) => setState(() {}),
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -2880,7 +2907,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -3048,12 +3075,13 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
 
           return Container(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Center(
@@ -3109,8 +3137,9 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                 const SizedBox(height: 12),
 
                 // 회원 리스트
-                Expanded(
+                Flexible(
                   child: ListView.builder(
+                    shrinkWrap: true,
                     itemCount: filtered.length,
                     itemBuilder: (ctx, i) {
                       final m = filtered[i];
@@ -5062,8 +5091,10 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                                   });
                                 },
                               )
-                            : SizedBox(
-                                height: MediaQuery.of(ctx).size.height * 0.58,
+                            : ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxHeight: MediaQuery.of(ctx).size.height * 0.58,
+                                ),
                                 child: _buildStep3MemberSelection(
                                   clubMembers: filteredClubMembers,
                                   totalCount: clubMembers.length,
@@ -5183,6 +5214,8 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
 
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
+                                          behavior: SnackBarBehavior.floating,
+                                          margin: const EdgeInsets.fromLTRB(20, 0, 20, 88),
                                           backgroundColor: AppTheme.primaryDark,
                                           content: Row(
                                             children: [
@@ -5725,6 +5758,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     required VoidCallback onSelectAll,
   }) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         // 상단 안내 & 전체 선택 바
         Padding(
@@ -5807,12 +5841,16 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
         const Divider(height: 1),
 
         // 회원 리스트
-        Expanded(
+        Flexible(
           child: clubMembers.isEmpty
-              ? const Center(
-                  child: Text('등록된 회원이 없거나 검색 결과가 없습니다.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+              ? const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: Text('등록된 회원이 없거나 검색 결과가 없습니다.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                  ),
                 )
               : ListView.builder(
+                  shrinkWrap: true,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   itemCount: clubMembers.length,
                   itemBuilder: (ctx, index) {

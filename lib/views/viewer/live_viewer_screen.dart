@@ -305,6 +305,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
+        bottom: false,
         child: CustomScrollView(
           slivers: [
             // 1. 상단 헤더 + [웹 링크 복사] & [결과 요약 텍스트 복사] 액션 바
@@ -340,7 +341,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                 ),
               ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 110)),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
           ],
         ),
       ),

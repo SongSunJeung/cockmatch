@@ -24,6 +24,7 @@ class CourtOperationScreen extends ConsumerWidget {
       return Scaffold(
         backgroundColor: AppTheme.background,
         body: SafeArea(
+          bottom: false,
           child: Column(
             children: [
               // 1. 상단 앱바 & 헤더
@@ -239,6 +240,7 @@ class CourtOperationScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
+        bottom: false,
         child: CustomScrollView(
           slivers: [
             // 1. 상단 앱바 & 헤더
@@ -873,7 +875,7 @@ class CourtOperationScreen extends ConsumerWidget {
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -2874,7 +2876,7 @@ class _PlayerSwapBottomSheetState extends ConsumerState<_PlayerSwapBottomSheet> 
           ),
 
           // 3. 교체 대상 목록
-          Expanded(
+          Flexible(
             child: _tabIndex == 0
                 ? _buildRestingMembersList(context, match, currentTarget, isTargetInTeamA)
                 : _buildSwapWithOtherPlayersList(context, match, currentTarget, isTargetInTeamA, otherPendingMatches),
@@ -2923,6 +2925,7 @@ class _PlayerSwapBottomSheetState extends ConsumerState<_PlayerSwapBottomSheet> 
     );
 
     return ListView.separated(
+      shrinkWrap: true,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       itemCount: widget.restingMembers.length,
       separatorBuilder: (_, _) => const SizedBox(height: 8),
@@ -3024,6 +3027,7 @@ class _PlayerSwapBottomSheetState extends ConsumerState<_PlayerSwapBottomSheet> 
     final oppositeTeamTitle = isTargetInTeamA ? 'TEAM B' : 'TEAM A';
 
     return ListView(
+      shrinkWrap: true,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       children: [
         // 같은 코트 상대팀과 맞바꿈 섹션
@@ -3633,7 +3637,7 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
 
           // 하단 코트 투입 버튼
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [

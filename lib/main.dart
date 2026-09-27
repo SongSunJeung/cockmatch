@@ -50,6 +50,7 @@ class CockMatchShellScreen extends ConsumerWidget {
     return Scaffold(
       key: AppTheme.rootScaffoldKey,
       backgroundColor: AppTheme.background,
+      resizeToAvoidBottomInset: false,
       drawer: _buildAppDrawer(
         context: context,
         ref: ref,
@@ -84,6 +85,7 @@ class CockMatchShellScreen extends ConsumerWidget {
         borderRadius: BorderRadius.horizontal(right: Radius.circular(24)),
       ),
       child: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

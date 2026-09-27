@@ -61,9 +61,13 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     final filteredMembers = ref.watch(filteredMembersProvider);
     final activeFilter = ref.watch(memberFilterProvider);
 
+    final bool isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0 ||
+        View.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
+        bottom: false,
         child: Stack(
           children: [
             CustomScrollView(
@@ -523,7 +527,12 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 2, 20, 88),
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      2,
+                      20,
+                      (_isMultiSelectMode && !isKeyboardOpen) ? 84 : 16,
+                    ),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -536,11 +545,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   ),
               ],
             ),
-            if (_isMultiSelectMode)
+            if (_isMultiSelectMode && !isKeyboardOpen)
               Positioned(
                 left: 20,
                 right: 20,
-                bottom: 16,
+                bottom: 12,
                 child: _buildMultiSelectMemberSmsBar(
                   context: context,
                   clubMembers: clubMembers,
@@ -3727,7 +3736,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(ctx).size.height * 0.80,
         ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -3765,7 +3774,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
             const Divider(height: 24),
 
             // 클럽 목록
-            Expanded(
+            Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
                 itemCount: clubs.length,
@@ -4070,12 +4079,15 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
           final selectedCount = selectedIds.length;
 
           return Container(
-            height: MediaQuery.of(ctx).size.height * 0.85,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            ),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 12),
                 Center(
@@ -4129,9 +4141,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                 ),
                 const Divider(height: 1),
 
-                Expanded(
+                Flexible(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
                     children: [
                       // 1. 발송 템플릿 칩
                       const Text(
@@ -4333,7 +4346,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
 
                 // 하단 발송 액션 버튼
                 Container(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
