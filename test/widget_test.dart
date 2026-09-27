@@ -31,7 +31,9 @@ void main() {
     expect(find.text('당일 출석 인원'), findsOneWidget);
     expect(find.text('회비 수납 현황'), findsOneWidget);
     expect(find.text('미납자 안내 문자 발송'), findsOneWidget);
-    expect(find.textContaining('모임 경기 전적'), findsOneWidget);
+    // 출석부 화면에서 '모임 경기 전적' 카드 및 상단 '모임 목록' 중복 버튼 제거 확인
+    expect(find.textContaining('모임 경기 전적'), findsNothing);
+    expect(find.text('모임 목록'), findsNothing);
     // '게스트 즉시 추가' 옆 개별 '문자 발송' 버튼이 제거되었는지 확인
     expect(find.text('게스트 즉시 추가'), findsOneWidget);
     expect(find.text('문자 발송'), findsNothing);
@@ -109,10 +111,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('급수: A조 ▾'), findsNothing);
 
-    // 다시 위로 스크롤하여 모임 목록으로 복귀 후 데이터 보존 및 지난 모임 카드 삭제 다이얼로그 확인
+    // 다시 위로 스크롤하여 우측 상단 팝업 메뉴로 모임 목록 복귀 후 데이터 보존 및 지난 모임 카드 삭제 다이얼로그 확인
     await tester.drag(find.byType(CustomScrollView).first, const Offset(0, 250));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('모임 목록'));
+    await tester.tap(find.byKey(const Key('session_header_more_menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('모임 목록 (진행/지난 모임)'));
     await tester.pumpAndSettle();
     expect(find.text('2026.09.22 화요 정기 모임'), findsOneWidget);
 
@@ -458,6 +462,8 @@ void main() {
 
     expect(find.text('오늘 모임 세션 & 대진 설정'), findsNothing);
     expect(find.textContaining('운영 코트 5면'), findsOneWidget);
+    // 대진표 탭 상단에 '모임 경기 전적' 요약 카드가 이동 배치되었는지 확인
+    expect(find.textContaining('모임 경기 전적'), findsOneWidget);
 
     // 2. 대진표 화면 상단 [+ 코트 추가] / [- 코트 축소] 제어 버튼 표시 확인
     final increaseBtn = find.byKey(const Key('increase_court_button'));

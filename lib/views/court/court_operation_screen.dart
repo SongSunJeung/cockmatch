@@ -451,6 +451,12 @@ class CourtOperationScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    // 1-3. 모임 경기 전적 요약 카드 (대진표 탭 상단 배치)
+                    _SessionMatchHistoryCard(
+                      matches: allMatches,
+                      memberMap: memberMap,
+                    ),
                   ],
                 ),
               ),
@@ -3536,3 +3542,190 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
     );
   }
 }
+
+/// 대진표 탭 상단에 배치되는 '모임 경기 전적' 요약 카드 (접기/펼치기 지원)
+class _SessionMatchHistoryCard extends StatefulWidget {
+  final List<GameMatch> matches;
+  final Map<String, Member> memberMap;
+
+  const _SessionMatchHistoryCard({
+    required this.matches,
+    required this.memberMap,
+  });
+
+  @override
+  State<_SessionMatchHistoryCard> createState() => _SessionMatchHistoryCardState();
+}
+
+class _SessionMatchHistoryCardState extends State<_SessionMatchHistoryCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final matches = widget.matches;
+    final memberMap = widget.memberMap;
+    final finishedMatches = matches.where((m) => m.isFinished).toList();
+    final rounds = matches.map((m) => m.round).toSet().toList()..sort();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.pastelPeriwinkle,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.sports_tennis_rounded,
+                    size: 15,
+                    color: AppTheme.pastelPeriwinkleDark,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '모임 경기 전적 (${finishedMatches.length}/${matches.length}경기 완료 · 총 ${rounds.length}R)',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textDark,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  _isExpanded ? '접기' : '전적 펼쳐보기',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: AppTheme.textMuted,
+                ),
+              ],
+            ),
+          ),
+          if (_isExpanded) ...[
+            const SizedBox(height: 10),
+            if (matches.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  '아직 기록된 대진 경기가 없습니다.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                ),
+              )
+            else
+              ...matches.map((m) {
+                final teamANames = m.teamA.map((id) => memberMap[id]?.name ?? '선수').join('·');
+                final teamBNames = m.teamB.map((id) => memberMap[id]?.name ?? '선수').join('·');
+                final aWon = m.isTeamAWon || (m.isFinished && m.scoreA > m.scoreB);
+                final bWon = m.isTeamBWon || (m.isFinished && m.scoreB > m.scoreA);
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${m.round}R · ${m.courtNumber}코트',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          teamANames,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: aWon ? FontWeight.w900 : FontWeight.w600,
+                            color: aWon ? AppTheme.primaryDark : AppTheme.textDark,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: m.isFinished ? AppTheme.pastelMint : AppTheme.pastelYellow,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            m.isFinished ? '${m.scoreA} : ${m.scoreB}' : '진행중',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              color: m.isFinished
+                                  ? AppTheme.pastelMintDark
+                                  : AppTheme.pastelYellowDark,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          teamBNames,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: bWon ? FontWeight.w900 : FontWeight.w600,
+                            color: bWon ? AppTheme.primaryDark : AppTheme.textDark,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
