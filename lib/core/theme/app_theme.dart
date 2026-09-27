@@ -12,17 +12,23 @@ class AppTheme {
   static const Color cardWhite = Colors.white;
   static const Color textDark = Color(0xFF22263A); // 딥 인디고 차콜 타이포그래피
   static const Color textMuted = Color(0xFF8E94AA); // 차분한 쿨 슬레이트 그레이
+  static const Color textPrimary = textDark;
+  static const Color textSecondary = textMuted;
 
   // 통일된 3톤 파스텔 팔레트 (소프트 라벤더 · 스카이 아쿠아 · 소프트 살몬 코랄)
   static const Color pastelCoral = Color(0xFFFFF0EE); // 소프트 살몬 코랄 (경고/미납/포인트)
   static const Color pastelCoralDark = Color(0xFFE2665A);
   static const Color coralRed = Color(0xFFE2665A);
+  static const Color errorRed = pastelCoralDark;
 
   static const Color pastelPeriwinkle = Color(0xFFEEEBFF); // 시그니처 소프트 라벤더 필 (Insight/Journal 톤)
   static const Color pastelPeriwinkleDark = Color(0xFF5A4AD1);
 
   static const Color pastelMint = Color(0xFFE6F7FA); // 소프트 스카이 아쿠아 (출전/완납/긍정 상태)
   static const Color pastelMintDark = Color(0xFF2490A6);
+  static const Color pastelBlue = Color(0xFFE6F7FA);
+  static const Color pastelBlueDark = Color(0xFF2490A6);
+  static const Color accentBlue = pastelBlueDark;
 
   // 기존 노란색/핫핑크 난립을 막기 위해 소프트 라벤더 및 소프트 코랄로 톤앤매너 단일화
   static const Color pastelYellow = Color(0xFFEEEBFF); // 코트 뱃지·휴식 뱃지도 차분한 라벤더 필로 통일

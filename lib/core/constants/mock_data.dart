@@ -739,4 +739,135 @@ class MockData {
 
   /// 기본 초기 세션
   static GameSession initialSession = getInitialSessionForClub('club_mega');
+
+  /// 클럽별 기본 회비 정책 및 계좌 정보 초기값
+  static final Map<String, ClubFeePolicy> initialClubFeePolicies = {
+    'club_mega': const ClubFeePolicy(
+      clubId: 'club_mega',
+      defaultMonthlyFee: 30000,
+      paymentDueDay: 25,
+      bankName: '카카오뱅크',
+      accountNumber: '3333-01-5829104',
+      accountHolder: '김연아(메가배드민턴)',
+      rulesAndMemo: ClubFeePolicy.defaultRulesText,
+    ),
+    'club_gangnam': const ClubFeePolicy(
+      clubId: 'club_gangnam',
+      defaultMonthlyFee: 35000,
+      paymentDueDay: 20,
+      bankName: '신한은행',
+      accountNumber: '110-482-991023',
+      accountHolder: '박서준(강남에이스)',
+      rulesAndMemo:
+          '1. 정기 월 회비: 월 35,000원 (매월 20일 마감)\n'
+          '2. 부부/가족 할인: 1인당 월 25,000원 적용\n'
+          '3. 장기 부상·출장 휴회 신청 시 해당 기간 회비 면제',
+    ),
+    'club_dawn': const ClubFeePolicy(
+      clubId: 'club_dawn',
+      defaultMonthlyFee: 25000,
+      paymentDueDay: 25,
+      bankName: '토스뱅크',
+      accountNumber: '1000-8291-4402',
+      accountHolder: '차은우(새벽콕)',
+      rulesAndMemo:
+          '1. 정기 월 회비: 월 25,000원 (매월 25일 마감)\n'
+          '2. 총무·회장 운영진 회비 면제 적용',
+    ),
+  };
+
+  /// 연간/월별 회비 납부 현황표 초기 시드 데이터 생성 (2025년 ~ 2026년)
+  static Map<String, MonthlyFeeRecord> buildInitialFeeLedgerMap() {
+    final map = <String, MonthlyFeeRecord>{};
+
+    for (final member in initialMembers) {
+      if (member.isGuest) continue;
+      final clubId = member.clubId ?? 'club_mega';
+      final policy = initialClubFeePolicies[clubId] ??
+          ClubFeePolicy(clubId: clubId);
+      final standardFee =
+          FeeLedgerCalculator.getMemberStandardMonthlyFee(member, policy);
+
+      // 2025년: 1~12월 전체 완납(면제자는 자동 면제) 시드
+      for (int m = 1; m <= 12; m++) {
+        final autoReason2025 =
+            FeeLedgerCalculator.resolveAutoExemptReason(member, 2025, m);
+        final key2025 = FeeLedgerCalculator.buildCellKey(
+          clubId: clubId,
+          year: 2025,
+          memberId: member.id,
+          month: m,
+        );
+        if (autoReason2025 != null) {
+          map[key2025] = MonthlyFeeRecord(
+            status: FeeStatus.exempt,
+            paidAmount: 0,
+            memo: autoReason2025,
+          );
+        } else {
+          final mm = m.toString().padLeft(2, '0');
+          map[key2025] = MonthlyFeeRecord(
+            status: FeeStatus.paid,
+            paidAmount: standardFee,
+            paidDate: '2025.$mm.18',
+            memo: member.feePolicy == FeePolicyType.discounted
+                ? '${member.customFeeLabel ?? "할인"} 적용'
+                : '정기 자동이체',
+          );
+        }
+      }
+
+      // 2026년: 1~8월 완납, 9월(당월)은 회원 현재 feeStatus 반영, 10~12월은 미납/면제 기본 반영
+      for (int m = 1; m <= 12; m++) {
+        final autoReason =
+            FeeLedgerCalculator.resolveAutoExemptReason(member, 2026, m);
+        final key = FeeLedgerCalculator.buildCellKey(
+          clubId: clubId,
+          year: 2026,
+          memberId: member.id,
+          month: m,
+        );
+
+        if (autoReason != null) {
+          map[key] = MonthlyFeeRecord(
+            status: FeeStatus.exempt,
+            paidAmount: 0,
+            memo: autoReason,
+          );
+          continue;
+        }
+
+        final mm = m.toString().padLeft(2, '0');
+        if (m <= 8) {
+          map[key] = MonthlyFeeRecord(
+            status: FeeStatus.paid,
+            paidAmount: standardFee,
+            paidDate: '2026.$mm.18',
+            memo: member.feePolicy == FeePolicyType.discounted
+                ? '${member.customFeeLabel ?? "할인"} 적용'
+                : '정기 납부 완료',
+          );
+        } else if (m == 9) {
+          if (member.feeStatus == FeeStatus.paid) {
+            map[key] = MonthlyFeeRecord(
+              status: FeeStatus.paid,
+              paidAmount: standardFee,
+              paidDate: '2026.09.15',
+              memo: member.feePolicy == FeePolicyType.discounted
+                  ? '${member.customFeeLabel ?? "할인"} 입금 완료'
+                  : '9월 정기회비 완납',
+            );
+          } else {
+            map[key] = MonthlyFeeRecord(
+              status: FeeStatus.unpaid,
+              paidAmount: standardFee,
+              memo: '9월 납부 대기',
+            );
+          }
+        }
+      }
+    }
+
+    return map;
+  }
 }

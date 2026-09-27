@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/mock_data.dart';
@@ -109,7 +110,7 @@ final sessionPreferencesProvider =
   SessionPreferencesNotifier.new,
 );
 
-/// 메인 네비게이션 활성 탭 인덱스 Notifier (0: 회원명부, 1: 출석부, 2: 대진표, 3: 웹뷰어)
+/// 메인 네비게이션 활성 탭 인덱스 Notifier (0: 회원명부, 1: 출석부, 2: 대진표, 3: 웹뷰어, 4: 월회비 관리)
 class CurrentTabNotifier extends Notifier<int> {
   @override
   int build() => 1; // 기본(초기) 화면: 출석부 (Index 1)
@@ -119,6 +120,50 @@ class CurrentTabNotifier extends Notifier<int> {
 
 final currentTabProvider = NotifierProvider<CurrentTabNotifier, int>(
   CurrentTabNotifier.new,
+);
+
+const String kIsProUserStorageKey = 'cockmatch_is_pro_user_v1';
+const String kSessionHistoryStorageKey = 'cockmatch_session_history_v1';
+const String kActiveSessionStorageKey = 'cockmatch_active_session_v1';
+const String kSelectedRoundStorageKey = 'cockmatch_selected_round_v1';
+const String kSessionMatchesArchiveStorageKey = 'cockmatch_matches_archive_v1';
+
+/// PRO 유료 플랜 구독 상태 Notifier (월회비 관리 🔒 권한 가드용)
+class IsProUserNotifier extends Notifier<bool> {
+  bool _hasLocalMutation = false;
+
+  @override
+  bool build() {
+    _loadFromStorageAsync();
+    return false;
+  }
+
+  Future<void> _loadFromStorageAsync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getBool(kIsProUserStorageKey);
+      if (saved != null && !_hasLocalMutation) {
+        state = saved;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setProStatus(bool isPro) async {
+    _hasLocalMutation = true;
+    state = isPro;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(kIsProUserStorageKey, isPro);
+    } catch (_) {}
+  }
+
+  Future<void> toggleProStatus() async {
+    await setProStatus(!state);
+  }
+}
+
+final isProUserProvider = NotifierProvider<IsProUserNotifier, bool>(
+  IsProUserNotifier.new,
 );
 
 // ==========================================
@@ -450,24 +495,66 @@ final attendanceSelectionProvider = NotifierProvider<AttendanceSelectionNotifier
 /// - 모임이 종료(완료)되어도 절대 자동 삭제되지 않으며,
 ///   총무가 [모임 기록 영구 삭제]를 수동 실행하고 확인 팝업을 거칠 때만 삭제됨.
 class SessionHistoryNotifier extends Notifier<List<GameSession>> {
+  bool _hasLocalMutation = false;
+
   @override
   List<GameSession> build() {
+    _loadFromStorageAsync();
     return List<GameSession>.from(MockData.initialArchivedSessions);
+  }
+
+  Future<void> _loadFromStorageAsync() async {
+    await restoreFromStorage(respectLocalMutation: true);
+  }
+
+  Future<void> restoreFromStorage({bool respectLocalMutation = false}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kSessionHistoryStorageKey);
+      if (raw != null && raw.trim().isNotEmpty) {
+        if (respectLocalMutation && _hasLocalMutation) return;
+        final decoded = jsonDecode(raw) as List<dynamic>;
+        final loaded = <GameSession>[];
+        for (final item in decoded) {
+          if (item is Map<String, dynamic>) {
+            final id = (item['id'] as String?) ?? '';
+            if (id.isNotEmpty) {
+              loaded.add(GameSession.fromMap(item, id: id));
+            }
+          }
+        }
+        if (loaded.isNotEmpty) {
+          state = loaded;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistToStorage(List<GameSession> sessions) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = sessions.map((s) => {'id': s.id, ...s.toMap()}).toList();
+      await prefs.setString(kSessionHistoryStorageKey, jsonEncode(list));
+    } catch (_) {}
   }
 
   /// 세션 추가 또는 최신 상태 동기화
   void upsertSession(GameSession session) {
+    _hasLocalMutation = true;
     final exists = state.any((s) => s.id == session.id);
     if (exists) {
       state = state.map((s) => s.id == session.id ? session : s).toList();
     } else {
       state = [session, ...state];
     }
+    _persistToStorage(state);
   }
 
   /// [모임 기록 영구 삭제] 수동 실행 시에만 아카이브에서 영구 제거
   void removeSessionPermanently(String sessionId) {
+    _hasLocalMutation = true;
     state = state.where((s) => s.id != sessionId).toList();
+    _persistToStorage(state);
   }
 }
 
@@ -492,10 +579,53 @@ final currentClubArchivedSessionsProvider = Provider<List<GameSession>>((ref) {
 /// 현재 열려 있는 게임 세션 상태 관리 Notifier (null은 모임 목록/미선택 상태)
 class SessionNotifier extends Notifier<GameSession?> {
   final Map<String, GameSession?> _clubSessionsCache = {};
+  bool _hasLocalMutation = false;
 
   @override
   GameSession? build() {
+    _loadFromStorageAsync();
     return null;
+  }
+
+  Future<void> _loadFromStorageAsync() async {
+    await restoreFromStorage(respectLocalMutation: true);
+  }
+
+  /// 로컬 스토리지(SharedPreferences)에서 진행 중인 활성 세션 복원 (새로고침 자동 복구 지원)
+  Future<void> restoreFromStorage({bool respectLocalMutation = false}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kActiveSessionStorageKey);
+      if (raw != null && raw.trim().isNotEmpty) {
+        if (respectLocalMutation && _hasLocalMutation) return;
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        final id = (decoded['id'] as String?) ?? '';
+        if (id.isNotEmpty) {
+          final restored = GameSession.fromMap(decoded, id: id);
+          _clubSessionsCache[restored.clubId] = restored;
+          state = restored;
+          await ref.read(matchesProvider.notifier).restoreFromStorage(
+                respectLocalMutation: respectLocalMutation,
+                targetSessionId: restored.id,
+                targetClubId: restored.clubId,
+              );
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistActiveSession(GameSession? session) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (session == null) {
+        await prefs.remove(kActiveSessionStorageKey);
+      } else {
+        await prefs.setString(
+          kActiveSessionStorageKey,
+          jsonEncode({'id': session.id, ...session.toMap()}),
+        );
+      }
+    } catch (_) {}
   }
 
   @override
@@ -504,39 +634,47 @@ class SessionNotifier extends Notifier<GameSession?> {
   }
 
   void _syncToHistory(GameSession? updated) {
+    _hasLocalMutation = true;
     if (updated != null) {
       _clubSessionsCache[updated.clubId] = updated;
       ref.read(sessionHistoryProvider.notifier).upsertSession(updated);
     }
+    _persistActiveSession(updated);
   }
 
   /// 다른 클럽으로 세션 전환
   void loadSessionForClub(String clubId) {
+    _hasLocalMutation = true;
     final prevClubId = ref.read(currentClubIdProvider);
     if (state != null) {
       _clubSessionsCache[prevClubId] = state;
     }
     state = _clubSessionsCache[clubId];
+    _persistActiveSession(state);
   }
 
   /// 모임 목록에서 특정 모임([진행 모임] 또는 [지난 모임]) 선택하여 열기
   void selectSession(GameSession targetSession) {
+    _hasLocalMutation = true;
     if (targetSession.clubId != ref.read(currentClubIdProvider)) {
       ref.read(currentClubIdProvider.notifier).switchClub(targetSession.clubId);
     }
     _clubSessionsCache[targetSession.clubId] = targetSession;
     state = targetSession;
+    _persistActiveSession(targetSession);
     ref.read(matchesProvider.notifier).loadMatchesForSession(targetSession.id, clubId: targetSession.clubId);
   }
 
   /// 현재 조회 중인 모임 화면을 닫고 모임 목록 화면으로 복귀 (데이터는 100% 보존)
   void closeSessionView() {
+    _hasLocalMutation = true;
     final currentClubId = ref.read(currentClubIdProvider);
     if (state != null) {
       _syncToHistory(state);
     }
     _clubSessionsCache[currentClubId] = null;
     state = null;
+    _persistActiveSession(null);
   }
 
   /// 3단계 생성 플로우를 통해 새 모임 세션 시작 (직전에 저장된 대진 설정값 자동 반영)
@@ -554,6 +692,7 @@ class SessionNotifier extends Notifier<GameSession?> {
     PartnerMode? partnerMode,
     List<List<String>>? fixedPairs,
   }) {
+    _hasLocalMutation = true;
     final savedPrefs = ref.read(sessionPreferencesProvider);
     final recommendedCourts = (attendeeIds.length ~/ 4).clamp(1, 15);
     final effectiveCourtCount =
@@ -615,6 +754,7 @@ class SessionNotifier extends Notifier<GameSession?> {
 
   /// 모임 세션 종료 (아카이빙 보관 정책 적용: 데이터를 절대 삭제하지 않고 [지난 모임]으로 전환)
   void endSession() {
+    _hasLocalMutation = true;
     final current = state;
     final currentClubId = ref.read(currentClubIdProvider);
     if (current != null) {
@@ -636,16 +776,19 @@ class SessionNotifier extends Notifier<GameSession?> {
     }
     _clubSessionsCache[currentClubId] = null;
     state = null;
+    _persistActiveSession(null);
   }
 
   /// [모임 기록 영구 삭제] 총무가 수동으로 확인 팝업을 거쳤을 때만 호출되는 영구 삭제 메서드
   void permanentlyDeleteSession(String sessionId) {
+    _hasLocalMutation = true;
     ref.read(sessionHistoryProvider.notifier).removeSessionPermanently(sessionId);
     ref.read(matchesProvider.notifier).deleteMatchesForSession(sessionId);
 
     _clubSessionsCache.removeWhere((_, s) => s?.id == sessionId);
     if (state?.id == sessionId) {
       state = null;
+      _persistActiveSession(null);
     }
   }
 
@@ -699,6 +842,12 @@ class SessionNotifier extends Notifier<GameSession?> {
   void updateMatchFormat(MatchFormat format) {
     if (state == null) return;
     state = state!.copyWith(matchFormat: format);
+    _syncToHistory(state);
+  }
+
+  void updateCurrentRound(int round) {
+    if (state == null) return;
+    state = state!.copyWith(currentRound: round.clamp(1, 99));
     _syncToHistory(state);
   }
 
@@ -827,10 +976,42 @@ final sessionProvider = NotifierProvider<SessionNotifier, GameSession?>(
 );
 
 class SelectedRoundNotifier extends Notifier<int> {
-  @override
-  int build() => 1;
+  bool _hasLocalMutation = false;
 
-  void setRound(int r) => state = r;
+  @override
+  int build() {
+    _loadFromStorageAsync();
+    return 1;
+  }
+
+  Future<void> _loadFromStorageAsync() async {
+    await restoreFromStorage(respectLocalMutation: true);
+  }
+
+  Future<void> restoreFromStorage({bool respectLocalMutation = false}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getInt(kSelectedRoundStorageKey);
+      if (saved != null && saved >= 1) {
+        if (respectLocalMutation && _hasLocalMutation) return;
+        state = saved;
+      }
+    } catch (_) {}
+  }
+
+  void setRound(int r) {
+    _hasLocalMutation = true;
+    state = r;
+    ref.read(sessionProvider.notifier).updateCurrentRound(r);
+    _persistRound(r);
+  }
+
+  Future<void> _persistRound(int r) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(kSelectedRoundStorageKey, r);
+    } catch (_) {}
+  }
 }
 
 final selectedRoundProvider = NotifierProvider<SelectedRoundNotifier, int>(
@@ -838,7 +1019,7 @@ final selectedRoundProvider = NotifierProvider<SelectedRoundNotifier, int>(
 );
 
 // ==========================================
-// 4. 경기 목록 관리 (세션별 & 클럽별 영구 아카이브 캐시)
+// 4. 경기 목록 관리 (세션별 & 클럽별 영구 아카이브 캐시 + 로컬 스토리지 자동 복구)
 // ==========================================
 
 /// 경기 목록 관리 Notifier
@@ -848,19 +1029,79 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
     for (final entry in MockData.initialArchivedMatches.entries)
       entry.key: List<GameMatch>.from(entry.value),
   };
+  bool _hasLocalMutation = false;
 
   @override
   List<GameMatch> build() {
+    _loadFromStorageAsync();
     return [];
   }
 
+  Future<void> _loadFromStorageAsync() async {
+    await restoreFromStorage(respectLocalMutation: true);
+  }
+
+  /// 로컬 스토리지(SharedPreferences)에서 경기 대진표/점수/상태 복원 (모바일 새로고침 100% 복구)
+  Future<void> restoreFromStorage({
+    bool respectLocalMutation = false,
+    String? targetSessionId,
+    String? targetClubId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kSessionMatchesArchiveStorageKey);
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        for (final entry in decoded.entries) {
+          if (entry.value is List) {
+            final parsedList = <GameMatch>[];
+            for (final item in (entry.value as List)) {
+              if (item is Map<String, dynamic>) {
+                final id = (item['id'] as String?) ?? '';
+                if (id.isNotEmpty) {
+                  parsedList.add(GameMatch.fromMap(item, id: id));
+                }
+              }
+            }
+            if (!respectLocalMutation || !_hasLocalMutation) {
+              _sessionMatchesArchive[entry.key] = parsedList;
+            }
+          }
+        }
+        if (respectLocalMutation && _hasLocalMutation) return;
+        final activeSessionId = targetSessionId ?? ref.read(sessionProvider)?.id;
+        final String activeClubId =
+            targetClubId ?? (ref.read(currentClubIdProvider) as String? ?? 'club_mega');
+        if (activeSessionId != null && _sessionMatchesArchive.containsKey(activeSessionId)) {
+          final restored = List<GameMatch>.from(_sessionMatchesArchive[activeSessionId]!);
+          _clubMatchesCache[activeClubId] = restored;
+          state = restored;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistMatchesArchive() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serializable = <String, dynamic>{};
+      for (final entry in _sessionMatchesArchive.entries) {
+        serializable[entry.key] =
+            entry.value.map((m) => {'id': m.id, ...m.toMap()}).toList();
+      }
+      await prefs.setString(kSessionMatchesArchiveStorageKey, jsonEncode(serializable));
+    } catch (_) {}
+  }
+
   void _saveCurrentSessionMatches(List<GameMatch> matches) {
+    _hasLocalMutation = true;
     final currentSession = ref.read(sessionProvider);
     final currentClubId = ref.read(currentClubIdProvider);
     _clubMatchesCache[currentClubId] = matches;
     if (currentSession != null) {
       _sessionMatchesArchive[currentSession.id] = matches;
     }
+    _persistMatchesArchive();
   }
 
   /// 특정 세션(진행 모임 또는 지난 모임)의 전체 경기 전적 조회
@@ -874,25 +1115,33 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
 
   /// 특정 세션 선택 시 해당 세션의 경기 기록 로드
   void loadMatchesForSession(String sessionId, {String? clubId}) {
+    _hasLocalMutation = true;
     final loaded = _sessionMatchesArchive[sessionId] ?? const <GameMatch>[];
     state = List<GameMatch>.from(loaded);
     if (clubId != null) {
       _clubMatchesCache[clubId] = state;
     }
-    ref.read(selectedRoundProvider.notifier).setRound(1);
+    final activeSession = ref.read(sessionProvider);
+    final initialRound = (activeSession != null && activeSession.id == sessionId)
+        ? activeSession.currentRound
+        : 1;
+    ref.read(selectedRoundProvider.notifier).setRound(initialRound);
   }
 
   /// [모임 기록 영구 삭제] 시 해당 세션의 경기 기록도 함께 삭제
   void deleteMatchesForSession(String sessionId) {
+    _hasLocalMutation = true;
     _sessionMatchesArchive.remove(sessionId);
     final currentSession = ref.read(sessionProvider);
     if (currentSession?.id == sessionId) {
       state = [];
     }
+    _persistMatchesArchive();
   }
 
   /// 클럽 전환 시 해당 클럽의 대진표로 스위치
   void loadMatchesForClub(String clubId) {
+    _hasLocalMutation = true;
     final currentSession = ref.read(sessionProvider);
     if (currentSession != null) {
       _sessionMatchesArchive[currentSession.id] = state;
@@ -1261,8 +1510,396 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
     _saveCurrentSessionMatches(state);
     return newMatch;
   }
+
+  /// [남은 라운드 재편성]:
+  /// - 경기 중 조퇴·지각·휴식 발생 시, 이미 완료된 코트 기록(isFinished)과 이전 라운드 기록은 100% 보존하고
+  ///   대기 중인 코트 및 남은 라운드만 현재 출석 가능 인원(activeAttendees)으로 다시 배정
+  int reshuffleRemainingMatches({int? targetRound}) {
+    final session = ref.read(sessionProvider);
+    if (session == null) return 0;
+
+    final allMembers = ref.read(currentClubMembersProvider);
+    final generator = ref.read(matchGeneratorServiceProvider);
+    final int currentRound =
+        targetRound ?? (ref.read(selectedRoundProvider) as int? ?? 1);
+
+    final currentRoundMatches = state.where((m) => m.round == currentRound).toList();
+    final int maxExistingRound = state.isEmpty
+        ? currentRound
+        : state.map((m) => m.round).reduce((a, b) => a > b ? a : b);
+
+    // 현재 라운드의 모든 코트가 이미 종료(finished)되었고 다음 라운드가 아직 없다면 다음 라운드를 새로 배정
+    final bool allCurrentFinished = currentRoundMatches.isNotEmpty &&
+        currentRoundMatches.every((m) => m.isFinished);
+
+    final int startReshuffleRound =
+        (allCurrentFinished && maxExistingRound == currentRound)
+            ? currentRound + 1
+            : currentRound;
+    final int endReshuffleRound =
+        maxExistingRound > startReshuffleRound ? maxExistingRound : startReshuffleRound;
+
+    // 1. startReshuffleRound 이전의 모든 경기 보존
+    final List<GameMatch> updatedMatches =
+        state.where((m) => m.round < startReshuffleRound).toList();
+    int regeneratedCount = 0;
+
+    // 2. startReshuffleRound부터 endReshuffleRound까지 완료된 코트는 보존하고 미완료(대기) 코트만 현재 출석 인원으로 재편성
+    for (int r = startReshuffleRound; r <= endReshuffleRound; r++) {
+      final preservedInRound = state
+          .where((m) => m.round == r && m.isFinished)
+          .toList();
+      updatedMatches.addAll(preservedInRound);
+
+      final lockedCourts = preservedInRound.map((m) => m.courtNumber).toSet();
+      final lockedPlayers = preservedInRound.expand((m) => m.allPlayerIds).toSet();
+
+      final startCourt = session.startCourtNumber;
+      final allCourtNumbers =
+          List.generate(session.courtCount, (i) => startCourt + i);
+      final openCourts =
+          allCourtNumbers.where((c) => !lockedCourts.contains(c)).toList();
+
+      if (openCourts.isEmpty) continue;
+
+      final availableAttendees = session.activeAttendees
+          .where((id) => !lockedPlayers.contains(id))
+          .toList();
+      if (availableAttendees.length < 4) continue;
+
+      final tempSession = session.copyWith(
+        attendees: availableAttendees,
+        courtCount: openCourts.length,
+        startCourtNumber: openCourts.first,
+      );
+
+      final generated = generator.generateRoundMatches(
+        session: tempSession,
+        allMembers: allMembers,
+        existingMatches: updatedMatches,
+        targetRound: r,
+      );
+
+      for (int i = 0; i < generated.length && i < openCourts.length; i++) {
+        final assignedCourt = openCourts[i];
+        updatedMatches.add(
+          generated[i].copyWith(
+            id: 'reshuffle_r${r}_c${assignedCourt}_${DateTime.now().millisecondsSinceEpoch}_$i',
+            courtNumber: assignedCourt,
+          ),
+        );
+        regeneratedCount++;
+      }
+    }
+
+    state = updatedMatches;
+    _saveCurrentSessionMatches(state);
+    ref.read(selectedRoundProvider.notifier).setRound(startReshuffleRound);
+    return regeneratedCount;
+  }
 }
 
 final matchesProvider = NotifierProvider<MatchesNotifier, List<GameMatch>>(
   MatchesNotifier.new,
+);
+
+// ============================================================================
+// 연간/월별 회비 납부 현황표 & 클럽 기본 회비 정책/회칙 상태 관리 (영구 저장 지원)
+// ============================================================================
+
+const String kClubFeePoliciesStorageKey = 'cockmatch_club_fee_policies_v1';
+const String kFeeLedgerStorageKey = 'cockmatch_fee_ledger_v1';
+
+class ClubFeePoliciesNotifier extends Notifier<Map<String, ClubFeePolicy>> {
+  @override
+  Map<String, ClubFeePolicy> build() {
+    _loadFromStorageAsync();
+    return Map<String, ClubFeePolicy>.from(MockData.initialClubFeePolicies);
+  }
+
+  Future<void> _loadFromStorageAsync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kClubFeePoliciesStorageKey);
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        final loaded = Map<String, ClubFeePolicy>.from(state);
+        for (final entry in decoded.entries) {
+          if (entry.value is Map<String, dynamic>) {
+            loaded[entry.key] = ClubFeePolicy.fromJson(
+              entry.value as Map<String, dynamic>,
+            );
+          }
+        }
+        state = loaded;
+      }
+    } catch (_) {
+      // 테스트 또는 스토리지 미초기화 환경 폴백
+    }
+  }
+
+  Future<void> _persist(Map<String, ClubFeePolicy> current) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serializable = {
+        for (final e in current.entries) e.key: e.value.toJson(),
+      };
+      await prefs.setString(kClubFeePoliciesStorageKey, jsonEncode(serializable));
+    } catch (_) {}
+  }
+
+  Future<void> updatePolicy(ClubFeePolicy updated) async {
+    final next = {...state, updated.clubId: updated};
+    state = next;
+    await _persist(next);
+  }
+
+  Future<void> updateRulesAndMemo(String clubId, String rulesAndMemo) async {
+    final existing = state[clubId] ?? ClubFeePolicy(clubId: clubId);
+    final updated = existing.copyWith(rulesAndMemo: rulesAndMemo);
+    await updatePolicy(updated);
+  }
+}
+
+final clubFeePoliciesProvider =
+    NotifierProvider<ClubFeePoliciesNotifier, Map<String, ClubFeePolicy>>(
+  ClubFeePoliciesNotifier.new,
+);
+
+/// 현재 선택된 클럽의 기본 회비 정책 및 입금 계좌/회칙 Provider
+final currentClubFeePolicyProvider = Provider<ClubFeePolicy>((ref) {
+  final clubId = ref.watch(currentClubIdProvider);
+  final policies = ref.watch(clubFeePoliciesProvider);
+  return policies[clubId] ?? ClubFeePolicy(clubId: clubId);
+});
+
+/// 연간/월별 회비 납부 매트릭스 셀 상태 관리 Notifier
+class FeeLedgerNotifier extends Notifier<Map<String, MonthlyFeeRecord>> {
+  @override
+  Map<String, MonthlyFeeRecord> build() {
+    _loadFromStorageAsync();
+    return MockData.buildInitialFeeLedgerMap();
+  }
+
+  Future<void> _loadFromStorageAsync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kFeeLedgerStorageKey);
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        final loaded = Map<String, MonthlyFeeRecord>.from(state);
+        for (final entry in decoded.entries) {
+          if (entry.value is Map<String, dynamic>) {
+            loaded[entry.key] = MonthlyFeeRecord.fromJson(
+              entry.value as Map<String, dynamic>,
+            );
+          }
+        }
+        state = loaded;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist(Map<String, MonthlyFeeRecord> current) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serializable = {
+        for (final e in current.entries) e.key: e.value.toJson(),
+      };
+      await prefs.setString(kFeeLedgerStorageKey, jsonEncode(serializable));
+    } catch (_) {}
+  }
+
+  /// 특정 회원의 특정 연·월 납부 상태 및 입금일/메모 저장
+  Future<void> updateCellRecord({
+    required String clubId,
+    required int year,
+    required String memberId,
+    required int month,
+    required MonthlyFeeRecord record,
+  }) async {
+    final key = FeeLedgerCalculator.buildCellKey(
+      clubId: clubId,
+      year: year,
+      memberId: memberId,
+      month: month,
+    );
+    final next = {...state, key: record};
+    state = next;
+
+    // 2026년 9월(당월) 상태 변경 시 회원 프로필의 당월 feeStatus와도 자동 동기화
+    if (year == 2026 && month == 9) {
+      ref.read(membersProvider.notifier).updateFeeStatus(memberId, record.status);
+    }
+
+    await _persist(next);
+  }
+
+  /// 셀 클릭 시 상태 원터치 토글: [완납(녹색 체크)] ↔ [미납(붉은 점)] ↔ [면제·휴면(회색 대시)]
+  Future<FeeStatus> cycleCellStatus({
+    required String clubId,
+    required int year,
+    required Member member,
+    required int month,
+    required ClubFeePolicy policy,
+  }) async {
+    final currentRec = FeeLedgerCalculator.resolveCellRecord(
+      ledgerMap: state,
+      clubId: clubId,
+      year: year,
+      month: month,
+      member: member,
+      policy: policy,
+    );
+    final FeeStatus nextStatus = switch (currentRec.status) {
+      FeeStatus.paid => FeeStatus.unpaid,
+      FeeStatus.unpaid => FeeStatus.exempt,
+      FeeStatus.exempt => FeeStatus.paid,
+    };
+    final standardFee =
+        FeeLedgerCalculator.getMemberStandardMonthlyFee(member, policy);
+    final now = DateTime.now();
+    final todayStr =
+        '${now.year}.${now.month.toString().padLeft(2, '0')}.${now.day.toString().padLeft(2, '0')}';
+
+    final updatedRecord = MonthlyFeeRecord(
+      status: nextStatus,
+      paidAmount: nextStatus == FeeStatus.paid ? standardFee : 0,
+      paidDate: nextStatus == FeeStatus.paid ? (currentRec.paidDate ?? todayStr) : null,
+      memo: currentRec.memo,
+      isManualOverride: true,
+    );
+    await updateCellRecord(
+      clubId: clubId,
+      year: year,
+      memberId: member.id,
+      month: month,
+      record: updatedRecord,
+    );
+    return nextStatus;
+  }
+
+  /// 특정 회원의 연간(1~12월) 또는 상반기(1~6월)/하반기(7~12월) 회비 일괄 완납 처리 ([1년 일괄 완납])
+  Future<int> markMemberPeriodAllPaid({
+    required String clubId,
+    required int year,
+    required Member member,
+    required ClubFeePolicy policy,
+    int startMonth = 1,
+    int endMonth = 12,
+    String? paidDate,
+    String? memo,
+  }) async {
+    final next = Map<String, MonthlyFeeRecord>.from(state);
+    final standardFee =
+        FeeLedgerCalculator.getMemberStandardMonthlyFee(member, policy);
+    final effectiveFee = standardFee > 0 ? standardFee : policy.defaultMonthlyFee;
+    final now = DateTime.now();
+    final effectiveDate = paidDate ??
+        '${now.year}.${now.month.toString().padLeft(2, '0')}.${now.day.toString().padLeft(2, '0')}';
+    final effectiveMemo = memo ??
+        (startMonth == 1 && endMonth == 12
+            ? '1년 일괄 완납'
+            : '$startMonth~$endMonth월 일괄 완납');
+
+    int updatedCount = 0;
+    for (int m = startMonth; m <= endMonth; m++) {
+      final key = FeeLedgerCalculator.buildCellKey(
+        clubId: clubId,
+        year: year,
+        memberId: member.id,
+        month: m,
+      );
+      next[key] = MonthlyFeeRecord(
+        status: FeeStatus.paid,
+        paidAmount: effectiveFee,
+        paidDate: effectiveDate,
+        memo: effectiveMemo,
+        isManualOverride: true,
+      );
+      if (year == 2026 && m == 9) {
+        ref.read(membersProvider.notifier).updateFeeStatus(member.id, FeeStatus.paid);
+      }
+      updatedCount++;
+    }
+
+    state = next;
+    await _persist(next);
+    return updatedCount;
+  }
+
+  /// 수동 오버라이드를 해제하고 회원 프로필(면제/휴면/기본액) 자동 연동 상태로 복원
+  Future<void> resetCellToAutoDefault({
+    required String clubId,
+    required int year,
+    required String memberId,
+    required int month,
+  }) async {
+    final key = FeeLedgerCalculator.buildCellKey(
+      clubId: clubId,
+      year: year,
+      memberId: memberId,
+      month: month,
+    );
+    final next = Map<String, MonthlyFeeRecord>.from(state)..remove(key);
+    state = next;
+    await _persist(next);
+  }
+
+  /// 특정 월의 미납 활동 회원 전원을 일괄 완납 처리
+  Future<int> markMonthAllPaid({
+    required String clubId,
+    required int year,
+    required int month,
+    required List<Member> members,
+    required ClubFeePolicy policy,
+    required String paidDate,
+  }) async {
+    final next = Map<String, MonthlyFeeRecord>.from(state);
+    int updatedCount = 0;
+
+    for (final member in members) {
+      if (member.isGuest) continue;
+      final currentRec = FeeLedgerCalculator.resolveCellRecord(
+        ledgerMap: next,
+        clubId: clubId,
+        year: year,
+        month: month,
+        member: member,
+        policy: policy,
+      );
+      if (currentRec.status == FeeStatus.unpaid) {
+        final key = FeeLedgerCalculator.buildCellKey(
+          clubId: clubId,
+          year: year,
+          memberId: member.id,
+          month: month,
+        );
+        final standardFee =
+            FeeLedgerCalculator.getMemberStandardMonthlyFee(member, policy);
+        next[key] = MonthlyFeeRecord(
+          status: FeeStatus.paid,
+          paidAmount: standardFee,
+          paidDate: paidDate,
+          memo: '일괄 완납 처리',
+          isManualOverride: true,
+        );
+        if (year == 2026 && month == 9) {
+          ref.read(membersProvider.notifier).updateFeeStatus(member.id, FeeStatus.paid);
+        }
+        updatedCount++;
+      }
+    }
+
+    if (updatedCount > 0) {
+      state = next;
+      await _persist(next);
+    }
+    return updatedCount;
+  }
+}
+
+final feeLedgerProvider =
+    NotifierProvider<FeeLedgerNotifier, Map<String, MonthlyFeeRecord>>(
+  FeeLedgerNotifier.new,
 );

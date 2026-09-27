@@ -1455,6 +1455,27 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                 bg: AppTheme.pastelPeriwinkle.withValues(alpha: 0.65),
                 fg: AppTheme.pastelPeriwinkleDark,
               ),
+              InkWell(
+                onTap: () => ref.read(currentTabProvider.notifier).setTab(4),
+                borderRadius: BorderRadius.circular(7),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryDark,
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: const Text(
+                    '📊 연간/월별 회비 현황표 →',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -2659,7 +2680,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     );
   }
 
-  /// 6. 하단 플로팅 액션 바 [출전 가능 N명 · 대진표 설정 및 이동]
+  /// 6. 하단 플로팅 액션 바 [출전 가능 N명 · 대진표 동적 상태 전환 및 진입 보호]
   Widget _buildBottomConfirmBar({
     required BuildContext context,
     required WidgetRef ref,
@@ -2668,9 +2689,11 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
   }) {
     final possibleCourts = (activeCount ~/ 4).clamp(0, 15);
     final canGenerate = activeCount >= 4;
+    final matches = ref.watch(matchesProvider);
+    final hasOngoingBracket = matches.isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF7565E8), Color(0xFF6151D8)],
@@ -2695,38 +2718,97 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.sports_tennis_rounded, size: 16, color: Colors.white),
-                    const SizedBox(width: 6),
-                    Text(
-                      '출전 $activeCount명',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
+                    const Icon(Icons.sports_tennis_rounded, size: 15, color: Colors.white),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        '출전 $activeCount명',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  canGenerate
-                      ? '최대 $possibleCourts코트 가동 가능 (${activeCount % 4}명 대기)'
-                      : '4명 이상 출전 시 대진표 생성 가능',
-                  style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.82)),
+                  hasOngoingBracket
+                      ? '진행 대진 ${matches.length}경기 보존 중'
+                      : (canGenerate
+                          ? '최대 $possibleCourts코트 가동 (${activeCount % 4}명 대기)'
+                          : '4명 이상 출전 시 대진 생성 가능'),
+                  style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.85)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-
-          // 대진 설정 & 이동 버튼 (참조 이미지의 화이트 캡슐 CTA 스타일)
+          const SizedBox(width: 6),
+          // 동적 기본 액션 버튼: 초기 [⚡ 대진 생성 및 시작] ↔ 진행 중 [📋 현재 대진표 이어보기]
+          ElevatedButton(
+            key: Key(
+              hasOngoingBracket
+                  ? 'bottom_bar_continue_bracket_button'
+                  : 'bottom_bar_generate_bracket_button',
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: (hasOngoingBracket || canGenerate)
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.25),
+              foregroundColor: (hasOngoingBracket || canGenerate)
+                  ? AppTheme.primaryDark
+                  : Colors.white70,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: hasOngoingBracket
+                ? () {
+                    // 기존 데이터 유실 없이 단순 화면 이동만 수행
+                    ref.read(currentTabProvider.notifier).setTab(2);
+                  }
+                : (canGenerate
+                    ? () {
+                        _showSessionConfirmSheet(
+                          context,
+                          ref,
+                          session.activeAttendees,
+                          session,
+                        );
+                      }
+                    : null),
+            child: Text(
+              hasOngoingBracket ? '📋 현재 대진표 이어보기' : '⚡ 대진 생성 및 시작',
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // 대진 설정 & 이동 버튼 (상세 설정 및 부분 재편성/초기화 모달 호출)
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: canGenerate ? Colors.white : Colors.white.withValues(alpha: 0.25),
-              foregroundColor: canGenerate ? AppTheme.primaryDark : Colors.white70,
+              backgroundColor: canGenerate
+                  ? Colors.white.withValues(alpha: 0.18)
+                  : Colors.white.withValues(alpha: 0.1),
+              foregroundColor: canGenerate ? Colors.white : Colors.white54,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            icon: const Icon(Icons.tune_rounded, size: 16),
+            icon: const Icon(Icons.tune_rounded, size: 14),
             label: const Text(
               '대진 설정 & 이동',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5),
             ),
             onPressed: canGenerate
                 ? () {
@@ -4471,20 +4553,13 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             ),
           ),
           const SizedBox(height: 12),
-          // 6. 세션 시작 및 대진표 화면으로 바로 이동 버튼 (하단 고정)
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              key: const Key('start_session_and_generate_button'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryMint,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0,
-              ),
-              onPressed: () {
-                // [전원 고정 페어] 모드에서 미편성 인원이 남아있을 경우 자동으로 2인 페어 보완
+          // 6. 대진표 상태에 따른 동적 버튼 전환 및 안전장치 (Part 1)
+          Builder(
+            builder: (btnCtx) {
+              final existingMatches = ref.watch(matchesProvider);
+              final hasOngoingMatches = existingMatches.isNotEmpty;
+
+              void executeFullGenerate() {
                 List<List<String>> finalFixedPairs = List<List<String>>.from(fixedPairs);
                 if (partnerMode == PartnerMode.fixedAll && unpairedMembers.length >= 2) {
                   final autoPairs = ref.read(matchGeneratorServiceProvider).autoPairByTier(
@@ -4495,7 +4570,6 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   finalFixedPairs = [...finalFixedPairs, ...autoPairs];
                 }
 
-                // 새 세션 시작 및 1라운드 대진 생성 (대진표 화면 자동 전환 포함)
                 ref.read(matchesProvider.notifier).startNewSessionAndGenerate(
                       attendeeIds: selectedIds,
                       courtCount: courtCount,
@@ -4526,19 +4600,193 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                     ),
                   ),
                 );
-              },
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              }
+
+              void showDestructiveRegenerateWarning() {
+                showDialog(
+                  context: ctx,
+                  builder: (dCtx) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: AppTheme.errorRed, size: 24),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '대진표 초기화 후 재생성',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    content: const Text(
+                      '⚠️ 경고: 이미 진행된 매칭과 입력된 경기 점수/기록이 모두 영구 삭제됩니다. 정말 새로 생성하시겠습니까?',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        key: const Key('cancel_regenerate_bracket_button'),
+                        onPressed: () => Navigator.pop(dCtx),
+                        child: const Text(
+                          '취소 (기존 유지)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                      ElevatedButton(
+                        key: const Key('confirm_regenerate_bracket_button'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.errorRed,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(dCtx);
+                          executeFullGenerate();
+                        },
+                        child: const Text(
+                          '기록 삭제 후 새로 생성',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              if (!hasOngoingMatches) {
+                return SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    key: const Key('start_session_and_generate_button'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryMint,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    onPressed: executeFullGenerate,
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.bolt_rounded, size: 20),
+                        SizedBox(width: 6),
+                        Text(
+                          '⚡ 대진 생성 및 시작',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.rocket_launch_rounded, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    '세션 시작 & 대진 생성',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      key: const Key('continue_existing_bracket_button'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryMint,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        ref.read(currentTabProvider.notifier).setTab(2);
+                      },
+                      child: const Text(
+                        '📋 현재 대진표 이어보기',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          key: const Key('reshuffle_remaining_rounds_button'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.accentBlue,
+                            side: BorderSide(color: AppTheme.accentBlue.withValues(alpha: 0.45)),
+                            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            ref.read(sessionProvider.notifier).updateCourtCount(courtCount);
+                            ref.read(sessionProvider.notifier).updateStartCourtNumber(startCourtNumber);
+                            ref.read(sessionProvider.notifier).updateMatchMode(matchMode);
+                            ref.read(sessionProvider.notifier).updateMatchFormat(matchFormat);
+                            ref.read(sessionProvider.notifier).updateMatchType(matchType);
+                            final count = ref
+                                .read(matchesProvider.notifier)
+                                .reshuffleRemainingMatches();
+                            Navigator.pop(ctx);
+                            ref.read(currentTabProvider.notifier).setTab(2);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: AppTheme.primaryDark,
+                                content: Text(
+                                  '완료된 경기 기록은 보존하고 대기 코트/남은 라운드($count경기)를 현재 출석 인원으로 재편성했습니다.',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.autorenew_rounded, size: 15),
+                          label: const Text(
+                            '남은 라운드 재편성',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          key: const Key('start_session_and_generate_button'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.errorRed,
+                            side: BorderSide(color: AppTheme.errorRed.withValues(alpha: 0.45)),
+                            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: showDestructiveRegenerateWarning,
+                          icon: const Icon(Icons.restart_alt_rounded, size: 15),
+                          label: const Text(
+                            '대진표 초기화 후 재생성',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),

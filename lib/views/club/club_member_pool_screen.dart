@@ -150,6 +150,17 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                           ),
                         ),
                         IconButton(
+                          icon: const Icon(
+                            Icons.account_balance_wallet_rounded,
+                            size: 20,
+                            color: AppTheme.primaryDark,
+                          ),
+                          tooltip: '연간/월별 회비 납부 현황표',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () =>
+                              ref.read(currentTabProvider.notifier).setTab(4),
+                        ),
+                        IconButton(
                           icon: const Icon(Icons.sms_rounded, size: 21, color: AppTheme.primaryMint),
                           tooltip: '단체 문자 발송',
                           visualDensity: VisualDensity.compact,
@@ -2076,10 +2087,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                     ),
                     const SizedBox(height: 8),
 
-                    // 옵션 1: [기본 회비 부과]
+                    // 옵션 1: [기본 회비 부과] (클럽 기본 월 회비 설정값 자동 연동)
                     _buildFeePolicyOptionTile(
                       title: '기본 회비 부과',
-                      subtitle: '기본값 - 클럽 기본 정기/일일회비 적용',
+                      subtitle:
+                          '기본값 - 클럽 기본 월 회비(${ref.read(currentClubFeePolicyProvider).formattedDefaultFee}) 및 일일회비 연동',
                       icon: Icons.payments_outlined,
                       isSelected: selectedFeePolicy == FeePolicyType.standard,
                       onTap: () => setModalState(() => selectedFeePolicy = FeePolicyType.standard),

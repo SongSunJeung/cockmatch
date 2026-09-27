@@ -322,6 +322,14 @@ class CourtOperationScreen extends ConsumerWidget {
                           ),
                         ),
                         IconButton(
+                          key: const Key('court_header_live_viewer_button'),
+                          icon: const Icon(Icons.live_tv_rounded, color: AppTheme.primaryDark),
+                          tooltip: '실시간 전광판 웹뷰어',
+                          onPressed: () {
+                            ref.read(currentTabProvider.notifier).setTab(3);
+                          },
+                        ),
+                        IconButton(
                           icon: const Icon(Icons.leaderboard_rounded, color: AppTheme.textDark),
                           tooltip: '실시간 랭킹 순위표',
                           onPressed: () => _showRankingsDialog(context, ref, allMatches, allMembers),
@@ -512,8 +520,9 @@ class CourtOperationScreen extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
                             children: [
                               OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
@@ -541,7 +550,38 @@ class CourtOperationScreen extends ConsumerWidget {
                                   allMembers,
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              OutlinedButton.icon(
+                                key: const Key('court_reshuffle_remaining_button'),
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: AppTheme.accentBlue,
+                                  side: BorderSide(color: AppTheme.accentBlue.withValues(alpha: 0.45)),
+                                  minimumSize: const Size(0, 32),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                                ),
+                                icon: const Icon(Icons.autorenew_rounded, size: 14),
+                                label: const Text(
+                                  '남은 라운드 재편성',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                ),
+                                onPressed: () {
+                                  final count = ref
+                                      .read(matchesProvider.notifier)
+                                      .reshuffleRemainingMatches(targetRound: selectedRound);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: AppTheme.primaryDark,
+                                      content: Text(
+                                        '✅ 완료된 코트 기록은 보존하고 대기 코트/남은 라운드($count경기)를 현재 출석 인원으로 재편성했습니다.',
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                               ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.primaryDark,
@@ -567,6 +607,111 @@ class CourtOperationScreen extends ConsumerWidget {
                                   allMatches: allMatches,
                                 ),
                               ),
+                              if (allMatches.isNotEmpty)
+                                OutlinedButton.icon(
+                                  key: const Key('court_reset_and_regenerate_button'),
+                                  style: OutlinedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: AppTheme.errorRed,
+                                    side: BorderSide(color: AppTheme.errorRed.withValues(alpha: 0.45)),
+                                    minimumSize: const Size(0, 32),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                                  ),
+                                  icon: const Icon(Icons.restart_alt_rounded, size: 14),
+                                  label: const Text(
+                                    '대진표 초기화 후 재생성',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                  ),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (dCtx) => AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        title: const Row(
+                                          children: [
+                                            Icon(
+                                              Icons.warning_amber_rounded,
+                                              color: AppTheme.errorRed,
+                                              size: 24,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                '대진표 초기화 후 재생성',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w900,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        content: const Text(
+                                          '⚠️ 경고: 이미 진행된 매칭과 입력된 경기 점수/기록이 모두 영구 삭제됩니다. 정말 새로 생성하시겠습니까?',
+                                          style: TextStyle(
+                                            fontSize: 13.5,
+                                            height: 1.45,
+                                            color: AppTheme.textSecondary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(dCtx),
+                                            child: const Text(
+                                              '취소 (기존 유지)',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                color: AppTheme.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppTheme.errorRed,
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            onPressed: () {
+                                              Navigator.pop(dCtx);
+                                              ref
+                                                  .read(matchesProvider.notifier)
+                                                  .startNewSessionAndGenerate(
+                                                    attendeeIds: session.activeAttendees,
+                                                    courtCount: session.courtCount,
+                                                    startCourtNumber: session.startCourtNumber,
+                                                    matchMode: session.matchMode,
+                                                    matchFormat: session.matchFormat,
+                                                    matchType: session.matchType,
+                                                    partnerMode: session.partnerMode,
+                                                    fixedPairs: session.fixedPairs,
+                                                  );
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  backgroundColor: AppTheme.primaryDark,
+                                                  content: Text('대진표가 초기화되고 1라운드부터 새로 생성되었습니다.'),
+                                                ),
+                                              );
+                                            },
+                                            child: const Text(
+                                              '기록 삭제 후 새로 생성',
+                                              style: TextStyle(fontWeight: FontWeight.w900),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                             ],
                           ),
                         ],

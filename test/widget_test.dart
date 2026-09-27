@@ -552,6 +552,109 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('대진 설정 & 이동'), findsOneWidget);
   });
+
+  testWidgets('Part 1~3 통합 검증: 대진표 안전장치/재편성, PRO 잠금 가드 & 연간 회비 현황표, 3화면 스와이프', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: CockMatchApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // [Part 3-1] 메인 3개 화면(회원명부 0 ↔ 출석부 1 ↔ 대진표 2) PageView 존재 확인
+    expect(find.byKey(const Key('main_three_tab_page_view')), findsOneWidget);
+
+    // [Part 3-2] 좌측 드로어 메뉴에서 [월회비 관리 🔒] 클릭 시 비구독자(isProUser == false) 안내 모달 노출 검증
+    await tester.tap(find.byTooltip('메뉴 열기').first);
+    await tester.pumpAndSettle();
+    expect(find.text('월회비 관리 🔒'), findsOneWidget);
+    await tester.tap(find.text('월회비 관리 🔒'));
+    await tester.pumpAndSettle();
+
+    // 비구독자 진입 차단 및 PRO 기능 안내 모달 확인
+    expect(
+      find.text('클럽 총무님을 위한 연간 회비 장부 및 미납 알림 기능 안내'),
+      findsOneWidget,
+    );
+
+    // 모달에서 [PRO 구독 활성화 후 열기] 클릭 -> isProUser == true 전환 및 회비 현황표 오픈 확인
+    await tester.tap(find.byKey(const Key('activate_pro_and_open_fee_ledger_button')));
+    await tester.pumpAndSettle();
+
+    // [Part 2] 연간/월별 회비 납부 현황표 핵심 UI 검증
+    expect(find.text('연간/월별 회비 납부 현황표'), findsOneWidget);
+    expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsOneWidget);
+    expect(find.text('30,000원'), findsWidgets);
+    expect(find.text('매월 25일'), findsOneWidget);
+
+    // [📜 클럽 회비 회칙 & 메모란] 아코디언 펼치기 및 접기 확인
+    expect(find.text('클럽 회비 회칙 & 메모란'), findsOneWidget);
+    await tester.tap(find.text('클럽 회비 회칙 & 메모란'));
+    await tester.pumpAndSettle();
+    expect(find.text('회칙/메모 영구 저장'), findsOneWidget);
+    await tester.tap(find.text('클럽 회비 회칙 & 메모란'));
+    await tester.pumpAndSettle();
+
+    // 상단 대시보드 통계(당월 수납액 · 당월 미납액) 및 액션 툴바 버튼 확인
+    expect(find.textContaining('당월 수납액'), findsOneWidget);
+    expect(find.textContaining('당월 미납액'), findsOneWidget);
+    expect(find.text('📢 당월 미납자 알림 문구 복사'), findsOneWidget);
+    expect(find.text('📸 장부 이미지 내보내기'), findsOneWidget);
+    expect(find.text('🔗 실시간 회비 웹뷰어 링크 복사'), findsOneWidget);
+    expect(find.text('📊 엑셀 다운로드'), findsOneWidget);
+
+    // [실시간 웹뷰어] 진입 시 읽기 전용 뷰어 및 하단 배너 광고 슬롯 노출 확인
+    await tester.tap(find.text('실시간 웹뷰어'));
+    await tester.pumpAndSettle();
+    expect(find.text('LIVE 읽기 전용 웹뷰어'), findsOneWidget);
+    expect(find.textContaining('하단 스폰서/광고 배너'), findsOneWidget);
+  });
+
+  testWidgets('Part 1 대진표 안전장치: [📋 현재 대진표 이어보기], 2단계 초기화 경고 모달, [남은 라운드 재편성] 검증', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: CockMatchApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 대진 기록이 있는 모임('2026.09.22 화요 정기 모임') 열기
+    final archivedCard = find.text('2026.09.22 화요 정기 모임');
+    await tester.ensureVisible(archivedCard);
+    await tester.pumpAndSettle();
+    await tester.tap(archivedCard);
+    await tester.pumpAndSettle();
+
+    // 1. 이미 대진표가 생성된 상태이므로 하단 기본 버튼이 [📋 현재 대진표 이어보기]로 표시되는지 확인
+    expect(find.text('📋 현재 대진표 이어보기'), findsOneWidget);
+
+    // 2. [대진 설정 & 이동] 모달 내부에서도 [📋 현재 대진표 이어보기], [남은 라운드 재편성], [대진표 초기화 후 재생성] 분리 확인
+    await tester.tap(find.text('대진 설정 & 이동'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('continue_existing_bracket_button')), findsOneWidget);
+    expect(find.byKey(const Key('reshuffle_remaining_rounds_button')), findsOneWidget);
+    expect(find.text('대진표 초기화 후 재생성'), findsOneWidget);
+
+    // 3. [대진표 초기화 후 재생성] 클릭 시 2단계 파괴적 액션 방지 경고 모달 필수 노출 확인
+    await tester.tap(find.text('대진표 초기화 후 재생성'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('⚠️ 경고: 이미 진행된 매칭과 입력된 경기 점수/기록이 모두 영구 삭제됩니다. 정말 새로 생성하시겠습니까?'),
+      findsOneWidget,
+    );
+    expect(find.text('취소 (기존 유지)'), findsOneWidget);
+    expect(find.text('기록 삭제 후 새로 생성'), findsOneWidget);
+
+    // [취소 (기존 유지)] 클릭 시 기존 대진표 유지 확인
+    await tester.tap(find.text('취소 (기존 유지)'));
+    await tester.pumpAndSettle();
+
+    // [📋 현재 대진표 이어보기] 클릭 시 기존 데이터 유실 없이 대진표 화면으로 즉시 이동 확인
+    await tester.tap(find.byKey(const Key('continue_existing_bracket_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('court_reshuffle_remaining_button')), findsOneWidget);
+    expect(find.byKey(const Key('court_header_live_viewer_button')), findsOneWidget);
+  });
 }
 
 

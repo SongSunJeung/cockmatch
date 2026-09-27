@@ -838,6 +838,205 @@ void main() {
       expect(r1Preserved.every((m) => m.isFinished && m.scoreA == 21 && m.scoreB == 15), isTrue);
     });
   });
+
+  group('연간/월별 회비 납부 현황표 & 회원 프로필 자동 연동 테스트', () {
+    test('회원 프로필(가족할인 차등 금액 / 영구·기간 면제 / 휴면 기간) 자동 연동 및 수납 통계 검증', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final policy = container.read(currentClubFeePolicyProvider);
+      expect(policy.defaultMonthlyFee, equals(30000));
+      expect(policy.paymentDueDay, equals(25));
+
+      final members = container.read(currentClubMembersProvider);
+      final ledgerMap = container.read(feeLedgerProvider);
+
+      // 1) 차등 할인 회원(강호동 m06: 가족할인 20,000원) 기준액 검증
+      final discountedMember = members.firstWhere((m) => m.id == 'm06');
+      expect(
+        FeeLedgerCalculator.getMemberStandardMonthlyFee(discountedMember, policy),
+        equals(20000),
+      );
+
+      // 2) 영구 면제 회원(이용대 m02: 회장) 및 기간 면제 회원(김연아 m04: ~2026.12.31) 자동 면제 검증
+      final presidentMember = members.firstWhere((m) => m.id == 'm02');
+      final managerMember = members.firstWhere((m) => m.id == 'm04');
+      expect(
+        FeeLedgerCalculator.resolveCellRecord(
+          ledgerMap: ledgerMap,
+          clubId: 'club_mega',
+          year: 2026,
+          month: 9,
+          member: presidentMember,
+          policy: policy,
+        ).status,
+        equals(FeeStatus.exempt),
+      );
+      expect(
+        FeeLedgerCalculator.resolveCellRecord(
+          ledgerMap: ledgerMap,
+          clubId: 'club_mega',
+          year: 2026,
+          month: 9,
+          member: managerMember,
+          policy: policy,
+        ).status,
+        equals(FeeStatus.exempt),
+      );
+
+      // 3) 휴면 회원(아이유 m21: 2026.09.01 ~ 2026.11.30 엘보 부상) 9~11월 자동 면제/휴면 세팅 검증
+      final restingMember = members.firstWhere((m) => m.id == 'm21');
+      for (final m in [9, 10, 11]) {
+        final rec = FeeLedgerCalculator.resolveCellRecord(
+          ledgerMap: ledgerMap,
+          clubId: 'club_mega',
+          year: 2026,
+          month: m,
+          member: restingMember,
+          policy: policy,
+        );
+        expect(rec.status, equals(FeeStatus.exempt));
+      }
+
+      // 4) 당월(9월) 수납 요약 및 미납자 카톡 독려 문구 / 엑셀(UTF-8 BOM) 생성 검증
+      final summary = FeeLedgerCalculator.calculateMonthlySummary(
+        ledgerMap: ledgerMap,
+        clubId: 'club_mega',
+        year: 2026,
+        month: 9,
+        members: members,
+        policy: policy,
+      );
+      expect(summary.paidCount, equals(16));
+      expect(summary.unpaidCount, equals(2));
+      expect(summary.exemptCount, equals(3));
+
+      final kakaoMsg = FeeLedgerCalculator.buildKakaoUnpaidReminderMessage(
+        clubName: '메가 배드민턴 클럽',
+        year: 2026,
+        month: 9,
+        summary: summary,
+        policy: policy,
+      );
+      expect(kakaoMsg, contains(policy.accountNumber));
+      expect(kakaoMsg, contains('조규성'));
+      expect(kakaoMsg, contains('배수지'));
+
+      final csvBytes = FeeLedgerCalculator.buildAnnualLedgerCsvBytes(
+        clubName: '메가 배드민턴 클럽',
+        clubId: 'club_mega',
+        year: 2026,
+        members: members,
+        ledgerMap: ledgerMap,
+        policy: policy,
+      );
+      expect(csvBytes.sublist(0, 3), equals([0xEF, 0xBB, 0xBF]));
+    });
+
+    test('[남은 라운드 재편성], [1년 일괄 완납], 로컬 스토리지 실시간 자동 복구 검증', () async {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final members = container.read(currentClubMembersProvider);
+      final attendeeIds = members
+          .where((m) => m.status == MemberStatus.active)
+          .take(12)
+          .map((m) => m.id)
+          .toList();
+
+      // 1) 세션 생성 및 1라운드(3코트) 대진 생성
+      container.read(sessionProvider.notifier).createSession(
+            clubId: 'club_mega',
+            title: '테스트 모임',
+            memberFee: 5000,
+            guestFee: 10000,
+            attendeeIds: attendeeIds,
+            courtCount: 3,
+          );
+      container.read(matchesProvider.notifier).startNewSessionAndGenerate(
+            attendeeIds: attendeeIds,
+            courtCount: 3,
+            matchMode: MatchMode.tiered,
+          );
+
+      final initialMatches = container.read(matchesProvider);
+      expect(initialMatches.length, equals(3));
+
+      // 1번 코트 경기 종료(점수 25:19) 처리
+      final court1Match = initialMatches.firstWhere((m) => m.courtNumber == 1);
+      container.read(matchesProvider.notifier).updateScore(
+            court1Match.id,
+            25,
+            19,
+            status: MatchStatus.finished,
+          );
+
+      // 2번 코트 배정 선수 중 1명 조퇴(withdrawn) 발생
+      final court2Match = initialMatches.firstWhere((m) => m.courtNumber == 2);
+      final withdrawnPlayerId = court2Match.teamA.first;
+      container
+          .read(sessionProvider.notifier)
+          .updateAttendeeStatus(withdrawnPlayerId, AttendanceStatus.withdrawn);
+
+      // [남은 라운드 재편성] 실행 -> 완료된 1번 코트 기록(25:19)은 보존되고, 미완료 코트는 조퇴자를 제외하고 재편성
+      container.read(matchesProvider.notifier).reshuffleRemainingMatches(targetRound: 1);
+      final reshuffledMatches = container.read(matchesProvider);
+
+      final preservedCourt1 = reshuffledMatches.firstWhere((m) => m.courtNumber == 1);
+      expect(preservedCourt1.isFinished, isTrue);
+      expect(preservedCourt1.scoreA, equals(25));
+      expect(preservedCourt1.scoreB, equals(19));
+
+      final openCourtMatches = reshuffledMatches.where((m) => !m.isFinished).toList();
+      for (final m in openCourtMatches) {
+        expect(m.allPlayerIds.contains(withdrawnPlayerId), isFalse);
+      }
+
+      // 2) [1년 일괄 완납] 검증
+      final policy = container.read(currentClubFeePolicyProvider);
+      final targetMember = members.firstWhere((m) => m.id == 'm07'); // 조규성 (9월 미납 상태)
+      final updatedMonths = await container
+          .read(feeLedgerProvider.notifier)
+          .markMemberPeriodAllPaid(
+            clubId: 'club_mega',
+            year: 2026,
+            member: targetMember,
+            policy: policy,
+          );
+      expect(updatedMonths, equals(12));
+      final updatedLedger = container.read(feeLedgerProvider);
+      expect(
+        FeeLedgerCalculator.calculateMemberPaidMonthsCount(
+          ledgerMap: updatedLedger,
+          clubId: 'club_mega',
+          year: 2026,
+          member: targetMember,
+          policy: policy,
+        ),
+        equals(12),
+      );
+
+      // 3) 로컬 스토리지 실시간 자동 복구 (브라우저 새로고침 시뮬레이션)
+      container.read(selectedRoundProvider.notifier).setRound(2);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final freshContainer = ProviderContainer();
+      addTearDown(freshContainer.dispose);
+
+      await freshContainer.read(sessionProvider.notifier).restoreFromStorage();
+      await freshContainer.read(matchesProvider.notifier).restoreFromStorage();
+      await freshContainer.read(selectedRoundProvider.notifier).restoreFromStorage();
+
+      expect(freshContainer.read(selectedRoundProvider), equals(2));
+      final restoredMatches = freshContainer.read(matchesProvider);
+      expect(restoredMatches.length, equals(reshuffledMatches.length));
+      final restoredCourt1 = restoredMatches.firstWhere((m) => m.courtNumber == 1);
+      expect(restoredCourt1.isFinished, isTrue);
+      expect(restoredCourt1.scoreA, equals(25));
+      expect(restoredCourt1.scoreB, equals(19));
+    });
+  });
 }
 
 
