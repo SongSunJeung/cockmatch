@@ -379,18 +379,12 @@ void main() {
     expect(find.text('오늘 모임 세션 & 대진 설정'), findsOneWidget);
     expect(find.byKey(const Key('reset_session_settings_button')), findsOneWidget);
     expect(find.text('설정 초기화'), findsOneWidget);
+    // 기본 화면에서 '시작 코트 번호 지정' 섹션이 제거되었는지 확인
+    expect(find.text('시작 코트 번호 지정'), findsNothing);
 
-    // 1. 설정값 변경: [풀리그전], [5번 코트 시작], [통합 밸런스 매칭], [전원 고정 페어 (복식팀 대전)]
+    // 1. 설정값 변경: [풀리그전], [통합 밸런스 매칭], [전원 고정 페어 (복식팀 대전)]
     await tester.tap(find.text('풀리그전'));
     await tester.pumpAndSettle();
-
-    final startCourt5Chip = find.text('5번 코트 시작');
-    await tester.ensureVisible(startCourt5Chip);
-    await tester.pumpAndSettle();
-    await tester.tap(startCourt5Chip);
-    await tester.pumpAndSettle();
-
-    expect(find.text('5번부터'), findsOneWidget);
 
     final balanceModeCard = find.text('통합 밸런스 매칭');
     await tester.ensureVisible(balanceModeCard);
@@ -414,7 +408,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('직전 설정 기억됨'), findsOneWidget);
-    expect(find.text('5번부터'), findsOneWidget);
     expect(find.text('복식 페어 편성 목록'), findsOneWidget);
 
     // 3. 상단 우측 [설정 초기화] 버튼 클릭 시 기본 권장 설정으로 즉시 리셋되는지 검증
@@ -425,7 +418,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('기본 권장 설정'), findsOneWidget);
-    expect(find.text('1번부터'), findsOneWidget);
     expect(find.text('복식 페어 편성 목록'), findsNothing);
     expect(find.text('+ 특정 고정 페어 추가'), findsOneWidget);
   });
@@ -461,9 +453,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('오늘 모임 세션 & 대진 설정'), findsNothing);
-    expect(find.textContaining('운영 코트 5면'), findsOneWidget);
+    // '운영 코트 5면' 표기 확인 ('(1~5번)' 제거 확인)
+    expect(find.text('운영 코트 5면'), findsOneWidget);
+    expect(find.textContaining('(1~5번)'), findsNothing);
+    // 코트 헤더에서 '급수합' 표기가 완전 제거되었는지 확인
+    expect(find.textContaining('급수합'), findsNothing);
     // 대진표 탭 상단에 '모임 경기 전적' 요약 카드가 이동 배치되었는지 확인
     expect(find.textContaining('모임 경기 전적'), findsOneWidget);
+
+    // 라운드 운영 현황 박스 수치('출전 인원', '휴식 인원', '출석 인원') 터치 시 회원 '이름 (급수)' 팝업 확인
+    await tester.tap(find.text('출전 인원'));
+    await tester.pumpAndSettle();
+    expect(find.text('출전 인원 명단'), findsOneWidget);
+    expect(find.text('안세영 (A조)'), findsOneWidget);
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
 
     // 2. 대진표 화면 상단 [+ 코트 추가] / [- 코트 축소] 제어 버튼 표시 확인
     final increaseBtn = find.byKey(const Key('increase_court_button'));
@@ -476,7 +480,7 @@ void main() {
     // 3. [+ 코트 추가] 클릭 -> 새 빈 코트 슬롯 생성 확인
     await tester.tap(increaseBtn);
     await tester.pumpAndSettle();
-    expect(find.textContaining('운영 코트 6면'), findsOneWidget);
+    expect(find.text('운영 코트 6면'), findsOneWidget);
     expect(find.text('빈 코트 1면'), findsOneWidget);
 
     // 아래로 스크롤하여 새로 생성된 '빈 코트 슬롯' 카드 노출 확인
@@ -500,7 +504,7 @@ void main() {
     await tester.tap(decreaseBtn);
     await tester.pumpAndSettle();
     expect(find.text('빈 코트 1면'), findsNothing);
-    expect(find.textContaining('운영 코트 5면'), findsOneWidget);
+    expect(find.text('운영 코트 5면'), findsOneWidget);
 
     // 4. 빈 코트가 없는 상태에서 [- 코트 축소] 클릭 -> 진행/배정 중인 코트 축소 확인 다이얼로그 호출 확인
     await tester.tap(decreaseBtn);
@@ -517,7 +521,7 @@ void main() {
     await tester.tap(find.byKey(const Key('reduce_court_to_waiting_button')));
     await tester.pumpAndSettle();
     expect(find.text('진행/배정 중인 코트 축소 확인'), findsNothing);
-    expect(find.textContaining('운영 코트 4면'), findsOneWidget);
+    expect(find.text('운영 코트 4면'), findsOneWidget);
     expect(find.text('현재 휴식 중: '), findsOneWidget);
   });
 }

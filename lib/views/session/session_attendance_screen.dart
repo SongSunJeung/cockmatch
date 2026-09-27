@@ -3383,7 +3383,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     int courtCount = hasSaved && savedPrefs.courtCount != null
         ? savedPrefs.courtCount!.clamp(1, 15)
         : recommendedCourts;
-    int startCourtNumber = (hasSaved ? savedPrefs.startCourtNumber : session.startCourtNumber).clamp(1, 30);
+    int startCourtNumber = 1;
     MatchFormat matchFormat = hasSaved ? savedPrefs.matchFormat : session.matchFormat;
     MatchMode matchMode = hasSaved ? savedPrefs.matchMode : session.matchMode;
     PartnerMode partnerMode = hasSaved ? savedPrefs.partnerMode : session.partnerMode;
@@ -3731,109 +3731,6 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                               ],
                             ),
                           ],
-                        ),
-                        const Divider(height: 18),
-
-                        // 2-2. 시작 코트 번호 유연화
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    '시작 코트 번호 지정',
-                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppTheme.textDark),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    courtCount == 1
-                                        ? '배정 코트: $startCourtNumber번 코트 사용'
-                                        : '배정 코트: $startCourtNumber번 ~ $endCourtNumber번 코트 사용',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.pastelPeriwinkleDark,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  icon: const Icon(Icons.remove_circle_outline, size: 20),
-                                  onPressed: startCourtNumber > 1
-                                      ? () {
-                                          setSheetState(() => startCourtNumber--);
-                                          persistCurrentSheetSettings();
-                                        }
-                                      : null,
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.pastelPeriwinkle,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    '$startCourtNumber번부터',
-                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppTheme.pastelPeriwinkleDark),
-                                  ),
-                                ),
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  icon: const Icon(Icons.add_circle_outline, size: 20),
-                                  onPressed: startCourtNumber < 30
-                                      ? () {
-                                          setSheetState(() => startCourtNumber++);
-                                          persistCurrentSheetSettings();
-                                        }
-                                      : null,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // 빠른 시작 코트 번호 선택 칩 (예: 1번, 3번, 5번, 7번, 9번)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [1, 2, 3, 5, 7, 9].map((n) {
-                              final isSelected = startCourtNumber == n;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: InkWell(
-                                  onTap: () {
-                                    setSheetState(() => startCourtNumber = n);
-                                    persistCurrentSheetSettings();
-                                  },
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? AppTheme.primaryDark : Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: isSelected ? AppTheme.primaryDark : Colors.grey.shade300,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      '$n번 코트 시작',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: isSelected ? Colors.white : AppTheme.textMuted,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
                         ),
                       ],
                     ),
