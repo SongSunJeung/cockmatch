@@ -231,6 +231,13 @@ class CourtOperationScreen extends ConsumerWidget {
     final isPastCompletedRound = selectedRound < maxRound &&
         roundMatches.isNotEmpty &&
         roundMatches.every((m) => m.isFinished);
+    final bool hasInProgressOrCompletedMatches = allMatches.any(
+      (m) =>
+          m.isFinished ||
+          m.status == MatchStatus.playing ||
+          m.scoreA > 0 ||
+          m.scoreB > 0,
+    );
 
     // 현재 라운드에 표시할 코트 번호 목록 (운영 코트 범위 + 범위 밖 특별 매치 코트 번호 합집합, 오름차순 정렬)
     final displayCourtNumbers = isPastCompletedRound
@@ -583,6 +590,7 @@ class CourtOperationScreen extends ConsumerWidget {
                                 },
                               ),
                               ElevatedButton.icon(
+                                key: const Key('court_auto_or_next_round_button'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.primaryDark,
                                   foregroundColor: Colors.white,
@@ -594,18 +602,50 @@ class CourtOperationScreen extends ConsumerWidget {
                                   ),
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 ),
-                                icon: const Icon(Icons.auto_awesome, size: 14),
-                                label: const Text(
-                                  '대진표 자동 생성',
-                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                icon: Icon(
+                                  hasInProgressOrCompletedMatches
+                                      ? Icons.sync_rounded
+                                      : Icons.auto_awesome,
+                                  size: 14,
                                 ),
-                                onPressed: () => _handleGenerateRound(
-                                  context: context,
-                                  ref: ref,
-                                  targetRound: selectedRound,
-                                  isTournament: isTournament,
-                                  allMatches: allMatches,
+                                label: Text(
+                                  hasInProgressOrCompletedMatches
+                                      ? '🔄 다음 라운드 스마트 편성'
+                                      : '✨ 대진표 자동 생성',
+                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
                                 ),
+                                onPressed: () {
+                                  if (hasInProgressOrCompletedMatches) {
+                                    final maxRoundHasLocked = allMatches.any(
+                                      (m) =>
+                                          m.round == maxRound &&
+                                          (m.isFinished ||
+                                              m.status == MatchStatus.playing ||
+                                              m.scoreA > 0 ||
+                                              m.scoreB > 0),
+                                    );
+                                    final nextTargetRound =
+                                        maxRoundHasLocked ? maxRound + 1 : maxRound;
+                                    _handleGenerateRound(
+                                      context: context,
+                                      ref: ref,
+                                      targetRound: nextTargetRound,
+                                      isTournament: isTournament,
+                                      allMatches: allMatches,
+                                      switchRound: true,
+                                    );
+                                  } else if (roundMatches.isNotEmpty) {
+                                    _showResetAndRegenerateConfirmDialog(context, ref, session);
+                                  } else {
+                                    _handleGenerateRound(
+                                      context: context,
+                                      ref: ref,
+                                      targetRound: selectedRound,
+                                      isTournament: isTournament,
+                                      allMatches: allMatches,
+                                    );
+                                  }
+                                },
                               ),
                               if (allMatches.isNotEmpty)
                                 OutlinedButton.icon(
@@ -626,91 +666,8 @@ class CourtOperationScreen extends ConsumerWidget {
                                     '대진표 초기화 후 재생성',
                                     style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
                                   ),
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (dCtx) => AlertDialog(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        title: const Row(
-                                          children: [
-                                            Icon(
-                                              Icons.warning_amber_rounded,
-                                              color: AppTheme.errorRed,
-                                              size: 24,
-                                            ),
-                                            SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                '대진표 초기화 후 재생성',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w900,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        content: const Text(
-                                          '⚠️ 경고: 이미 진행된 매칭과 입력된 경기 점수/기록이 모두 영구 삭제됩니다. 정말 새로 생성하시겠습니까?',
-                                          style: TextStyle(
-                                            fontSize: 13.5,
-                                            height: 1.45,
-                                            color: AppTheme.textSecondary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(dCtx),
-                                            child: const Text(
-                                              '취소 (기존 유지)',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w800,
-                                                color: AppTheme.textSecondary,
-                                              ),
-                                            ),
-                                          ),
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppTheme.errorRed,
-                                              foregroundColor: Colors.white,
-                                              elevation: 0,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(12),
-                                              ),
-                                            ),
-                                            onPressed: () {
-                                              Navigator.pop(dCtx);
-                                              ref
-                                                  .read(matchesProvider.notifier)
-                                                  .startNewSessionAndGenerate(
-                                                    attendeeIds: session.activeAttendees,
-                                                    courtCount: session.courtCount,
-                                                    startCourtNumber: session.startCourtNumber,
-                                                    matchMode: session.matchMode,
-                                                    matchFormat: session.matchFormat,
-                                                    matchType: session.matchType,
-                                                    partnerMode: session.partnerMode,
-                                                    fixedPairs: session.fixedPairs,
-                                                  );
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  backgroundColor: AppTheme.primaryDark,
-                                                  content: Text('대진표가 초기화되고 1라운드부터 새로 생성되었습니다.'),
-                                                ),
-                                              );
-                                            },
-                                            child: const Text(
-                                              '기록 삭제 후 새로 생성',
-                                              style: TextStyle(fontWeight: FontWeight.w900),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
+                                  onPressed: () =>
+                                      _showResetAndRegenerateConfirmDialog(context, ref, session),
                                 ),
                             ],
                           ),
@@ -1669,6 +1626,95 @@ class CourtOperationScreen extends ConsumerWidget {
     );
   }
 
+  /// 전체 대진표 1라운드부터 초기화 재생성 시 2단계 안전 확인 모달
+  void _showResetAndRegenerateConfirmDialog(
+    BuildContext context,
+    WidgetRef ref,
+    GameSession session,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.errorRed, size: 24),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '대진표 초기화 후 재생성',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          '⚠️ 완료된 경기 기록과 현재 점수가 모두 영구 삭제됩니다. 전체 대진표를 처음부터 다시 생성하시겠습니까?',
+          style: TextStyle(
+            fontSize: 13.5,
+            height: 1.45,
+            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('court_cancel_regenerate_button'),
+            onPressed: () => Navigator.pop(dCtx),
+            child: const Text(
+              '취소',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            key: const Key('court_confirm_regenerate_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorRed,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(dCtx);
+              ref.read(matchesProvider.notifier).startNewSessionAndGenerate(
+                    attendeeIds: session.effectiveAttendees,
+                    courtCount: session.courtCount,
+                    startCourtNumber: session.startCourtNumber,
+                    matchMode: session.matchMode,
+                    matchFormat: session.matchFormat,
+                    matchType: session.matchType,
+                    partnerMode: session.partnerMode,
+                    fixedPairs: session.fixedPairs,
+                  );
+              ref.read(selectedRoundProvider.notifier).setRound(1);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: AppTheme.primaryDark,
+                    content: Text('🔄 전체 대진표가 1라운드부터 새로 생성되었습니다.'),
+                  ),
+                );
+              }
+            },
+            child: const Text(
+              '기록 삭제 후 새로 생성',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 라운드 대진표 생성 핸들러 (토너먼트 승자 진출 검증 포함)
   void _handleGenerateRound({
     required BuildContext context,
@@ -2116,9 +2162,9 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
             children: [
               Flexible(
                 child: Tooltip(
-                  message: '터치하여 코트 번호 변경',
+                  message: isFinished ? '완료된 경기는 코트가 고정되어 있습니다' : '터치하여 코트 번호 변경',
                   child: InkWell(
-                    onTap: () => _showEditCourtNumberDialog(context, match),
+                    onTap: isFinished ? null : () => _showEditCourtNumberDialog(context, match),
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -2142,8 +2188,8 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(
-                            Icons.edit_rounded,
+                          Icon(
+                            isFinished ? Icons.lock_outline_rounded : Icons.edit_rounded,
                             size: 11,
                             color: AppTheme.pastelYellowDark,
                           ),
@@ -2704,6 +2750,7 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                 height: 38,
                 child: TextField(
                   controller: controller,
+                  readOnly: isFinished,
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
@@ -2714,7 +2761,7 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(vertical: 6),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: isFinished ? Colors.grey.shade100 : Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -2724,7 +2771,7 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                       borderSide: const BorderSide(color: AppTheme.primaryMint, width: 2),
                     ),
                   ),
-                  onChanged: onScoreChanged,
+                  onChanged: isFinished ? null : onScoreChanged,
                 ),
               ),
             ],

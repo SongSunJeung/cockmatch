@@ -1036,6 +1036,111 @@ void main() {
       expect(restoredCourt1.scoreA, equals(25));
       expect(restoredCourt1.scoreB, equals(19));
     });
+
+    test('[🔄 다음 라운드 스마트 편성] 완료 경기 Lock 보존 및 중간 변동 인원(신규 게스트 추가, 휴식/조퇴) 즉시 반영 검증', () {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final clubMembers = container.read(currentClubMembersProvider);
+      final initialAttendeeIds = clubMembers
+          .where((m) => m.status == MemberStatus.active)
+          .take(8)
+          .map((m) => m.id)
+          .toList();
+
+      // 1) 초기 8명(2코트)으로 1라운드 생성
+      container.read(sessionProvider.notifier).createSession(
+            clubId: 'club_mega',
+            title: '게스트·휴식 반영 테스트',
+            memberFee: 5000,
+            guestFee: 10000,
+            attendeeIds: initialAttendeeIds,
+            courtCount: 2,
+          );
+      container.read(matchesProvider.notifier).startNewSessionAndGenerate(
+            attendeeIds: initialAttendeeIds,
+            courtCount: 2,
+            matchMode: MatchMode.tiered,
+          );
+
+      final round1Matches = container.read(matchesProvider);
+      expect(round1Matches.length, equals(2));
+
+      // 1라운드 1번 코트 경기 완료(25:21) 처리
+      final r1Court1 = round1Matches.firstWhere((m) => m.courtNumber == 1);
+      container.read(matchesProvider.notifier).updateScore(
+            r1Court1.id,
+            25,
+            21,
+            status: MatchStatus.finished,
+          );
+
+      // 같은 1라운드에 대해 generateMatchesForRound(1)가 호출되더라도 완료된 1번 코트는 절대 초기화되지 않고 Lock 보존됨
+      container.read(matchesProvider.notifier).generateMatchesForRound(1);
+      final afterSameRoundGen = container.read(matchesProvider).where((m) => m.round == 1).toList();
+      final lockedCourt1 = afterSameRoundGen.firstWhere((m) => m.courtNumber == 1);
+      expect(lockedCourt1.isFinished, isTrue);
+      expect(lockedCourt1.scoreA, equals(25));
+      expect(lockedCourt1.scoreB, equals(21));
+      expect(lockedCourt1.allPlayerIds, equals(r1Court1.allPlayerIds));
+
+      // 2) 중간 변동 인원 발생:
+      // - 기존 인원 중 1명 휴식(resting), 1명 조퇴(withdrawn) 전환 (남은 기존 출전 가능 인원: 6명)
+      final restingId = initialAttendeeIds[0];
+      final withdrawnId = initialAttendeeIds[1];
+      container.read(sessionProvider.notifier).updateAttendeeStatus(restingId, AttendanceStatus.resting);
+      container.read(sessionProvider.notifier).updateAttendeeStatus(withdrawnId, AttendanceStatus.withdrawn);
+
+      // - 신규 게스트 2명(isGuest: true) 실시간 추가 -> 총 출전 가능 인원 8명(기존 6명 + 신규 게스트 2명)
+      final guest1 = Member(
+        id: 'guest_new_1',
+        clubId: 'club_mega',
+        name: '신규게스트A',
+        gender: Gender.male,
+        tier: Tier.b,
+        isGuest: true,
+      );
+      final guest2 = Member(
+        id: 'guest_new_2',
+        clubId: 'club_mega',
+        name: '신규게스트B',
+        gender: Gender.female,
+        tier: Tier.c,
+        isGuest: true,
+      );
+      container.read(membersProvider.notifier).addMember(guest1);
+      container.read(membersProvider.notifier).addMember(guest2);
+      container.read(sessionProvider.notifier).addAttendee(guest1.id);
+      container.read(sessionProvider.notifier).addAttendee(guest2.id);
+
+      final updatedSession = container.read(sessionProvider)!;
+      expect(updatedSession.activeAttendees.contains(restingId), isFalse);
+      expect(updatedSession.activeAttendees.contains(withdrawnId), isFalse);
+      expect(updatedSession.activeAttendees.contains(guest1.id), isTrue);
+      expect(updatedSession.activeAttendees.contains(guest2.id), isTrue);
+      expect(updatedSession.activeAttendees.length, equals(8));
+
+      // 3) [🔄 다음 라운드 스마트 편성] (smartGenerateNextRound) 실행 -> 2라운드 생성
+      final nextRound = container.read(matchesProvider.notifier).smartGenerateNextRound();
+      expect(nextRound, equals(2));
+
+      final allMatchesAfterR2 = container.read(matchesProvider);
+      // 1라운드 완료 기록은 그대로 보존
+      final preservedR1C1 = allMatchesAfterR2.firstWhere((m) => m.round == 1 && m.courtNumber == 1);
+      expect(preservedR1C1.isFinished, isTrue);
+      expect(preservedR1C1.scoreA, equals(25));
+      expect(preservedR1C1.scoreB, equals(21));
+
+      // 2라운드 대진에는 휴식/조퇴 인원이 제외되고 신규 게스트 2명이 즉시 포함되어 2코트(8명) 배정됨
+      final round2Matches = allMatchesAfterR2.where((m) => m.round == 2).toList();
+      expect(round2Matches.length, equals(2));
+      final round2Players = round2Matches.expand((m) => m.allPlayerIds).toSet();
+      expect(round2Players.contains(restingId), isFalse);
+      expect(round2Players.contains(withdrawnId), isFalse);
+      expect(round2Players.contains(guest1.id), isTrue);
+      expect(round2Players.contains(guest2.id), isTrue);
+    });
   });
 }
 

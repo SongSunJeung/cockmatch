@@ -871,6 +871,9 @@ class SessionNotifier extends Notifier<GameSession?> {
   void updateAttendeeStatus(String memberId, AttendanceStatus status) {
     if (state == null) return;
     final updatedMap = Map<String, AttendanceStatus>.from(state!.attendeeStatusMap);
+    for (final id in state!.effectiveAttendees) {
+      updatedMap.putIfAbsent(id, () => state!.getAttendeeStatus(id));
+    }
     updatedMap[memberId] = status;
     state = state!.copyWith(attendeeStatusMap: updatedMap);
     _syncToHistory(state);
@@ -878,22 +881,28 @@ class SessionNotifier extends Notifier<GameSession?> {
 
   void addAttendee(String memberId, {AttendanceStatus status = AttendanceStatus.active}) {
     if (state == null) return;
-    if (!state!.attendees.contains(memberId)) {
-      final updatedList = [...state!.attendees, memberId];
-      final updatedMap = Map<String, AttendanceStatus>.from(state!.attendeeStatusMap);
-      updatedMap[memberId] = status;
-      state = state!.copyWith(
-        attendees: updatedList,
-        attendeeStatusMap: updatedMap,
-      );
-      _syncToHistory(state);
+    final updatedList = state!.attendees.contains(memberId)
+        ? List<String>.from(state!.attendees)
+        : [...state!.attendees, memberId];
+    final updatedMap = Map<String, AttendanceStatus>.from(state!.attendeeStatusMap);
+    for (final id in state!.effectiveAttendees) {
+      updatedMap.putIfAbsent(id, () => state!.getAttendeeStatus(id));
     }
+    updatedMap[memberId] = status;
+    state = state!.copyWith(
+      attendees: updatedList,
+      attendeeStatusMap: updatedMap,
+    );
+    _syncToHistory(state);
   }
 
   void addAttendees(List<String> memberIds) {
     if (state == null) return;
     final updatedList = List<String>.from(state!.attendees);
     final updatedMap = Map<String, AttendanceStatus>.from(state!.attendeeStatusMap);
+    for (final id in state!.effectiveAttendees) {
+      updatedMap.putIfAbsent(id, () => state!.getAttendeeStatus(id));
+    }
     for (final id in memberIds) {
       if (!updatedList.contains(id)) {
         updatedList.add(id);
@@ -1197,7 +1206,7 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
         );
 
     final updatedSession = ref.read(sessionProvider)!;
-    final members = ref.read(currentClubMembersProvider);
+    final members = ref.read(membersProvider);
     final generator = ref.read(matchGeneratorServiceProvider);
 
     // 2. 1라운드 대진표 생성
@@ -1217,27 +1226,111 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
   }
 
   /// 특정 라운드 대진표 자동 생성
+  /// - 이미 완료(isFinished)되었거나 진행 중(playing / 점수 입력됨)인 경기는 절대 초기화되지 않고 완전 고정(Lock) 처리
+  /// - 현재 출석부의 출전 가능 인원(휴식/조퇴 제외, 신규 게스트 포함)을 실시간 감지하여 반영
   void generateMatchesForRound(int targetRound) {
     final session = ref.read(sessionProvider);
     if (session == null) return;
-    final members = ref.read(currentClubMembersProvider);
+    final members = ref.read(membersProvider);
     final generator = ref.read(matchGeneratorServiceProvider);
 
     final previousMatches = state.where((m) => m.round < targetRound).toList();
+    final lockedInTargetRound = state
+        .where(
+          (m) =>
+              m.round == targetRound &&
+              (m.isFinished ||
+                  m.status == MatchStatus.playing ||
+                  m.scoreA > 0 ||
+                  m.scoreB > 0),
+        )
+        .toList();
 
-    final newMatches = generator.generateRoundMatches(
-      session: session,
-      allMembers: members,
-      existingMatches: previousMatches,
-      targetRound: targetRound,
-    );
+    if (lockedInTargetRound.isEmpty) {
+      final newMatches = generator.generateRoundMatches(
+        session: session,
+        allMembers: members,
+        existingMatches: previousMatches,
+        targetRound: targetRound,
+      );
+
+      state = [
+        ...state.where((m) => m.round != targetRound),
+        ...newMatches,
+      ];
+      _saveCurrentSessionMatches(state);
+      ref.read(selectedRoundProvider.notifier).setRound(targetRound);
+      return;
+    }
+
+    // 해당 라운드에 이미 완료되었거나 진행 중인 경기가 있는 경우:
+    // 완료/진행 중 코트는 완전 고정(Lock)하고, 비어 있거나 대기 중인 코트만 현재 출석 가능 인원으로 편성
+    final lockedCourts = lockedInTargetRound.map((m) => m.courtNumber).toSet();
+    final lockedPlayers = lockedInTargetRound.expand((m) => m.allPlayerIds).toSet();
+    final startCourt = session.startCourtNumber;
+    final allCourtNumbers = List.generate(session.courtCount, (i) => startCourt + i);
+    final openCourts = allCourtNumbers.where((c) => !lockedCourts.contains(c)).toList();
+
+    final availableAttendees = session.activeAttendees
+        .where((id) => !lockedPlayers.contains(id))
+        .toList();
+
+    final openCourtMatches = <GameMatch>[];
+    if (openCourts.isNotEmpty && availableAttendees.length >= 4) {
+      final tempSession = session.copyWith(
+        attendees: availableAttendees,
+        attendeeStatusMap: {
+          for (final id in availableAttendees) id: AttendanceStatus.active,
+        },
+        courtCount: openCourts.length,
+        startCourtNumber: openCourts.first,
+      );
+      final generated = generator.generateRoundMatches(
+        session: tempSession,
+        allMembers: members,
+        existingMatches: [...previousMatches, ...lockedInTargetRound],
+        targetRound: targetRound,
+      );
+      for (int i = 0; i < generated.length && i < openCourts.length; i++) {
+        final assignedCourt = openCourts[i];
+        openCourtMatches.add(
+          generated[i].copyWith(
+            id: 'smart_r${targetRound}_c${assignedCourt}_${DateTime.now().millisecondsSinceEpoch}_$i',
+            courtNumber: assignedCourt,
+          ),
+        );
+      }
+    }
 
     state = [
       ...state.where((m) => m.round != targetRound),
-      ...newMatches,
+      ...lockedInTargetRound,
+      ...openCourtMatches,
     ];
     _saveCurrentSessionMatches(state);
     ref.read(selectedRoundProvider.notifier).setRound(targetRound);
+  }
+
+  /// [🔄 다음 라운드 스마트 편성]:
+  /// - 이미 완료되었거나 진행 중인 경기 기록은 100% Lock 보존하고,
+  ///   다음 라운드(또는 아직 시작되지 않은 최신 라운드)를 현재 출석 가능 인원(휴식/조퇴 제외, 신규 게스트 포함)으로 스마트 편성
+  int smartGenerateNextRound() {
+    if (state.isEmpty) {
+      generateMatchesForRound(1);
+      return 1;
+    }
+    final maxRound = state.map((m) => m.round).reduce((a, b) => a > b ? a : b);
+    final maxRoundHasLocked = state.any(
+      (m) =>
+          m.round == maxRound &&
+          (m.isFinished ||
+              m.status == MatchStatus.playing ||
+              m.scoreA > 0 ||
+              m.scoreB > 0),
+    );
+    final targetRound = maxRoundHasLocked ? maxRound + 1 : maxRound;
+    generateMatchesForRound(targetRound);
+    return targetRound;
   }
 
   /// 코트 번호 변경 및 스왑(Swap) 처리
@@ -1479,7 +1572,7 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
     final session = ref.read(sessionProvider);
     if (session == null) return null;
 
-    final allMembers = ref.read(currentClubMembersProvider);
+    final allMembers = ref.read(membersProvider);
     final roundMatches = state.where((m) => m.round == round).toList();
     final playingIds = roundMatches.expand((m) => m.allPlayerIds).toSet();
 
@@ -1490,6 +1583,9 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
 
     final tempSession = session.copyWith(
       attendees: waitingIds,
+      attendeeStatusMap: {
+        for (final id in waitingIds) id: AttendanceStatus.active,
+      },
       courtCount: 1,
       startCourtNumber: courtNumber,
     );
@@ -1513,12 +1609,12 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
 
   /// [남은 라운드 재편성]:
   /// - 경기 중 조퇴·지각·휴식 발생 시, 이미 완료된 코트 기록(isFinished)과 이전 라운드 기록은 100% 보존하고
-  ///   대기 중인 코트 및 남은 라운드만 현재 출석 가능 인원(activeAttendees)으로 다시 배정
+  ///   대기 중인 코트 및 남은 라운드만 현재 출석 가능 인원(activeAttendees, 신규 게스트 포함)으로 다시 배정
   int reshuffleRemainingMatches({int? targetRound}) {
     final session = ref.read(sessionProvider);
     if (session == null) return 0;
 
-    final allMembers = ref.read(currentClubMembersProvider);
+    final allMembers = ref.read(membersProvider);
     final generator = ref.read(matchGeneratorServiceProvider);
     final int currentRound =
         targetRound ?? (ref.read(selectedRoundProvider) as int? ?? 1);
@@ -1569,6 +1665,9 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
 
       final tempSession = session.copyWith(
         attendees: availableAttendees,
+        attendeeStatusMap: {
+          for (final id in availableAttendees) id: AttendanceStatus.active,
+        },
         courtCount: openCourts.length,
         startCourtNumber: openCourts.first,
       );

@@ -654,6 +654,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('court_reshuffle_remaining_button')), findsOneWidget);
     expect(find.byKey(const Key('court_header_live_viewer_button')), findsOneWidget);
+
+    // 4. 대진표 페이지에서 이미 완료된 경기가 있으므로 버튼이 [🔄 다음 라운드 스마트 편성]으로 전환되어 있는지 확인
+    expect(find.text('🔄 다음 라운드 스마트 편성'), findsOneWidget);
+    expect(find.text('✨ 대진표 자동 생성'), findsNothing);
+
+    // 5. 대진표 페이지의 [대진표 초기화 후 재생성] 버튼 클릭 시 2단계 안전 팝업 필수 노출 확인
+    final courtResetBtn = find.byKey(const Key('court_reset_and_regenerate_button'));
+    expect(courtResetBtn, findsOneWidget);
+    await tester.ensureVisible(courtResetBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(courtResetBtn);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('⚠️ 완료된 경기 기록과 현재 점수가 모두 영구 삭제됩니다. 전체 대진표를 처음부터 다시 생성하시겠습니까?'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('court_cancel_regenerate_button')), findsOneWidget);
+    expect(find.byKey(const Key('court_confirm_regenerate_button')), findsOneWidget);
+
+    // [취소] 클릭 시 기존 완료 경기 보존 확인
+    await tester.tap(find.byKey(const Key('court_cancel_regenerate_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('🔄 다음 라운드 스마트 편성'), findsOneWidget);
   });
 }
 

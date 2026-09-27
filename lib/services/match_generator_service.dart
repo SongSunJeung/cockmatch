@@ -39,11 +39,9 @@ class MatchGeneratorService {
       );
     }
 
-    // 1. 실시간 출전 가능한 참석자 회원 목록 필터링
+    // 1. 실시간 출전 가능한 참석자 회원 목록 필터링 (휴식/조퇴 제외, 신규 게스트 포함)
     final memberMap = {for (final m in allMembers) m.id: m};
-    final activeAttendees = (session.activeAttendees.isNotEmpty
-            ? session.activeAttendees
-            : session.attendees)
+    final activeAttendees = session.activeAttendees
         .where((id) => memberMap.containsKey(id))
         .map((id) => memberMap[id]!)
         .toList();

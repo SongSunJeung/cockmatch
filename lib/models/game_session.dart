@@ -77,7 +77,7 @@ class GameSession {
       return attendeeStatusMap[memberId]!;
     }
     final active = _activeAttendees;
-    if (active != null) {
+    if (attendeeStatusMap.isEmpty && active != null) {
       return active.contains(memberId)
           ? AttendanceStatus.active
           : AttendanceStatus.resting;
@@ -85,18 +85,11 @@ class GameSession {
     return AttendanceStatus.active;
   }
 
-  /// 실시간 출전 가능 명단 (지각/조퇴/휴식 실시간 반영)
+  /// 실시간 출전 가능 명단 (지각/조퇴/휴식 및 신규 게스트 실시간 반영)
   List<String> get activeAttendees {
-    if (attendeeStatusMap.isNotEmpty) {
-      return effectiveAttendees
-          .where((id) => getAttendeeStatus(id) == AttendanceStatus.active)
-          .toList();
-    }
-    final active = _activeAttendees;
-    if (active != null) {
-      return active;
-    }
-    return effectiveAttendees;
+    return effectiveAttendees
+        .where((id) => getAttendeeStatus(id) == AttendanceStatus.active)
+        .toList();
   }
 
   /// 일시 휴식 중인 인원 명단
