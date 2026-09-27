@@ -3736,12 +3736,14 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(ctx).size.height * 0.80,
         ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
+        child: SafeArea(
+          top: false,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -3902,6 +3904,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -4346,7 +4349,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
 
                 // 하단 발송 액션 버튼
                 Container(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
@@ -4357,7 +4360,9 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                       ),
                     ],
                   ),
-                  child: SizedBox(
+                  child: SafeArea(
+                    top: false,
+                    child: SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(
@@ -4422,6 +4427,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                 );
                               }
                             },
+                    ),
                     ),
                   ),
                 ),

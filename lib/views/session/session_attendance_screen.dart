@@ -2907,75 +2907,80 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '${member.name} 님의 출전 상태 변경',
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.textDark),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              '상태를 변경해도 이미 완료되거나 진행 중인 라운드의 기록은 절대 손상되지 않습니다.',
-              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-            ),
-            const Divider(height: 24),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '${member.name} 님의 출전 상태 변경',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.textDark),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '상태를 변경해도 이미 완료되거나 진행 중인 라운드의 기록은 절대 손상되지 않습니다.',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
+                const Divider(height: 24),
 
-            _buildStatusOptionTile(
-              title: '출전',
-              subtitle: '다음 라운드 대진 자동 배정',
-              icon: Icons.sports_tennis_rounded,
-              color: AppTheme.pastelMintDark,
-              bg: AppTheme.pastelMint,
-              isSelected: currentStatus == AttendanceStatus.active,
-              onTap: () {
-                ref.read(sessionProvider.notifier).updateAttendeeStatus(member.id, AttendanceStatus.active);
-                Navigator.pop(ctx);
-              },
-            ),
-            const SizedBox(height: 8),
+                _buildStatusOptionTile(
+                  title: '출전',
+                  subtitle: '다음 라운드 대진 자동 배정',
+                  icon: Icons.sports_tennis_rounded,
+                  color: AppTheme.pastelMintDark,
+                  bg: AppTheme.pastelMint,
+                  isSelected: currentStatus == AttendanceStatus.active,
+                  onTap: () {
+                    ref.read(sessionProvider.notifier).updateAttendeeStatus(member.id, AttendanceStatus.active);
+                    Navigator.pop(ctx);
+                  },
+                ),
+                const SizedBox(height: 8),
 
-            _buildStatusOptionTile(
-              title: '휴식',
-              subtitle: '잠시 숨돌리기. 다음 라운드 대진 편성에서 제외',
-              icon: Icons.bedtime_rounded,
-              color: AppTheme.pastelYellowDark,
-              bg: AppTheme.pastelYellow,
-              isSelected: currentStatus == AttendanceStatus.resting,
-              onTap: () {
-                ref.read(sessionProvider.notifier).updateAttendeeStatus(member.id, AttendanceStatus.resting);
-                Navigator.pop(ctx);
-              },
-            ),
-            const SizedBox(height: 8),
+                _buildStatusOptionTile(
+                  title: '휴식',
+                  subtitle: '잠시 숨돌리기. 다음 라운드 대진 편성에서 제외',
+                  icon: Icons.bedtime_rounded,
+                  color: AppTheme.pastelYellowDark,
+                  bg: AppTheme.pastelYellow,
+                  isSelected: currentStatus == AttendanceStatus.resting,
+                  onTap: () {
+                    ref.read(sessionProvider.notifier).updateAttendeeStatus(member.id, AttendanceStatus.resting);
+                    Navigator.pop(ctx);
+                  },
+                ),
+                const SizedBox(height: 8),
 
-            _buildStatusOptionTile(
-              title: '조퇴',
-              subtitle: '조퇴 또는 부상으로 귀가. 이후 모든 대진에서 제외',
-              icon: Icons.exit_to_app_rounded,
-              color: Colors.red.shade700,
-              bg: AppTheme.pastelRose,
-              isSelected: currentStatus == AttendanceStatus.withdrawn,
-              onTap: () {
-                ref.read(sessionProvider.notifier).updateAttendeeStatus(member.id, AttendanceStatus.withdrawn);
-                Navigator.pop(ctx);
-              },
+                _buildStatusOptionTile(
+                  title: '조퇴',
+                  subtitle: '조퇴 또는 부상으로 귀가. 이후 모든 대진에서 제외',
+                  icon: Icons.exit_to_app_rounded,
+                  color: Colors.red.shade700,
+                  bg: AppTheme.pastelRose,
+                  isSelected: currentStatus == AttendanceStatus.withdrawn,
+                  onTap: () {
+                    ref.read(sessionProvider.notifier).updateAttendeeStatus(member.id, AttendanceStatus.withdrawn);
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -3075,146 +3080,151 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
 
           return Container(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.group_add_rounded, color: AppTheme.primaryMint, size: 22),
-                    const SizedBox(width: 8),
-                    const Text('정회원 출석부로 불러오기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () {
-                        setModalState(() {
-                          if (tempSelected.length == regularMembers.length) {
-                            tempSelected.clear();
-                          } else {
-                            tempSelected.addAll(regularMembers.map((m) => m.id));
-                          }
-                        });
-                      },
-                      child: Text(
-                        tempSelected.length == regularMembers.length ? '전체 해제' : '전체 선택',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        const Icon(Icons.group_add_rounded, color: AppTheme.primaryMint, size: 22),
+                        const SizedBox(width: 8),
+                        const Text('정회원 출석부로 불러오기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () {
+                            setModalState(() {
+                              if (tempSelected.length == regularMembers.length) {
+                                tempSelected.clear();
+                              } else {
+                                tempSelected.addAll(regularMembers.map((m) => m.id));
+                              }
+                            });
+                          },
+                          child: Text(
+                            tempSelected.length == regularMembers.length ? '전체 해제' : '전체 선택',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // 검색창
+                    Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TextField(
+                        onChanged: (val) => setModalState(() => searchKeyword = val.trim()),
+                        decoration: const InputDecoration(
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: InputBorder.none,
+                          hintText: '이름 또는 초성 검색',
+                          hintStyle: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          prefixIcon: Icon(Icons.search, size: 16, color: AppTheme.textMuted),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 회원 리스트
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        itemBuilder: (ctx, i) {
+                          final m = filtered[i];
+                          final isChecked = tempSelected.contains(m.id);
+
+                          return InkWell(
+                            onTap: () {
+                              setModalState(() {
+                                if (isChecked) {
+                                  tempSelected.remove(m.id);
+                                } else {
+                                  tempSelected.add(m.id);
+                                }
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isChecked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                                    color: isChecked ? AppTheme.primaryMint : Colors.grey.shade400,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(m.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.getTierBgColor(m.tier),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      m.tier.label,
+                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.getTierTextColor(m.tier)),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    m.gender == Gender.female ? '여' : '남',
+                                    style: TextStyle(fontSize: 11, color: m.gender == Gender.female ? Colors.pink : Colors.blue),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryMint,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: () {
+                          ref.read(sessionProvider.notifier).addAttendees(tempSelected.toList());
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('총 ${tempSelected.length}명의 회원이 출석부에 등록되었습니다!')),
+                          );
+                        },
+                        child: Text(
+                          '선택한 ${tempSelected.length}명 출석부 등록',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                // 검색창
-                Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppTheme.background,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: TextField(
-                    onChanged: (val) => setModalState(() => searchKeyword = val.trim()),
-                    decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      border: InputBorder.none,
-                      hintText: '이름 또는 초성 검색',
-                      hintStyle: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                      prefixIcon: Icon(Icons.search, size: 16, color: AppTheme.textMuted),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 회원 리스트
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: filtered.length,
-                    itemBuilder: (ctx, i) {
-                      final m = filtered[i];
-                      final isChecked = tempSelected.contains(m.id);
-
-                      return InkWell(
-                        onTap: () {
-                          setModalState(() {
-                            if (isChecked) {
-                              tempSelected.remove(m.id);
-                            } else {
-                              tempSelected.add(m.id);
-                            }
-                          });
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isChecked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                                color: isChecked ? AppTheme.primaryMint : Colors.grey.shade400,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(m.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.getTierBgColor(m.tier),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  m.tier.label,
-                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.getTierTextColor(m.tier)),
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                m.gender == Gender.female ? '여' : '남',
-                                style: TextStyle(fontSize: 11, color: m.gender == Gender.female ? Colors.pink : Colors.blue),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryMint,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    onPressed: () {
-                      ref.read(sessionProvider.notifier).addAttendees(tempSelected.toList());
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('총 ${tempSelected.length}명의 회원이 출석부에 등록되었습니다!')),
-                      );
-                    },
-                    child: Text(
-                      '선택한 ${tempSelected.length}명 출석부 등록',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         },

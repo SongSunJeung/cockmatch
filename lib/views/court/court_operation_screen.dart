@@ -2877,9 +2877,12 @@ class _PlayerSwapBottomSheetState extends ConsumerState<_PlayerSwapBottomSheet> 
 
           // 3. 교체 대상 목록
           Flexible(
-            child: _tabIndex == 0
-                ? _buildRestingMembersList(context, match, currentTarget, isTargetInTeamA)
-                : _buildSwapWithOtherPlayersList(context, match, currentTarget, isTargetInTeamA, otherPendingMatches),
+            child: SafeArea(
+              top: false,
+              child: _tabIndex == 0
+                  ? _buildRestingMembersList(context, match, currentTarget, isTargetInTeamA)
+                  : _buildSwapWithOtherPlayersList(context, match, currentTarget, isTargetInTeamA, otherPendingMatches),
+            ),
           ),
         ],
       ),
@@ -3350,6 +3353,7 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           // 드래그 핸들
           Center(
@@ -3404,9 +3408,10 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
 
           const Divider(height: 1),
 
-          Expanded(
+          Flexible(
             child: ListView(
-              padding: const EdgeInsets.all(20),
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               children: [
                 // 1. 코트 번호 설정
                 Row(
@@ -3637,7 +3642,7 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
 
           // 하단 코트 투입 버튼
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
@@ -3648,7 +3653,9 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
                 ),
               ],
             ),
-            child: SizedBox(
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
@@ -3688,6 +3695,7 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
                         );
                       }
                     : null,
+              ),
               ),
             ),
           ),
