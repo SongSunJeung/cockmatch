@@ -268,8 +268,7 @@ class AppTheme {
   }
 
   /// 3개 스와이프 화면(회원 명부 · 출석부 · 대진표) 최상단 AppBar 좌측 고정 헤더
-  /// - [☰ 햄버거 메뉴] + [고정 폭 페이지 타이틀] + [고정 위치 ● ○ ○ 3도트 인디케이터]
-  /// - 스와이프 시 3개 화면 모두 흔들림 없이 동일한 절대 위치(x, y)를 유지하도록 규격 통일
+  /// - [☰ 햄버거 메뉴] + [고정 폭 페이지 타이틀]
   static Widget buildMainAppBarLeftHeader({
     required BuildContext context,
     required int currentIndex,
@@ -320,9 +319,47 @@ class AppTheme {
             overflow: TextOverflow.clip,
           ),
         ),
-        const SizedBox(width: 6),
-        buildSlimPageIndicator(currentIndex: safeIndex),
       ],
+    );
+  }
+
+  /// 3개 스와이프 화면(회원 명부 · 출석부 · 대진표) 최상단 AppBar 행
+  /// - 좌측: [☰ 햄버거 메뉴] + [페이지 타이틀]
+  /// - 정중앙(Center): [● ○ ○] 3도트 인디케이터 고정 배치
+  /// - 우측: 화면별 액션 버튼들
+  static Widget buildMainAppBarRow({
+    required BuildContext context,
+    required int currentIndex,
+    List<Widget> actions = const [],
+  }) {
+    final safeIndex = currentIndex.clamp(0, 2);
+    return SizedBox(
+      height: 36,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: buildMainAppBarLeftHeader(
+              context: context,
+              currentIndex: safeIndex,
+            ),
+          ),
+          Align(
+            alignment: Alignment.center,
+            child: buildSlimPageIndicator(currentIndex: safeIndex),
+          ),
+          if (actions.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: actions,
+              ),
+            ),
+        ],
+      ),
     );
   }
 

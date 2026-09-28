@@ -19,6 +19,7 @@ class Member {
   final int? customFeeAmount; // 차등/할인 부과 금액 (예: 20000)
   final String? customFeeLabel; // 차등/할인 명칭 (예: "가족할인")
   final bool isPermanentExempt; // 회비 면제 시 영구 면제 여부 (false일 경우 기간 지정 면제)
+  final String? exemptStartDate; // 기간 지정 면제 시작일 (예: "2026.09.01")
   final String? exemptUntilDate; // 기간 지정 면제 종료일 (예: "2026.12.31")
   final bool isGuest; // 게스트 여부
   final FeeStatus feeStatus; // 당일 참가비/콕비 납부 상태 (완납/미납/면제)
@@ -46,6 +47,7 @@ class Member {
     this.customFeeAmount,
     this.customFeeLabel,
     this.isPermanentExempt = true,
+    this.exemptStartDate,
     this.exemptUntilDate,
     this.isGuest = false,
     bool feePaid = false,
@@ -137,10 +139,15 @@ class Member {
       return '휴회 면제';
     }
     if (feePolicy == FeePolicyType.exempt) {
-      if (!isPermanentExempt &&
-          exemptUntilDate != null &&
-          exemptUntilDate!.trim().isNotEmpty) {
-        return '면제 (~${formatShortDate(exemptUntilDate!)})';
+      if (!isPermanentExempt) {
+        final hasStart = exemptStartDate != null && exemptStartDate!.trim().isNotEmpty;
+        final hasUntil = exemptUntilDate != null && exemptUntilDate!.trim().isNotEmpty;
+        if (hasStart && hasUntil) {
+          return '면제 (${formatShortDate(exemptStartDate!)}~${formatShortDate(exemptUntilDate!)})';
+        }
+        if (hasUntil) {
+          return '면제 (~${formatShortDate(exemptUntilDate!)})';
+        }
       }
       return '면제 (영구)';
     }
@@ -195,6 +202,8 @@ class Member {
       if (customFeeLabel != null && customFeeLabel!.trim().isNotEmpty)
         'customFeeLabel': customFeeLabel!.trim(),
       'isPermanentExempt': isPermanentExempt,
+      if (exemptStartDate != null && exemptStartDate!.trim().isNotEmpty)
+        'exemptStartDate': exemptStartDate!.trim(),
       if (exemptUntilDate != null && exemptUntilDate!.trim().isNotEmpty)
         'exemptUntilDate': exemptUntilDate!.trim(),
       'isGuest': isGuest,
@@ -247,6 +256,7 @@ class Member {
       customFeeAmount: (map['customFeeAmount'] as num?)?.toInt(),
       customFeeLabel: map['customFeeLabel'] as String?,
       isPermanentExempt: (map['isPermanentExempt'] as bool?) ?? true,
+      exemptStartDate: map['exemptStartDate'] as String?,
       exemptUntilDate: map['exemptUntilDate'] as String?,
       isGuest: (map['isGuest'] as bool?) ?? false,
       feeStatus: (memberStatus == MemberStatus.resting ||
@@ -290,6 +300,8 @@ class Member {
     String? customFeeLabel,
     bool clearCustomFee = false,
     bool? isPermanentExempt,
+    String? exemptStartDate,
+    bool clearExemptStartDate = false,
     String? exemptUntilDate,
     bool clearExemptUntilDate = false,
     bool? isGuest,
@@ -340,6 +352,8 @@ class Member {
       customFeeLabel:
           clearCustomFee ? null : (customFeeLabel ?? this.customFeeLabel),
       isPermanentExempt: isPermanentExempt ?? this.isPermanentExempt,
+      exemptStartDate:
+          clearExemptStartDate ? null : (exemptStartDate ?? this.exemptStartDate),
       exemptUntilDate:
           clearExemptUntilDate ? null : (exemptUntilDate ?? this.exemptUntilDate),
       isGuest: isGuest ?? this.isGuest,

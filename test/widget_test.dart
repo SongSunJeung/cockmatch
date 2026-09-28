@@ -141,10 +141,11 @@ void main() {
     await tester.tap(find.text('회원명부'));
     await tester.pumpAndSettle();
 
-    // 회원명부 화면: 기본 정렬 '⇅ 이름순 (가나다)' 및 가나다순 최상단 회원(강호동: 010-6666-7777, 가족할인 20,000원 뱃지) 노출 확인
+    // 회원명부 화면: 기본 정렬 '⇅ 이름순 (가나다)' 및 가나다순 최상단 회원(강호동: 010-6666-7777, 가족회원 뱃지) 노출 확인
     expect(find.text('메가 배드민턴 클럽'), findsOneWidget);
     expect(find.byTooltip('신규 회원 직접 등록'), findsOneWidget);
-    expect(find.byTooltip('단체 문자 발송'), findsOneWidget);
+    // 최상단 AppBar 우측 말풍선(문자) 아이콘 중복 제거 및 본문 리스트 상단 [단체 문자 발송] 단일 유지 확인
+    expect(find.byTooltip('단체 문자 발송'), findsNothing);
     expect(find.text('단체 문자 발송'), findsOneWidget);
     expect(find.byIcon(Icons.phone_in_talk_rounded), findsNothing);
     expect(find.text('⇅ 이름순 (가나다)'), findsOneWidget);
@@ -158,17 +159,37 @@ void main() {
     expect(find.text('초심 (1점)'), findsNothing);
     expect(find.text('A조'), findsWidgets);
 
-    // 신규 회원 등록 모달 오픈 -> [회원 활동 상태], [회원 등급 / 직책] 커스텀 직접 추가, [회비 부과 기준] UI 검증
+    // 신규 회원 등록 모달 오픈 -> [회원 활동 상태]('활동 회원' 간소화), [회원 등급 / 직책] 커스텀 직접 추가, [회비 부과 기준] UI 검증
     await tester.tap(find.byTooltip('신규 회원 직접 등록'));
     await tester.pumpAndSettle();
-    expect(find.text('활동 회원 (기본값)'), findsOneWidget);
+    expect(find.text('활동 회원 (기본값)'), findsNothing);
+    expect(find.text('활동 회원'), findsOneWidget);
     expect(find.text('휴면(휴회) 회원'), findsOneWidget);
     expect(find.text('기본 회비 부과'), findsOneWidget);
     expect(find.text('차등/할인 금액 지정'), findsOneWidget);
     expect(find.text('회비 면제'), findsOneWidget);
 
+    // [회비 면제 -> 기간 지정 면제] 선택 시 [면제 시작일] ~ [면제 종료일] 입력 필드 노출 확인
+    final exemptPolicyBtn = find.text('회비 면제');
+    await tester.ensureVisible(exemptPolicyBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(exemptPolicyBtn);
+    await tester.pumpAndSettle();
+    final periodExemptChip = find.text('기간 지정 면제');
+    await tester.ensureVisible(periodExemptChip);
+    await tester.pumpAndSettle();
+    await tester.tap(periodExemptChip);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('member_exempt_start_date_field')), findsOneWidget);
+    expect(find.byKey(const Key('member_exempt_until_date_field')), findsOneWidget);
+    expect(find.text('면제 시작일'), findsOneWidget);
+    expect(find.text('면제 종료일'), findsOneWidget);
+
     // [휴면(휴회) 회원] 선택 시 휴면 시작일, 복귀 예정일, 휴면 사유 입력란 및 휴회 면제 안내 노출 확인
-    await tester.tap(find.text('휴면(휴회) 회원'));
+    final restingMemberBtn = find.text('휴면(휴회) 회원');
+    await tester.ensureVisible(restingMemberBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(restingMemberBtn);
     await tester.pumpAndSettle();
     expect(find.text('휴면 시작일'), findsOneWidget);
     expect(find.text('복귀 예정일 (선택)'), findsOneWidget);
@@ -371,8 +392,8 @@ void main() {
     await tester.tap(find.textContaining('모임 시작 & 출석부 열기'));
     await tester.pumpAndSettle();
 
-    // 출석부 하단 [대진 설정 & 이동] 버튼 클릭 -> '오늘 모임 세션 & 대진 설정' 바텀시트 오픈
-    final startSessionBtn = find.text('대진 설정 & 이동');
+    // 출석부 하단 [대진표 설정수정] 버튼 클릭 -> '오늘 모임 세션 & 대진 설정' 바텀시트 오픈
+    final startSessionBtn = find.text('대진표 설정수정');
     expect(startSessionBtn, findsOneWidget);
     await tester.tap(startSessionBtn);
     await tester.pumpAndSettle();
@@ -441,7 +462,7 @@ void main() {
     await tester.tap(find.textContaining('모임 시작 & 출석부 열기'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('대진 설정 & 이동'));
+    await tester.tap(find.text('대진표 설정수정'));
     await tester.pumpAndSettle();
 
     final balanceModeOption = find.text('통합 밸런스 매칭');
@@ -560,24 +581,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 1. 지난 모임 열기 -> 하단 플로팅 바('대진 설정 & 이동') 기본 노출 확인
+    // 1. 지난 모임 열기 -> 하단 플로팅 바('대진표 설정수정') 기본 노출 확인
     final archivedCard = find.text('2026.09.22 화요 정기 모임');
     await tester.ensureVisible(archivedCard);
     await tester.pumpAndSettle();
     await tester.tap(archivedCard);
     await tester.pumpAndSettle();
 
-    expect(find.text('대진 설정 & 이동'), findsOneWidget);
+    expect(find.text('대진표 설정수정'), findsOneWidget);
 
     // 2. 가상 키보드 활성화 시뮬레이션 (viewInsets.bottom = 300) -> 플로팅 바 자동 숨김 확인
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     await tester.pumpAndSettle();
-    expect(find.text('대진 설정 & 이동'), findsNothing);
+    expect(find.text('대진표 설정수정'), findsNothing);
 
     // 3. 가상 키보드 닫힘 시뮬레이션 (viewInsets.bottom = 0) -> 플로팅 바 재노출 확인
     tester.view.resetViewInsets();
     await tester.pumpAndSettle();
-    expect(find.text('대진 설정 & 이동'), findsOneWidget);
+    expect(find.text('대진표 설정수정'), findsOneWidget);
   });
 
   testWidgets('Part 1~3 통합 검증: 대진표 안전장치/재편성, PRO 잠금 가드 & 연간 회비 현황표, 3화면 스와이프', (WidgetTester tester) async {
@@ -664,7 +685,7 @@ void main() {
     expect(find.textContaining('하단 스폰서/광고 배너'), findsOneWidget);
   });
 
-  testWidgets('Part 1 대진표 안전장치: [📋 현재 대진표 이어보기], 2단계 초기화 경고 모달, [남은 라운드 재편성] 검증', (WidgetTester tester) async {
+  testWidgets('Part 1 대진표 안전장치: [현재 대진표 확인], 2단계 초기화 경고 모달, [남은 라운드 재편성] 및 상단 회비 칩 터치 필터링 검증', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: CockMatchApp(),
@@ -682,11 +703,30 @@ void main() {
     // 1. [출석부] 상단 회비 수납 현황 카드 내 [연간/월별 회비 현황표 ->] 버튼이 삭제되었는지 확인
     expect(find.textContaining('연간/월별 회비 현황표'), findsNothing);
 
-    // 2. 이미 대진표가 생성된 상태이므로 하단 기본 버튼이 [📋 현재 대진표 이어보기]로 표시되는지 확인
-    expect(find.text('📋 현재 대진표 이어보기'), findsOneWidget);
+    // 1-2. [출석부] 상단 회비 수납 칩([미납 N명], [완납 N명], [면제 N명]) 터치 시 참석자 리스트 즉시 필터링 및 재터치 시 해제 검증
+    final unpaidChip = find.byKey(const Key('attendance_summary_fee_chip_unpaid'));
+    final paidChip = find.byKey(const Key('attendance_summary_fee_chip_paid'));
+    final exemptChip = find.byKey(const Key('attendance_summary_fee_chip_exempt'));
+    expect(unpaidChip, findsOneWidget);
+    expect(paidChip, findsOneWidget);
+    expect(exemptChip, findsOneWidget);
 
-    // 3. [대진 설정 & 이동] 모달 내부에서도 [📋 현재 대진표 이어보기], [남은 라운드 재편성], [대진표 초기화 후 재생성] 분리 확인
-    await tester.tap(find.text('대진 설정 & 이동'));
+    await tester.tap(unpaidChip);
+    await tester.pumpAndSettle();
+    // 필터 초기화 버튼이 노출되면 필터가 활성화된 상태임을 의미
+    expect(find.text('필터 초기화'), findsOneWidget);
+
+    // 같은 칩을 한 번 더 탭하면 필터가 해제되는지 확인
+    await tester.tap(unpaidChip);
+    await tester.pumpAndSettle();
+    expect(find.text('필터 초기화'), findsNothing);
+
+    // 2. 이미 대진표가 생성된 상태이므로 하단 기본 버튼이 [현재 대진표 확인] 및 [대진표 설정수정]으로 표시되는지 확인
+    expect(find.text('현재 대진표 확인'), findsOneWidget);
+    expect(find.text('대진표 설정수정'), findsOneWidget);
+
+    // 3. [대진표 설정수정] 모달 내부에서도 [📋 현재 대진표 이어보기], [남은 라운드 재편성], [대진표 초기화 후 재생성] 분리 확인
+    await tester.tap(find.text('대진표 설정수정'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('continue_existing_bracket_button')), findsOneWidget);
     expect(find.byKey(const Key('reshuffle_remaining_rounds_button')), findsOneWidget);
@@ -719,6 +759,18 @@ void main() {
     expect(find.text('+ 라운드 추가'), findsOneWidget);
     expect(find.text('+ 특별 매치 추가'), findsOneWidget);
     expect(find.text('🔄 다음 라운드 스마트 편성'), findsNothing);
+
+    // 4-2. [대진표] 코트 점수 입력 필드 터치(포커스) 시 전체 선택(Select All) 및 숫자 입력 시 선행 '0' 자동 제거 검증
+    final scoreFields = find.byType(TextField);
+    expect(scoreFields, findsWidgets);
+    await tester.tap(scoreFields.first);
+    await tester.pumpAndSettle();
+    final TextField tappedScoreField = tester.widget<TextField>(scoreFields.first);
+    expect(tappedScoreField.controller?.selection.baseOffset, 0);
+    expect(
+      tappedScoreField.controller?.selection.extentOffset,
+      tappedScoreField.controller?.text.length,
+    );
 
     // 5. [남은 라운드 재편성] 및 [대진표 초기화 후 재생성] 버튼이 '운영 요약 펼침' 안이 아닌 바깥에 즉시 노출되는지 확인
     final reshuffleBtn = find.byKey(const Key('court_reshuffle_remaining_button'));
@@ -754,7 +806,7 @@ void main() {
     expect(find.text('+ 라운드 추가'), findsOneWidget);
   });
 
-  testWidgets('단일 퍼플 톤 원복, AppBar 좌측 페이지명 전환(회원 명부/출석부/대진표), 고정 위치 3도트 인디케이터(● ○ ○) 정렬 검증', (WidgetTester tester) async {
+  testWidgets('단일 퍼플 톤 원복, AppBar 좌측 페이지명 전환(회원 명부/출석부/대진표), 정중앙(Center) 3도트 인디케이터(● ○ ○) 정렬 검증', (WidgetTester tester) async {
     // 1. 시범 적용했던 5개 분기 컬러가 모두 해제되고 단일 시그니처 퍼플 톤으로 원복되었는지 검증
     expect(AppTheme.usePageSpecificAccentThemes, isFalse);
     for (int i = 0; i < 5; i++) {
@@ -772,7 +824,7 @@ void main() {
     expect(AppTheme.buildDotIndicatorString(1), '○ ● ○');
     expect(AppTheme.buildDotIndicatorString(2), '○ ○ ●');
 
-    // 3. 실제 앱 화면에서 스와이프/이동 시 AppBar 좌측 타이틀과 고정 3도트 인디케이터가 동일한 절대 좌표(x, y)에 유지되는지 검증
+    // 3. 실제 앱 화면에서 스와이프/이동 시 AppBar 좌측 타이틀과 정중앙(Center) 고정 3도트 인디케이터가 동일한 절대 좌표(x, y)에 유지되는지 검증
     await tester.pumpWidget(
       const ProviderScope(
         child: CockMatchApp(),
@@ -780,13 +832,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 기본 진입(Page 1 출석부): '출석부' + '○ ● ○'
+    final double screenCenterX = tester.view.physicalSize.width / tester.view.devicePixelRatio / 2;
+
+    // 기본 진입(Page 1 출석부): '출석부' + 정중앙 '○ ● ○'
     final title1Finder = find.byKey(const Key('app_bar_page_title_1'));
     final dot1Finder = find.byKey(const Key('top_page_dot_indicator_1'));
     expect(title1Finder, findsOneWidget);
     expect(dot1Finder, findsOneWidget);
     expect(find.text('출석부'), findsWidgets);
     expect(find.text('○ ● ○'), findsOneWidget);
+    expect(tester.getCenter(dot1Finder).dx, closeTo(screenCenterX, 0.5));
     // 임시 텍스트 뱃지 완전 삭제 확인
     expect(find.textContaining('1/5 회원 명단'), findsNothing);
     expect(find.textContaining('SAGE 그린 활동 톤'), findsNothing);
@@ -794,7 +849,7 @@ void main() {
     final Offset title1TopLeft = tester.getTopLeft(title1Finder);
     final Offset dot1TopLeft = tester.getTopLeft(dot1Finder);
 
-    // 드로어로 Page 0(회원 명부) 이동: '회원 명부' + '● ○ ○'
+    // 드로어로 Page 0(회원 명부) 이동: '회원 명부' + 정중앙 '● ○ ○'
     await tester.tap(find.byTooltip('메뉴 열기').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('회원명부'));
@@ -806,6 +861,7 @@ void main() {
     expect(dot0Finder, findsOneWidget);
     expect(find.text('회원 명부'), findsOneWidget);
     expect(find.text('● ○ ○'), findsOneWidget);
+    expect(tester.getCenter(dot0Finder).dx, closeTo(screenCenterX, 0.5));
     expect(find.text('가족회원'), findsWidgets);
     expect(find.text('가족할인 20,000원'), findsNothing);
 
@@ -814,7 +870,15 @@ void main() {
     expect(title0TopLeft, equals(title1TopLeft));
     expect(dot0TopLeft, equals(dot1TopLeft));
 
-    // 드로어로 Page 2(대진표) 이동: '대진표' + '○ ○ ●'
+    // 회원 명부 카드 터치 -> 회원 상세 팝업 내 '특이사항:' 라벨 노출 확인 ('회비 정책:' 미노출)
+    await tester.tap(find.text('강호동').first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('특이사항:'), findsOneWidget);
+    expect(find.textContaining('회비 정책:'), findsNothing);
+    await tester.tap(find.byIcon(Icons.close_rounded).first);
+    await tester.pumpAndSettle();
+
+    // 드로어로 Page 2(대진표) 이동: '대진표' + 정중앙 '○ ○ ●'
     await tester.tap(find.byTooltip('메뉴 열기').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('대진표').first);
@@ -825,6 +889,7 @@ void main() {
     expect(title2Finder, findsOneWidget);
     expect(dot2Finder, findsOneWidget);
     expect(find.text('○ ○ ●'), findsOneWidget);
+    expect(tester.getCenter(dot2Finder).dx, closeTo(screenCenterX, 0.5));
 
     final Offset title2TopLeft = tester.getTopLeft(title2Finder);
     final Offset dot2TopLeft = tester.getTopLeft(dot2Finder);
@@ -855,7 +920,7 @@ void main() {
     expect(pinnedSummaryFinder, findsOneWidget);
     expect(find.text('월별 수납 요약'), findsOneWidget);
 
-    // 2. 좌측 회원명 터치 시 '회원 상세 카드' 팝업 및 전화/문자 버튼 노출 확인
+    // 2. 좌측 회원명 터치 시 '회원 상세 카드' 팝업('특이사항:' 라벨) 및 전화/문자 버튼 노출 확인
     final memberTrigger = find.byKey(const Key('member_detail_trigger_m06')); // 강호동
     await tester.ensureVisible(memberTrigger);
     await tester.pumpAndSettle();
@@ -867,6 +932,8 @@ void main() {
 
     await tester.tap(memberTrigger);
     await tester.pumpAndSettle();
+    expect(find.textContaining('특이사항:'), findsOneWidget);
+    expect(find.textContaining('회비 정책:'), findsNothing);
     expect(find.text('전화 걸기'), findsOneWidget);
     expect(find.text('문자 보내기'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.close_rounded).first);

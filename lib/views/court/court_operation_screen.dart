@@ -42,33 +42,26 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      height: 36,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          AppTheme.buildMainAppBarLeftHeader(
-                            context: context,
-                            currentIndex: 2,
+                    AppTheme.buildMainAppBarRow(
+                      context: context,
+                      currentIndex: 2,
+                      actions: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppTheme.pastelPeriwinkle,
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppTheme.pastelPeriwinkle,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              currentClub.clubName,
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryDark,
-                              ),
+                          child: Text(
+                            currentClub.clubName,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryDark,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Row(
@@ -249,52 +242,45 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      height: 36,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          AppTheme.buildMainAppBarLeftHeader(
-                            context: context,
-                            currentIndex: 2,
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            key: const Key('court_header_live_viewer_button'),
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.all(6),
-                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            icon: Icon(Icons.live_tv_rounded, color: pagePalette.primary, size: 20),
-                            tooltip: '실시간 전광판 웹뷰어',
-                            onPressed: () {
-                              ref.read(currentTabProvider.notifier).setTab(3);
-                            },
-                          ),
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.all(6),
-                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            icon: const Icon(Icons.leaderboard_rounded, color: AppTheme.textDark, size: 20),
-                            tooltip: '실시간 랭킹 순위표',
-                            onPressed: () => _showRankingsDialog(context, ref, allMatches, allMembers),
-                          ),
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.all(6),
-                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            icon: const Icon(Icons.share_rounded, color: AppTheme.textDark, size: 19),
-                            tooltip: '일반 회원용 웹 링크 복사',
-                            onPressed: () {
-                              Clipboard.setData(
-                                ClipboardData(text: 'https://cockmatch.web.app/viewer/${session.id}'),
-                              );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('일반 회원용 실시간 웹 뷰어 링크가 복사되었습니다!')),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                    AppTheme.buildMainAppBarRow(
+                      context: context,
+                      currentIndex: 2,
+                      actions: [
+                        IconButton(
+                          key: const Key('court_header_live_viewer_button'),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: Icon(Icons.live_tv_rounded, color: pagePalette.primary, size: 20),
+                          tooltip: '실시간 전광판 웹뷰어',
+                          onPressed: () {
+                            ref.read(currentTabProvider.notifier).setTab(3);
+                          },
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: const Icon(Icons.leaderboard_rounded, color: AppTheme.textDark, size: 20),
+                          tooltip: '실시간 랭킹 순위표',
+                          onPressed: () => _showRankingsDialog(context, ref, allMatches, allMembers),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: const Icon(Icons.share_rounded, color: AppTheme.textDark, size: 19),
+                          tooltip: '일반 회원용 웹 링크 복사',
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(text: 'https://cockmatch.web.app/viewer/${session.id}'),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('일반 회원용 실시간 웹 뷰어 링크가 복사되었습니다!')),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Row(
@@ -2406,27 +2392,68 @@ class CourtMatchCard extends ConsumerStatefulWidget {
 class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
   late TextEditingController _scoreACtrl;
   late TextEditingController _scoreBCtrl;
+  late FocusNode _scoreAFocus;
+  late FocusNode _scoreBFocus;
+
+  void _selectAllScoreText(TextEditingController controller) {
+    if (controller.text.isEmpty) return;
+    controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: controller.text.length,
+    );
+  }
+
+  void _onScoreFocusChanged(FocusNode focusNode, TextEditingController controller) {
+    if (focusNode.hasFocus) {
+      _selectAllScoreText(controller);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && focusNode.hasFocus) {
+          _selectAllScoreText(controller);
+        }
+      });
+    } else {
+      if (controller.text.trim().isEmpty) {
+        controller.text = '0';
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _scoreACtrl = TextEditingController(text: '${widget.match.scoreA}');
     _scoreBCtrl = TextEditingController(text: '${widget.match.scoreB}');
+    _scoreAFocus = FocusNode()
+      ..addListener(() => _onScoreFocusChanged(_scoreAFocus, _scoreACtrl));
+    _scoreBFocus = FocusNode()
+      ..addListener(() => _onScoreFocusChanged(_scoreBFocus, _scoreBCtrl));
   }
 
   @override
   void didUpdateWidget(covariant CourtMatchCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.match.scoreA.toString() != _scoreACtrl.text) {
+    final currentParsedA = int.tryParse(_scoreACtrl.text.trim()) ?? 0;
+    if (widget.match.scoreA != currentParsedA ||
+        (!_scoreAFocus.hasFocus && widget.match.scoreA.toString() != _scoreACtrl.text)) {
       _scoreACtrl.text = '${widget.match.scoreA}';
+      if (_scoreAFocus.hasFocus) {
+        _scoreACtrl.selection = TextSelection.collapsed(offset: _scoreACtrl.text.length);
+      }
     }
-    if (widget.match.scoreB.toString() != _scoreBCtrl.text) {
+    final currentParsedB = int.tryParse(_scoreBCtrl.text.trim()) ?? 0;
+    if (widget.match.scoreB != currentParsedB ||
+        (!_scoreBFocus.hasFocus && widget.match.scoreB.toString() != _scoreBCtrl.text)) {
       _scoreBCtrl.text = '${widget.match.scoreB}';
+      if (_scoreBFocus.hasFocus) {
+        _scoreBCtrl.selection = TextSelection.collapsed(offset: _scoreBCtrl.text.length);
+      }
     }
   }
 
   @override
   void dispose() {
+    _scoreAFocus.dispose();
+    _scoreBFocus.dispose();
     _scoreACtrl.dispose();
     _scoreBCtrl.dispose();
     super.dispose();
@@ -2633,6 +2660,7 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                   teamTitle: 'TEAM A',
                   members: teamAMembers,
                   controller: _scoreACtrl,
+                  focusNode: _scoreAFocus,
                   isWinner: teamAWon,
                   isLoser: teamBWon,
                   isFinished: isFinished,
@@ -2687,6 +2715,7 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                   teamTitle: 'TEAM B',
                   members: teamBMembers,
                   controller: _scoreBCtrl,
+                  focusNode: _scoreBFocus,
                   isWinner: teamBWon,
                   isLoser: teamAWon,
                   isFinished: isFinished,
@@ -2947,6 +2976,7 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
     required String teamTitle,
     required List<Member> members,
     required TextEditingController controller,
+    required FocusNode focusNode,
     required bool isWinner,
     required bool isLoser,
     required bool isFinished,
@@ -3043,7 +3073,7 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
           ),
           const SizedBox(height: 8),
 
-          // 인라인 실시간 점수 입력창 (숫자 키보드 바로 작동)
+          // 인라인 실시간 점수 입력창 (포커스/터치 시 기존 숫자 전체 선택되어 바로 새 점수 입력 가능)
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -3056,8 +3086,10 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                 height: 38,
                 child: TextField(
                   controller: controller,
+                  focusNode: focusNode,
                   readOnly: isFinished,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 18,
@@ -3077,7 +3109,25 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                       borderSide: const BorderSide(color: AppTheme.primaryMint, width: 2),
                     ),
                   ),
-                  onChanged: isFinished ? null : onScoreChanged,
+                  onTap: isFinished
+                      ? null
+                      : () {
+                          _selectAllScoreText(controller);
+                        },
+                  onChanged: isFinished
+                      ? null
+                      : (val) {
+                          if (val.length > 1 && val.startsWith('0')) {
+                            final normalized = (int.tryParse(val) ?? 0).toString();
+                            controller.value = TextEditingValue(
+                              text: normalized,
+                              selection: TextSelection.collapsed(offset: normalized.length),
+                            );
+                            onScoreChanged(normalized);
+                            return;
+                          }
+                          onScoreChanged(val);
+                        },
                 ),
               ),
             ],

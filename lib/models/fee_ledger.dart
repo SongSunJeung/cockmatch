@@ -240,6 +240,12 @@ class FeeLedgerCalculator {
       if (member.isPermanentExempt) {
         return '영구 면제';
       }
+      if (member.exemptStartDate != null &&
+          member.exemptStartDate!.trim().isNotEmpty &&
+          member.exemptUntilDate != null &&
+          member.exemptUntilDate!.trim().isNotEmpty) {
+        return '${member.exemptStartDate}~${member.exemptUntilDate} 면제';
+      }
       return member.exemptUntilDate != null
           ? '~${member.exemptUntilDate} 면제'
           : '기간 면제';
@@ -292,8 +298,17 @@ class FeeLedgerCalculator {
             ? '${member.displayRoleLabel} 회비 면제'
             : '영구 회비 면제';
       }
+      final startYm = _parseYearMonth(member.exemptStartDate);
       final untilYm = _parseYearMonth(member.exemptUntilDate);
-      if (untilYm == null || targetYm <= untilYm) {
+      final afterStart = startYm == null || targetYm >= startYm;
+      final beforeEnd = untilYm == null || targetYm <= untilYm;
+      if (afterStart && beforeEnd) {
+        if (member.exemptStartDate != null &&
+            member.exemptStartDate!.trim().isNotEmpty &&
+            member.exemptUntilDate != null &&
+            member.exemptUntilDate!.trim().isNotEmpty) {
+          return '기간 면제 (${member.exemptStartDate}~${member.exemptUntilDate})';
+        }
         return member.exemptUntilDate != null
             ? '기간 면제 (~${member.exemptUntilDate})'
             : '기간 지정 면제';

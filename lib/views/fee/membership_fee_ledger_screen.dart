@@ -2330,7 +2330,7 @@ class _MembershipFeeLedgerScreenState
                   if (feePolicyBadge != null) ...[
                     const SizedBox(height: 6),
                     Text(
-                      '회비 정책: $feePolicyBadge',
+                      '특이사항: $feePolicyBadge',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,

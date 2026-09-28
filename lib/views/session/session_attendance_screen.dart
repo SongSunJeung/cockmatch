@@ -335,33 +335,26 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        height: 36,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            AppTheme.buildMainAppBarLeftHeader(
-                              context: context,
-                              currentIndex: 1,
+                      AppTheme.buildMainAppBarRow(
+                        context: context,
+                        currentIndex: 1,
+                        actions: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppTheme.pastelPeriwinkle,
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppTheme.pastelPeriwinkle,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                currentClub.clubName,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primaryDark,
-                                ),
+                            child: Text(
+                              currentClub.clubName,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryDark,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -566,33 +559,26 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          height: 36,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              AppTheme.buildMainAppBarLeftHeader(
-                                context: context,
-                                currentIndex: 1,
+                        AppTheme.buildMainAppBarRow(
+                          context: context,
+                          currentIndex: 1,
+                          actions: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.pastelPeriwinkle,
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.pastelPeriwinkle,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  currentClub.clubName,
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.primaryDark,
-                                  ),
+                              child: Text(
+                                currentClub.clubName,
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryDark,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 6),
                         _buildSessionHeader(context, session, currentClub),
@@ -1476,19 +1462,45 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _buildSummaryStatusChip(
+                key: const Key('attendance_summary_fee_chip_unpaid'),
                 label: unpaidCount > 0 ? '미납 $unpaidCount명' : '전원 수납완료!',
                 bg: unpaidCount > 0 ? AppTheme.pastelRose : pagePalette.softTint,
                 fg: unpaidCount > 0 ? AppTheme.pastelRoseDark : pagePalette.primary,
+                isSelected: _selectedFeeStatus == FeeStatus.unpaid,
+                onTap: () {
+                  setState(() {
+                    _selectedFeeStatus = _selectedFeeStatus == FeeStatus.unpaid
+                        ? null
+                        : FeeStatus.unpaid;
+                  });
+                },
               ),
               _buildSummaryStatusChip(
+                key: const Key('attendance_summary_fee_chip_paid'),
                 label: '완납 $paidCount명',
                 bg: pagePalette.softTint,
                 fg: pagePalette.primary,
+                isSelected: _selectedFeeStatus == FeeStatus.paid,
+                onTap: () {
+                  setState(() {
+                    _selectedFeeStatus =
+                        _selectedFeeStatus == FeeStatus.paid ? null : FeeStatus.paid;
+                  });
+                },
               ),
               _buildSummaryStatusChip(
+                key: const Key('attendance_summary_fee_chip_exempt'),
                 label: '면제 $exemptCount명',
                 bg: AppTheme.pastelPeriwinkle.withValues(alpha: 0.65),
                 fg: AppTheme.pastelPeriwinkleDark,
+                isSelected: _selectedFeeStatus == FeeStatus.exempt,
+                onTap: () {
+                  setState(() {
+                    _selectedFeeStatus = _selectedFeeStatus == FeeStatus.exempt
+                        ? null
+                        : FeeStatus.exempt;
+                  });
+                },
               ),
             ],
           ),
@@ -1497,26 +1509,42 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     );
   }
 
-  /// 요약 바 내부 가로형 상태 칩 (줄바꿈 없이 가로로 깔끔하게 표시)
+  /// 요약 바 내부 가로형 상태 칩 (줄바꿈 없이 가로로 깔끔하게 표시 + 터치 시 하단 명단 즉시 필터링)
   Widget _buildSummaryStatusChip({
+    Key? key,
     required String label,
     required Color bg,
     required Color fg,
+    bool isSelected = false,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: key,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(7),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        softWrap: false,
-        style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w800,
-          color: fg,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: isSelected ? fg : bg,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(
+              color: isSelected ? fg : fg.withValues(alpha: 0.25),
+              width: isSelected ? 1.4 : 1.0,
+            ),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            softWrap: false,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: isSelected ? Colors.white : fg,
+            ),
+          ),
         ),
       ),
     );
@@ -2799,12 +2827,12 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                       }
                     : null),
             child: Text(
-              hasOngoingBracket ? '📋 현재 대진표 이어보기' : '⚡ 대진 생성 및 시작',
+              hasOngoingBracket ? '현재 대진표 확인' : '⚡ 대진 생성 및 시작',
               style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
             ),
           ),
           const SizedBox(width: 6),
-          // 대진 설정 & 이동 버튼 (상세 설정 및 부분 재편성/초기화 모달 호출)
+          // 대진표 설정수정 버튼 (상세 설정 및 부분 재편성/초기화 모달 호출)
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: canGenerate
@@ -2822,7 +2850,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             ),
             icon: const Icon(Icons.tune_rounded, size: 14),
             label: const Text(
-              '대진 설정 & 이동',
+              '대진표 설정수정',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5),
             ),
             onPressed: canGenerate
@@ -4730,7 +4758,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                         ref.read(currentTabProvider.notifier).setTab(2);
                       },
                       child: const Text(
-                        '📋 현재 대진표 이어보기',
+                        '현재 대진표 확인',
                         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                       ),
                     ),

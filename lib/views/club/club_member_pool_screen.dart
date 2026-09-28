@@ -80,54 +80,36 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          height: 36,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              AppTheme.buildMainAppBarLeftHeader(
-                                context: context,
-                                currentIndex: 0,
+                        AppTheme.buildMainAppBarRow(
+                          context: context,
+                          currentIndex: 0,
+                          actions: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.account_balance_wallet_rounded,
+                                size: 20,
+                                color: AppTheme.primaryDark,
                               ),
-                              const Spacer(),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.account_balance_wallet_rounded,
-                                  size: 20,
-                                  color: AppTheme.primaryDark,
-                                ),
-                                tooltip: '연간/월별 회비 납부 현황표',
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.all(6),
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                onPressed: () =>
-                                    ref.read(currentTabProvider.notifier).setTab(4),
+                              tooltip: '연간/월별 회비 납부 현황표',
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(6),
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              onPressed: () =>
+                                  ref.read(currentTabProvider.notifier).setTab(4),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.person_add_alt_1_rounded,
+                                size: 20,
+                                color: AppTheme.primaryDark,
                               ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.sms_rounded,
-                                  size: 20,
-                                  color: AppTheme.textDark,
-                                ),
-                                tooltip: '단체 문자 발송',
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.all(6),
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                onPressed: () => _showGroupSmsDialog(context, clubMembers),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.person_add_alt_1_rounded,
-                                  size: 20,
-                                  color: AppTheme.primaryDark,
-                                ),
-                                tooltip: '신규 회원 직접 등록',
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.all(6),
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                onPressed: () => _showAddMemberDialog(context),
-                              ),
-                              PopupMenuButton<String>(
+                              tooltip: '신규 회원 직접 등록',
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(6),
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              onPressed: () => _showAddMemberDialog(context),
+                            ),
+                            PopupMenuButton<String>(
                                 icon: const Icon(
                                   Icons.more_vert_rounded,
                                   size: 21,
@@ -250,7 +232,6 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                         ),
                       ],
                     ),
-                  ),
                   const SizedBox(height: 4),
                   InkWell(
                     onTap: () => _showClubSwitchBottomSheet(context, ref),
@@ -1188,7 +1169,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   if (feePolicyBadge != null) ...[
                     const SizedBox(height: 6),
                     Text(
-                      '회비 정책: $feePolicyBadge',
+                      '특이사항: $feePolicyBadge',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.pastelPeriwinkleDark),
                     ),
                   ],
@@ -1573,6 +1554,9 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
           : '20000',
     );
     bool isPermanentExempt = existingMember?.isPermanentExempt ?? true;
+    final exemptStartCtrl = TextEditingController(
+      text: existingMember?.exemptStartDate ?? todayFormatted,
+    );
     final exemptUntilCtrl = TextEditingController(
       text: existingMember?.exemptUntilDate ?? '2026.12.31',
     );
@@ -1828,7 +1812,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                   const SizedBox(width: 6),
                                   Flexible(
                                     child: Text(
-                                      '활동 회원 (기본값)',
+                                      '활동 회원',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w800,
@@ -2263,39 +2247,93 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                             ),
                             if (!isPermanentExempt) ...[
                               const SizedBox(height: 10),
-                              TextField(
-                                controller: exemptUntilCtrl,
-                                onChanged: (_) => setModalState(() {}),
-                                decoration: InputDecoration(
-                                  labelText: '면제 종료일',
-                                  hintText: '예: 2026.12.31',
-                                  isDense: true,
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  suffixIcon: IconButton(
-                                    tooltip: '면제 종료일 달력 픽커',
-                                    icon: const Icon(
-                                      Icons.calendar_month_rounded,
-                                      size: 18,
-                                      color: AppTheme.pastelPeriwinkleDark,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      key: const Key('member_exempt_start_date_field'),
+                                      controller: exemptStartCtrl,
+                                      onChanged: (_) => setModalState(() {}),
+                                      decoration: InputDecoration(
+                                        labelText: '면제 시작일',
+                                        hintText: '예: 2026.09.01',
+                                        isDense: true,
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        suffixIcon: IconButton(
+                                          tooltip: '면제 시작일 달력 픽커',
+                                          icon: const Icon(
+                                            Icons.calendar_today_rounded,
+                                            size: 16,
+                                            color: AppTheme.pastelPeriwinkleDark,
+                                          ),
+                                          onPressed: () async {
+                                            final picked = await _pickFormattedDate(
+                                              ctx,
+                                              currentValue: exemptStartCtrl.text,
+                                              helpText: '면제 시작일 선택',
+                                            );
+                                            if (picked != null) {
+                                              setModalState(() {
+                                                exemptStartCtrl.text = picked;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
                                     ),
-                                    onPressed: () async {
-                                      final picked = await _pickFormattedDate(
-                                        ctx,
-                                        currentValue: exemptUntilCtrl.text,
-                                        helpText: '면제 종료일 선택',
-                                      );
-                                      if (picked != null) {
-                                        setModalState(() {
-                                          exemptUntilCtrl.text = picked;
-                                        });
-                                      }
-                                    },
                                   ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 6),
+                                    child: Text(
+                                      '~',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: AppTheme.textMuted,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  Expanded(
+                                    child: TextField(
+                                      key: const Key('member_exempt_until_date_field'),
+                                      controller: exemptUntilCtrl,
+                                      onChanged: (_) => setModalState(() {}),
+                                      decoration: InputDecoration(
+                                        labelText: '면제 종료일',
+                                        hintText: '예: 2026.12.31',
+                                        isDense: true,
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        suffixIcon: IconButton(
+                                          tooltip: '면제 종료일 달력 픽커',
+                                          icon: const Icon(
+                                            Icons.calendar_month_rounded,
+                                            size: 17,
+                                            color: AppTheme.pastelPeriwinkleDark,
+                                          ),
+                                          onPressed: () async {
+                                            final picked = await _pickFormattedDate(
+                                              ctx,
+                                              currentValue: exemptUntilCtrl.text,
+                                              helpText: '면제 종료일 선택',
+                                            );
+                                            if (picked != null) {
+                                              setModalState(() {
+                                                exemptUntilCtrl.text = picked;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ],
@@ -2362,6 +2400,17 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                     resolvedFeeStatus = FeeStatus.unpaid;
                   }
 
+                  final hasExemptPeriod =
+                      selectedFeePolicy == FeePolicyType.exempt && !isPermanentExempt;
+                  final resolvedExemptStart =
+                      hasExemptPeriod && exemptStartCtrl.text.trim().isNotEmpty
+                          ? exemptStartCtrl.text.trim()
+                          : null;
+                  final resolvedExemptUntil =
+                      hasExemptPeriod && exemptUntilCtrl.text.trim().isNotEmpty
+                          ? exemptUntilCtrl.text.trim()
+                          : null;
+
                   if (isEdit) {
                     final updated = existingMember.copyWith(
                       name: name,
@@ -2390,11 +2439,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                       isPermanentExempt: selectedFeePolicy == FeePolicyType.exempt
                           ? isPermanentExempt
                           : true,
-                      exemptUntilDate: selectedFeePolicy == FeePolicyType.exempt && !isPermanentExempt
-                          ? exemptUntilCtrl.text.trim()
-                          : null,
-                      clearExemptUntilDate:
-                          selectedFeePolicy != FeePolicyType.exempt || isPermanentExempt,
+                      exemptStartDate: resolvedExemptStart,
+                      clearExemptStartDate: !hasExemptPeriod,
+                      exemptUntilDate: resolvedExemptUntil,
+                      clearExemptUntilDate: !hasExemptPeriod,
                       feeStatus: resolvedFeeStatus,
                       phoneNumber: normalizedPhone,
                       memo: memoText,
@@ -2433,9 +2481,8 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                       isPermanentExempt: selectedFeePolicy == FeePolicyType.exempt
                           ? isPermanentExempt
                           : true,
-                      exemptUntilDate: selectedFeePolicy == FeePolicyType.exempt && !isPermanentExempt
-                          ? exemptUntilCtrl.text.trim()
-                          : null,
+                      exemptStartDate: resolvedExemptStart,
+                      exemptUntilDate: resolvedExemptUntil,
                       feeStatus: resolvedFeeStatus,
                       phoneNumber: normalizedPhone,
                       memo: memoText.isEmpty ? null : memoText,
