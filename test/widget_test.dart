@@ -738,40 +738,25 @@ void main() {
     expect(find.text('🔄 다음 라운드 스마트 편성'), findsOneWidget);
   });
 
-  testWidgets('5개 핵심 페이지 테마 컬러(HEX) 매칭, 슬림 페이지 인디케이터(● ○ ○ ○ ○), 단일 톤 롤백 검증', (WidgetTester tester) async {
-    // 1. 5개 페이지별 HEX 컬러 정확성 검증
-    AppTheme.usePageSpecificAccentThemes = true;
-    final p0 = AppTheme.getPagePalette(0);
-    final p1 = AppTheme.getPagePalette(1);
-    final p2 = AppTheme.getPagePalette(2);
-    final p3 = AppTheme.getPagePalette(3);
-    final p4 = AppTheme.getPagePalette(4);
+  testWidgets('단일 퍼플 톤 원복, AppBar 좌측 페이지명 전환(회원 명부/출석부/대진표), 고정 위치 3도트 인디케이터(● ○ ○) 정렬 검증', (WidgetTester tester) async {
+    // 1. 시범 적용했던 5개 분기 컬러가 모두 해제되고 단일 시그니처 퍼플 톤으로 원복되었는지 검증
+    expect(AppTheme.usePageSpecificAccentThemes, isFalse);
+    for (int i = 0; i < 5; i++) {
+      final p = AppTheme.getPagePalette(i);
+      expect(p.primary, AppTheme.primaryDark);
+      expect(p.secondary, AppTheme.primaryMint);
+      expect(p.softTint, AppTheme.pastelPeriwinkle);
+    }
 
-    expect(p0.primary, const Color(0xFF455A64));
-    expect(p0.secondary, const Color(0xFF80CBC4));
-    expect(p1.primary, const Color(0xFF527F5B));
-    expect(p1.secondary, const Color(0xFFA3C9A8));
-    expect(p2.primary, const Color(0xFF5E4B8B));
-    expect(p2.secondary, const Color(0xFF7D6CC4));
-    expect(p3.primary, const Color(0xFF1E88E5));
-    expect(p3.secondary, const Color(0xFF64B5F6));
-    expect(p4.primary, const Color(0xFFD4A017));
-    expect(p4.secondary, const Color(0xFFF0C94C));
+    // 2. 3개 메인 스와이프 페이지 타이틀 및 3도트 인디케이터 문자열 검증
+    expect(AppTheme.getMainPageTitle(0), '회원 명부');
+    expect(AppTheme.getMainPageTitle(1), '출석부');
+    expect(AppTheme.getMainPageTitle(2), '대진표');
+    expect(AppTheme.buildDotIndicatorString(0), '● ○ ○');
+    expect(AppTheme.buildDotIndicatorString(1), '○ ● ○');
+    expect(AppTheme.buildDotIndicatorString(2), '○ ○ ●');
 
-    // 2. 단일 톤 롤백 플래그(usePageSpecificAccentThemes = false) 검증 후 복원
-    AppTheme.usePageSpecificAccentThemes = false;
-    expect(AppTheme.getPagePalette(0).primary, AppTheme.unifiedDefaultPalette.primary);
-    expect(AppTheme.getPagePalette(4).primary, AppTheme.unifiedDefaultPalette.primary);
-    AppTheme.usePageSpecificAccentThemes = true;
-
-    // 3. 인디케이터 문자열 생성 검증
-    expect(AppTheme.buildDotIndicatorString(0), '● ○ ○ ○ ○');
-    expect(AppTheme.buildDotIndicatorString(1), '○ ● ○ ○ ○');
-    expect(AppTheme.buildDotIndicatorString(2), '○ ○ ● ○ ○');
-    expect(AppTheme.buildDotIndicatorString(3), '○ ○ ○ ● ○');
-    expect(AppTheme.buildDotIndicatorString(4), '○ ○ ○ ○ ●');
-
-    // 4. 실제 앱 화면에서 5개 페이지 이동 시 슬림 페이지 인디케이터 노출 확인
+    // 3. 실제 앱 화면에서 스와이프/이동 시 AppBar 좌측 타이틀과 고정 3도트 인디케이터가 동일한 절대 좌표(x, y)에 유지되는지 검증
     await tester.pumpWidget(
       const ProviderScope(
         child: CockMatchApp(),
@@ -779,45 +764,53 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 기본 진입(Page 1 출석부): ○ ● ○ ○ ○
-    expect(find.byKey(const Key('top_page_dot_indicator_1')), findsOneWidget);
-    expect(find.text('○ ● ○ ○ ○'), findsOneWidget);
+    // 기본 진입(Page 1 출석부): '출석부' + '○ ● ○'
+    final title1Finder = find.byKey(const Key('app_bar_page_title_1'));
+    final dot1Finder = find.byKey(const Key('top_page_dot_indicator_1'));
+    expect(title1Finder, findsOneWidget);
+    expect(dot1Finder, findsOneWidget);
+    expect(find.text('출석부'), findsWidgets);
+    expect(find.text('○ ● ○'), findsOneWidget);
+    // 임시 텍스트 뱃지 완전 삭제 확인
+    expect(find.textContaining('1/5 회원 명단'), findsNothing);
+    expect(find.textContaining('SAGE 그린 활동 톤'), findsNothing);
 
-    // 드로어로 Page 0(회원 명단) 이동: ● ○ ○ ○ ○
+    final Offset title1TopLeft = tester.getTopLeft(title1Finder);
+    final Offset dot1TopLeft = tester.getTopLeft(dot1Finder);
+
+    // 드로어로 Page 0(회원 명부) 이동: '회원 명부' + '● ○ ○'
     await tester.tap(find.byTooltip('메뉴 열기').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('회원명부'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('top_page_dot_indicator_0')), findsOneWidget);
-    expect(find.text('● ○ ○ ○ ○'), findsOneWidget);
 
-    // 드로어로 Page 2(대진표 운영) 이동: ○ ○ ● ○ ○
+    final title0Finder = find.byKey(const Key('app_bar_page_title_0'));
+    final dot0Finder = find.byKey(const Key('top_page_dot_indicator_0'));
+    expect(title0Finder, findsOneWidget);
+    expect(dot0Finder, findsOneWidget);
+    expect(find.text('회원 명부'), findsOneWidget);
+    expect(find.text('● ○ ○'), findsOneWidget);
+
+    final Offset title0TopLeft = tester.getTopLeft(title0Finder);
+    final Offset dot0TopLeft = tester.getTopLeft(dot0Finder);
+    expect(title0TopLeft, equals(title1TopLeft));
+    expect(dot0TopLeft, equals(dot1TopLeft));
+
+    // 드로어로 Page 2(대진표) 이동: '대진표' + '○ ○ ●'
     await tester.tap(find.byTooltip('메뉴 열기').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('대진표'));
+    await tester.tap(find.text('대진표').first);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('top_page_dot_indicator_2')), findsOneWidget);
-    expect(find.text('○ ○ ● ○ ○'), findsOneWidget);
 
-    // 드로어로 Page 3(실시간 웹뷰어) 이동: ○ ○ ○ ● ○
-    await tester.tap(find.byTooltip('메뉴 열기').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('웹뷰어'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('top_page_dot_indicator_3')), findsOneWidget);
-    expect(find.text('○ ○ ○ ● ○'), findsOneWidget);
+    final title2Finder = find.byKey(const Key('app_bar_page_title_2'));
+    final dot2Finder = find.byKey(const Key('top_page_dot_indicator_2'));
+    expect(title2Finder, findsOneWidget);
+    expect(dot2Finder, findsOneWidget);
+    expect(find.text('○ ○ ●'), findsOneWidget);
 
-    // 드로어로 Page 4(월회비 관리 PRO) 이동: ○ ○ ○ ○ ●
-    await tester.tap(find.byTooltip('메뉴 열기').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('월회비 관리 🔒'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('activate_pro_and_open_fee_ledger_button')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('top_page_dot_indicator_4')), findsOneWidget);
-    expect(find.text('○ ○ ○ ○ ●'), findsOneWidget);
+    final Offset title2TopLeft = tester.getTopLeft(title2Finder);
+    final Offset dot2TopLeft = tester.getTopLeft(dot2Finder);
+    expect(title2TopLeft, equals(title1TopLeft));
+    expect(dot2TopLeft, equals(dot1TopLeft));
   });
 }
-
-
-

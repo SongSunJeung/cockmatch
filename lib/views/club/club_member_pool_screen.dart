@@ -73,144 +73,74 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
           children: [
             CustomScrollView(
               slivers: [
-                // 1. 컴팩트 상단 헤더 & 빠른 액션 (TEAL/GRAY 테마 #455A64 / #80CBC4 & 페이지 인디케이터 ● ○ ○ ○ ○)
+                // 1. 최상단 AppBar ([☰] + '회원 명부' + [● ○ ○] 고정 인디케이터) & 클럽 전환 바
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            AppTheme.buildSlimPageIndicator(currentIndex: 0),
-                            const Spacer(),
-                            Text(
-                              pagePalette.toneLabel,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: pagePalette.primary.withValues(alpha: 0.75),
+                        SizedBox(
+                          height: 36,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              AppTheme.buildMainAppBarLeftHeader(
+                                context: context,
+                                currentIndex: 0,
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () => AppTheme.openDrawer(context),
-                              tooltip: '메뉴 열기',
-                              visualDensity: VisualDensity.compact,
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(
-                                    color: pagePalette.primary.withValues(alpha: 0.2),
-                                  ),
+                              const Spacer(),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  size: 20,
+                                  color: AppTheme.primaryDark,
                                 ),
+                                tooltip: '연간/월별 회비 납부 현황표',
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.all(6),
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                onPressed: () =>
+                                    ref.read(currentTabProvider.notifier).setTab(4),
                               ),
-                              icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 22),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => _showClubSwitchBottomSheet(context, ref),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Flexible(
-                                            child: Text(
-                                              currentClub.clubName,
-                                              style: const TextStyle(
-                                                fontSize: 17,
-                                                fontWeight: FontWeight.w800,
-                                                color: AppTheme.textDark,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 2),
-                                          Icon(
-                                            Icons.arrow_drop_down_rounded,
-                                            size: 24,
-                                            color: pagePalette.primary,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: pagePalette.softTint,
-                                              borderRadius: BorderRadius.circular(10),
-                                              border: Border.all(
-                                                color: pagePalette.secondary.withValues(alpha: 0.6),
-                                              ),
-                                            ),
-                                            child: Text(
-                                              '총 ${clubMembers.length}명',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: pagePalette.primary,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      Text(
-                                        currentClub.description ?? '회원 명부 및 주소록 관리 (터치하여 모임 전환)',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppTheme.textMuted,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.sms_rounded,
+                                  size: 20,
+                                  color: AppTheme.textDark,
                                 ),
+                                tooltip: '단체 문자 발송',
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.all(6),
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                onPressed: () => _showGroupSmsDialog(context, clubMembers),
                               ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.account_balance_wallet_rounded,
-                                size: 20,
-                                color: AppTheme.getPagePalette(4).primary,
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.person_add_alt_1_rounded,
+                                  size: 20,
+                                  color: AppTheme.primaryDark,
+                                ),
+                                tooltip: '신규 회원 직접 등록',
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.all(6),
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                onPressed: () => _showAddMemberDialog(context),
                               ),
-                              tooltip: '연간/월별 회비 납부 현황표',
-                              visualDensity: VisualDensity.compact,
-                              onPressed: () =>
-                                  ref.read(currentTabProvider.notifier).setTab(4),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.sms_rounded, size: 21, color: pagePalette.primary),
-                              tooltip: '단체 문자 발송',
-                              visualDensity: VisualDensity.compact,
-                              onPressed: () => _showGroupSmsDialog(context, clubMembers),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.person_add_alt_1_rounded,
-                                size: 21,
-                                color: pagePalette.primary,
-                              ),
-                              tooltip: '신규 회원 직접 등록',
-                              visualDensity: VisualDensity.compact,
-                              onPressed: () => _showAddMemberDialog(context),
-                            ),
-                            PopupMenuButton<String>(
-                              icon: Icon(Icons.more_vert_rounded, size: 22, color: pagePalette.primary),
-                          tooltip: '더보기 메뉴',
-                          offset: const Offset(0, 44),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          color: Colors.white,
-                          elevation: 8,
-                          onSelected: (value) {
+                              PopupMenuButton<String>(
+                                icon: const Icon(
+                                  Icons.more_vert_rounded,
+                                  size: 21,
+                                  color: AppTheme.textDark,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                tooltip: '더보기 메뉴',
+                                offset: const Offset(0, 40),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                color: Colors.white,
+                                elevation: 8,
+                                onSelected: (value) {
                             if (value == 'csv_import') {
                               _showCsvImportDialog(context, currentClub, clubMembers);
                             } else if (value == 'csv_export') {
@@ -320,10 +250,67 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 4),
+                  InkWell(
+                    onTap: () => _showClubSwitchBottomSheet(context, ref),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              currentClub.clubName,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.textDark,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const Icon(
+                            Icons.arrow_drop_down_rounded,
+                            size: 18,
+                            color: AppTheme.primaryDark,
+                          ),
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.pastelPeriwinkle,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '총 ${clubMembers.length}명',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryDark,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              currentClub.description ?? '회원 명부 및 주소록 관리',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textMuted,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
 
                 // 2. 실시간 이름/초성 검색창 + 우측 컴팩트 정렬 버튼(⇅)
                 SliverToBoxAdapter(

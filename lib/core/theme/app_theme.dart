@@ -138,12 +138,11 @@ class AppTheme {
   static const Color statusFinished = Color(0xFF38B6C8);
 
   // ===========================================================================
-  // [시범 적용] 5개 핵심 페이지별 포인트 컬러(Accent Color) 시스템
-  // - 추후 언제든 단일 톤으로 즉시 롤백할 수 있도록 스위치 플래그 및 팔레트 객체로 분리
+  // 단일 톤(Single-Tone) 시그니처 퍼플/라벤더 테마 설정
   // ===========================================================================
-  static bool usePageSpecificAccentThemes = true;
+  static bool usePageSpecificAccentThemes = false;
 
-  /// 단일 톤 롤백 시 사용되는 기본 팔레트
+  /// 단일 톤 기본 팔레트 (시그니처 퍼플/라벤더)
   static const PageAccentPalette unifiedDefaultPalette = PageAccentPalette(
     pageIndex: 0,
     pageName: '콕매치',
@@ -154,16 +153,11 @@ class AppTheme {
     borderTint: Color(0xFFD2CCFA),
   );
 
-  /// 5개 핵심 페이지별 포인트 테마 팔레트 매핑 (HEX)
-  /// 0: 회원 명단 - TEAL/GRAY 계열 (#455A64, 보조 #80CBC4)
-  /// 1: 출석부 - SAGE 그린 계열 (#527F5B, 보조 #A3C9A8)
-  /// 2: 대진표 운영 - LAVENDER 퍼플 계열 (#5E4B8B, 보조 #7D6CC4)
-  /// 3: 실시간 웹뷰어(전광판) - ARCTIC 블루 계열 (#1E88E5, 보조 #64B5F6)
-  /// 4: 월회비 관리(PRO) - MUSTARD 골드 계열 (#D4A017, 보조 #F0C94C)
+  /// 5개 페이지 팔레트 정의 (단일 톤 기본값으로 동작하며 필요 시 참조용 유지)
   static const List<PageAccentPalette> pagePalettes = [
     PageAccentPalette(
       pageIndex: 0,
-      pageName: '회원 명단',
+      pageName: '회원 명부',
       toneLabel: 'TEAL/GRAY 명부 톤',
       primary: Color(0xFF455A64),
       secondary: Color(0xFF80CBC4),
@@ -181,7 +175,7 @@ class AppTheme {
     ),
     PageAccentPalette(
       pageIndex: 2,
-      pageName: '대진표 운영',
+      pageName: '대진표',
       toneLabel: 'LAVENDER 코트 운영 톤',
       primary: Color(0xFF5E4B8B),
       secondary: Color(0xFF7D6CC4),
@@ -208,8 +202,7 @@ class AppTheme {
     ),
   ];
 
-  /// 현재 페이지 인덱스(0~4)에 맞는 포인트 컬러 팔레트 반환
-  /// `usePageSpecificAccentThemes == false` 설정 시 즉시 단일 톤으로 롤백됨
+  /// 현재 페이지 인덱스(0~4)에 맞는 팔레트 반환 (`usePageSpecificAccentThemes == false`이므로 시그니처 퍼플 단일 톤 반환)
   static PageAccentPalette getPagePalette(int pageIndex) {
     final safeIndex = pageIndex.clamp(0, pagePalettes.length - 1);
     if (!usePageSpecificAccentThemes) {
@@ -226,57 +219,110 @@ class AppTheme {
     return pagePalettes[safeIndex];
   }
 
-  /// 현재 페이지 인덱스(0~4)의 텍스트형 도트 문자열 반환 (예: "● ○ ○ ○ ○")
-  static String buildDotIndicatorString(int currentIndex) {
-    final safeIndex = currentIndex.clamp(0, 4);
-    return List.generate(5, (i) => i == safeIndex ? '●' : '○').join(' ');
+  /// 스와이프 3대 메인 페이지(0: 회원 명부, 1: 출석부, 2: 대진표)의 AppBar 좌측 페이지명 반환
+  static String getMainPageTitle(int currentIndex) {
+    switch (currentIndex.clamp(0, 2)) {
+      case 0:
+        return '회원 명부';
+      case 1:
+        return '출석부';
+      case 2:
+      default:
+        return '대진표';
+    }
   }
 
-  /// 상단 헤더 영역에 배치되는 슬림한 페이지 위치 인디케이터 (`● ○ ○ ○ ○`)
+  /// 스와이프 3대 메인 페이지(0~2)의 3도트 인디케이터 문자열 반환 ("● ○ ○", "○ ● ○", "○ ○ ●")
+  static String buildDotIndicatorString(int currentIndex) {
+    final safeIndex = currentIndex.clamp(0, 2);
+    return List.generate(3, (i) => i == safeIndex ? '●' : '○').join(' ');
+  }
+
+  /// AppBar 페이지 타이틀 바로 옆 고정 위치에 표시되는 미니멀 3도트 인디케이터 (`● ○ ○` / `○ ● ○` / `○ ○ ●`)
   static Widget buildSlimPageIndicator({
     required int currentIndex,
     ValueChanged<int>? onPageTap,
   }) {
-    final palette = getPagePalette(currentIndex);
-    final dotText = buildDotIndicatorString(currentIndex);
+    final safeIndex = currentIndex.clamp(0, 2);
+    final dotText = buildDotIndicatorString(safeIndex);
 
     return Container(
-      key: Key('top_page_dot_indicator_$currentIndex'),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+      key: Key('top_page_dot_indicator_$safeIndex'),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: palette.softTint,
+        color: pastelPeriwinkle,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: palette.primary.withValues(alpha: 0.25),
-          width: 1,
+      ),
+      child: Text(
+        dotText,
+        key: const Key('slim_page_dots_text'),
+        style: const TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
+          color: primaryDark,
+          letterSpacing: 1.0,
+          height: 1.0,
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            dotText,
-            key: const Key('slim_page_dots_text'),
-            style: TextStyle(
-              fontSize: 9.5,
+    );
+  }
+
+  /// 3개 스와이프 화면(회원 명부 · 출석부 · 대진표) 최상단 AppBar 좌측 고정 헤더
+  /// - [☰ 햄버거 메뉴] + [고정 폭 페이지 타이틀] + [고정 위치 ● ○ ○ 3도트 인디케이터]
+  /// - 스와이프 시 3개 화면 모두 흔들림 없이 동일한 절대 위치(x, y)를 유지하도록 규격 통일
+  static Widget buildMainAppBarLeftHeader({
+    required BuildContext context,
+    required int currentIndex,
+  }) {
+    final safeIndex = currentIndex.clamp(0, 2);
+    final pageTitle = getMainPageTitle(safeIndex);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 34,
+          height: 34,
+          child: IconButton(
+            onPressed: () => openDrawer(context),
+            tooltip: '메뉴 열기',
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(
+              Icons.menu_rounded,
+              color: textDark,
+              size: 20,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 72,
+          child: Text(
+            pageTitle,
+            key: Key('app_bar_page_title_$safeIndex'),
+            style: const TextStyle(
+              fontSize: 17,
               fontWeight: FontWeight.w900,
-              color: palette.primary,
-              letterSpacing: 0.5,
-              height: 1.0,
+              color: textDark,
+              letterSpacing: -0.3,
+              height: 1.1,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.clip,
           ),
-          const SizedBox(width: 5),
-          Text(
-            '${currentIndex.clamp(0, 4) + 1}/5 ${palette.pageName}',
-            style: TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w800,
-              color: palette.primary,
-              height: 1.0,
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 6),
+        buildSlimPageIndicator(currentIndex: safeIndex),
+      ],
     );
   }
 

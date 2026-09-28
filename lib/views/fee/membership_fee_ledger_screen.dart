@@ -280,8 +280,6 @@ class _MembershipFeeLedgerScreenState
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                AppTheme.buildSlimPageIndicator(currentIndex: 4),
               ],
             ),
           ),

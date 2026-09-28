@@ -109,8 +109,6 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
       );
     }
 
-    final activePalette = AppTheme.getPagePalette(currentTab);
-
     return Scaffold(
       key: AppTheme.rootScaffoldKey,
       backgroundColor: AppTheme.background,
@@ -123,30 +121,13 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
         sessionTitle: activeSession?.title,
         isProUser: isProUser,
       ),
-      body: Column(
-        children: [
-          // 상단 페이지별 포인트 컬러 슬림 스트립 (스와이프 시 직관적 구분)
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            height: 3.5,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [activePalette.primary, activePalette.secondary],
-              ),
-            ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: (currentTab == 4 && isProUser) ? 1080 : 700,
           ),
-          Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: (currentTab == 4 && isProUser) ? 1080 : 700,
-                ),
-                child: activeBody,
-              ),
-            ),
-          ),
-        ],
+          child: activeBody,
+        ),
       ),
     );
   }

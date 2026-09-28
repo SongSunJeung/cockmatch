@@ -447,8 +447,6 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 6),
-              AppTheme.buildSlimPageIndicator(currentIndex: 3),
             ],
           ),
           const SizedBox(height: 12),

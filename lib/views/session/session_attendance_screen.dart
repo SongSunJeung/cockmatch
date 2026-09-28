@@ -328,88 +328,66 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
           bottom: false,
           child: CustomScrollView(
             slivers: [
-              // 상단 헤더 (SAGE 그린 테마 #527F5B / #A3C9A8 & 페이지 인디케이터 ○ ● ○ ○ ○)
+              // 최상단 AppBar ([☰] + '출석부' + [○ ● ○] 고정 인디케이터)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          AppTheme.buildSlimPageIndicator(currentIndex: 1),
-                          const Spacer(),
-                          Text(
-                            pagePalette.toneLabel,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: pagePalette.primary.withValues(alpha: 0.75),
+                      SizedBox(
+                        height: 36,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            AppTheme.buildMainAppBarLeftHeader(
+                              context: context,
+                              currentIndex: 1,
                             ),
-                          ),
-                        ],
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.pastelPeriwinkle,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                currentClub.clubName,
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryDark,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          IconButton(
-                            onPressed: () => AppTheme.openDrawer(context),
-                            tooltip: '메뉴 열기',
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(
-                                  color: pagePalette.primary.withValues(alpha: 0.2),
-                                ),
-                              ),
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: AppTheme.pastelPeriwinkle,
+                              borderRadius: BorderRadius.circular(11),
                             ),
-                            icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 22),
+                            child: const Icon(
+                              Icons.edit_calendar_rounded,
+                              color: AppTheme.primaryDark,
+                              size: 18,
+                            ),
                           ),
                           const SizedBox(width: 10),
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: pagePalette.softTint,
-                              borderRadius: BorderRadius.circular(13),
-                            ),
-                            child: Icon(Icons.edit_calendar_rounded, color: pagePalette.primary, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: pagePalette.softTint,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        currentClub.clubName,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: pagePalette.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                const Text(
-                                  '오늘 모임 & 출석부',
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.textDark,
-                                  ),
-                                ),
-                              ],
+                          const Expanded(
+                            child: Text(
+                              '오늘 모임 & 출석부',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.textDark,
+                              ),
                             ),
                           ),
                         ],
@@ -581,11 +559,45 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
           children: [
             CustomScrollView(
               slivers: [
-                // 1. 상단 모임 헤더 & 기본 정보 바
+                // 1. 최상단 AppBar ([☰] + '출석부' + [○ ● ○] 고정 인디케이터) & 모임 기본 정보 카드
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                    child: _buildSessionHeader(context, session, currentClub),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          height: 36,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              AppTheme.buildMainAppBarLeftHeader(
+                                context: context,
+                                currentIndex: 1,
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.pastelPeriwinkle,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  currentClub.clubName,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryDark,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        _buildSessionHeader(context, session, currentClub),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -1020,32 +1032,6 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
         children: [
           Row(
             children: [
-              AppTheme.buildSlimPageIndicator(currentIndex: 1),
-              const Spacer(),
-              Text(
-                pagePalette.toneLabel,
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                  color: pagePalette.primary.withValues(alpha: 0.75),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => AppTheme.openDrawer(context),
-                tooltip: '메뉴 열기',
-                visualDensity: VisualDensity.compact,
-                style: IconButton.styleFrom(
-                  backgroundColor: pagePalette.softTint,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 21),
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
