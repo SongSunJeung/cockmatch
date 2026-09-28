@@ -453,15 +453,27 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('오늘 모임 세션 & 대진 설정'), findsNothing);
-    // '운영 코트 5면' 표기 확인 ('(1~5번)' 제거 확인)
-    expect(find.text('운영 코트 5면'), findsOneWidget);
-    expect(find.textContaining('(1~5번)'), findsNothing);
-    // 코트 헤더에서 '급수합' 표기가 완전 제거되었는지 확인
-    expect(find.textContaining('급수합'), findsNothing);
-    // 대진표 탭 상단에 '모임 경기 전적' 요약 카드가 이동 배치되었는지 확인
-    expect(find.textContaining('모임 경기 전적'), findsOneWidget);
+    // 1) 진입 즉시 상단 스크롤 없이 [1 라운드] 탭과 [1번 코트], [2번 코트] 매칭 카드가 즉시 노출되는지 확인
+    expect(find.text('1 라운드'), findsOneWidget);
+    expect(find.text('1번 코트'), findsOneWidget);
+    expect(find.text('2번 코트'), findsOneWidget);
 
-    // 라운드 운영 현황 박스 수치('출전 인원', '휴식 인원', '출석 인원') 터치 시 회원 '이름 (급수)' 팝업 확인
+    // 2) 상단 설정/통계 영역은 기본적으로 접힌 상태(Collapsed)이며 [운영 요약 및 설정 ⌵] 토글 버튼 제공 확인
+    expect(find.text('운영 요약 및 설정 ⌵'), findsOneWidget);
+    expect(find.text('출전 인원'), findsNothing);
+
+    // 3) 1줄 미니 툴바(칩 형태): [🏟️ 5코트 변경 ⚙️] 및 [모임 경기 전적] 확인
+    expect(find.text('🏟️ 5코트 변경 ⚙️'), findsOneWidget);
+    expect(find.textContaining('모임 경기 전적'), findsOneWidget);
+    expect(find.textContaining('(1~5번)'), findsNothing);
+    expect(find.textContaining('급수합'), findsNothing);
+
+    // [운영 요약 및 설정 ⌵] 토글 클릭 -> 통계 박스 펼치기 및 '출전 인원' 명단 팝업 확인
+    await tester.tap(find.byKey(const Key('toggle_operation_summary_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('운영 요약 및 설정 ⌃'), findsOneWidget);
+    expect(find.text('출전 인원'), findsOneWidget);
+
     await tester.tap(find.text('출전 인원'));
     await tester.pumpAndSettle();
     expect(find.text('출전 인원 명단'), findsOneWidget);
@@ -469,21 +481,33 @@ void main() {
     await tester.tap(find.text('확인'));
     await tester.pumpAndSettle();
 
-    // 2. 대진표 화면 상단 [+ 코트 추가] / [- 코트 축소] 제어 버튼 표시 확인
+    // 다시 접어서 코트 가시성 확보
+    await tester.tap(find.byKey(const Key('toggle_operation_summary_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('운영 요약 및 설정 ⌵'), findsOneWidget);
+
+    // 4) [🏟️ 5코트 변경 ⚙️] 칩 버튼 클릭 -> 코트 변경 다이얼로그 오픈 및 [+ 코트 추가] / [- 코트 축소] 확인
+    await tester.tap(find.byKey(const Key('open_court_change_dialog_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('실시간 운영 코트 변경'), findsOneWidget);
+    expect(find.text('운영 코트 5면'), findsOneWidget);
+
     final increaseBtn = find.byKey(const Key('increase_court_button'));
     final decreaseBtn = find.byKey(const Key('decrease_court_button'));
     expect(increaseBtn, findsOneWidget);
     expect(decreaseBtn, findsOneWidget);
-    expect(find.text('+ 코트 추가'), findsOneWidget);
-    expect(find.text('- 코트 축소'), findsOneWidget);
 
-    // 3. [+ 코트 추가] 클릭 -> 새 빈 코트 슬롯 생성 확인
+    // [+ 코트 추가] 클릭 -> 6코트 및 빈 코트 1면 반영 확인
     await tester.tap(increaseBtn);
     await tester.pumpAndSettle();
     expect(find.text('운영 코트 6면'), findsOneWidget);
-    expect(find.text('빈 코트 1면'), findsOneWidget);
+    expect(find.text('빈 코트 1면'), findsWidgets);
 
-    // 아래로 스크롤하여 새로 생성된 '빈 코트 슬롯' 카드 노출 확인
+    // 다이얼로그 닫고 아래로 스크롤하여 새로 생성된 '빈 코트 슬롯' 카드 노출 확인
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+    expect(find.text('🏟️ 6코트 변경 ⚙️'), findsOneWidget);
+
     final courtScrollable = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
       find.text('빈 코트 슬롯'),
@@ -494,20 +518,22 @@ void main() {
     expect(find.text('빈 코트 슬롯'), findsOneWidget);
     expect(find.text('배정된 경기가 없는 빈 코트 슬롯입니다'), findsOneWidget);
 
-    // 다시 상단으로 스크롤하여 [- 코트 축소] 클릭 -> 빈 코트가 우선 제거되는지 확인
+    // 다시 상단으로 스크롤하여 [🏟️ 6코트 변경 ⚙️] 다이얼로그에서 [- 코트 축소] 클릭 -> 빈 코트 우선 제거 확인
     await tester.scrollUntilVisible(
-      decreaseBtn,
+      find.byKey(const Key('open_court_change_dialog_button')),
       -350.0,
       scrollable: courtScrollable,
     );
     await tester.pumpAndSettle();
-    await tester.tap(decreaseBtn);
+    await tester.tap(find.byKey(const Key('open_court_change_dialog_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('decrease_court_button')));
     await tester.pumpAndSettle();
     expect(find.text('빈 코트 1면'), findsNothing);
     expect(find.text('운영 코트 5면'), findsOneWidget);
 
-    // 4. 빈 코트가 없는 상태에서 [- 코트 축소] 클릭 -> 진행/배정 중인 코트 축소 확인 다이얼로그 호출 확인
-    await tester.tap(decreaseBtn);
+    // 5) 빈 코트가 없는 상태에서 [- 코트 축소] 클릭 -> 진행/배정 중인 코트 축소 확인 다이얼로그 호출 확인
+    await tester.tap(find.byKey(const Key('decrease_court_button')));
     await tester.pumpAndSettle();
     expect(find.text('진행/배정 중인 코트 축소 확인'), findsOneWidget);
     expect(
@@ -517,11 +543,11 @@ void main() {
     expect(find.byKey(const Key('reduce_court_to_waiting_button')), findsOneWidget);
     expect(find.byKey(const Key('reduce_court_move_slot_button')), findsOneWidget);
 
-    // [대기 인원으로 전환 후 축소] 클릭 시 코트가 축소되고 대기(휴식) 인원으로 전환되는지 확인
+    // [대기 인원으로 전환 후 축소] 클릭 시 코트가 4면으로 축소되고 대기(휴식) 인원으로 전환되는지 확인
     await tester.tap(find.byKey(const Key('reduce_court_to_waiting_button')));
     await tester.pumpAndSettle();
     expect(find.text('진행/배정 중인 코트 축소 확인'), findsNothing);
-    expect(find.text('운영 코트 4면'), findsOneWidget);
+    expect(find.text('🏟️ 4코트 변경 ⚙️'), findsOneWidget);
     expect(find.text('현재 휴식 중: '), findsOneWidget);
   });
 
@@ -652,14 +678,18 @@ void main() {
     // [📋 현재 대진표 이어보기] 클릭 시 기존 데이터 유실 없이 대진표 화면으로 즉시 이동 확인
     await tester.tap(find.byKey(const Key('continue_existing_bracket_button')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('court_reshuffle_remaining_button')), findsOneWidget);
     expect(find.byKey(const Key('court_header_live_viewer_button')), findsOneWidget);
 
-    // 4. 대진표 페이지에서 이미 완료된 경기가 있으므로 버튼이 [🔄 다음 라운드 스마트 편성]으로 전환되어 있는지 확인
+    // 4. 라운드 라인 우측 미니 버튼: 이미 완료된 경기가 있으므로 [🔄 다음 라운드 스마트 편성] 및 [+ 특별 매치 추가] 노출 확인
     expect(find.text('🔄 다음 라운드 스마트 편성'), findsOneWidget);
+    expect(find.text('+ 특별 매치 추가'), findsOneWidget);
     expect(find.text('✨ 대진표 자동 생성'), findsNothing);
 
-    // 5. 대진표 페이지의 [대진표 초기화 후 재생성] 버튼 클릭 시 2단계 안전 팝업 필수 노출 확인
+    // 5. [운영 요약 및 설정 ⌵] 아코디언을 펼치면 [남은 라운드 재편성] 및 [대진표 초기화 후 재생성] 노출 확인
+    await tester.tap(find.byKey(const Key('toggle_operation_summary_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('court_reshuffle_remaining_button')), findsOneWidget);
+
     final courtResetBtn = find.byKey(const Key('court_reset_and_regenerate_button'));
     expect(courtResetBtn, findsOneWidget);
     await tester.ensureVisible(courtResetBtn);

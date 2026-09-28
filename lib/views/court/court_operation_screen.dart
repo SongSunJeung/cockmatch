@@ -12,11 +12,19 @@ import '../../providers/providers.dart';
 /// - 부상/조퇴 원클릭 대체 선수 치환
 /// - 실시간 랭킹(다승->득실차->다득점->승자승) 팝업 모달
 /// - 비회원 웹 링크 복사
-class CourtOperationScreen extends ConsumerWidget {
+class CourtOperationScreen extends ConsumerStatefulWidget {
   const CourtOperationScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CourtOperationScreen> createState() => _CourtOperationScreenState();
+}
+
+class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
+  /// [1. 상단 설정/통계 영역 접이식(Accordion) 전환] 기본 접힌 상태(Collapsed) 유지
+  bool _isSummaryExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final currentClub = ref.watch(currentClubProvider);
     final session = ref.watch(sessionProvider);
 
@@ -29,7 +37,7 @@ class CourtOperationScreen extends ConsumerWidget {
             children: [
               // 1. 상단 앱바 & 헤더
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 20, 8),
+                padding: const EdgeInsets.fromLTRB(16, 10, 20, 6),
                 child: Row(
                   children: [
                     IconButton(
@@ -44,14 +52,14 @@ class CourtOperationScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 10),
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: AppTheme.pastelMint,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Center(
-                        child: Text('🏸', style: TextStyle(fontSize: 20)),
+                        child: Text('🏸', style: TextStyle(fontSize: 18)),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -65,7 +73,7 @@ class CourtOperationScreen extends ConsumerWidget {
                                 child: Text(
                                   currentClub.clubName,
                                   style: const TextStyle(
-                                    fontSize: 18,
+                                    fontSize: 17,
                                     fontWeight: FontWeight.w800,
                                     color: AppTheme.textDark,
                                   ),
@@ -238,6 +246,7 @@ class CourtOperationScreen extends ConsumerWidget {
           m.scoreA > 0 ||
           m.scoreB > 0,
     );
+    final int finishedMatchesCount = allMatches.where((m) => m.isFinished).length;
 
     // 현재 라운드에 표시할 코트 번호 목록 (운영 코트 범위 + 범위 밖 특별 매치 코트 번호 합집합, 오름차순 정렬)
     final displayCourtNumbers = isPastCompletedRound
@@ -250,10 +259,10 @@ class CourtOperationScreen extends ConsumerWidget {
         bottom: false,
         child: CustomScrollView(
           slivers: [
-            // 1. 상단 앱바 & 헤더
+            // 1. 슬림 상단 앱바 & 1줄 미니 툴바 (코트 변경 칩 + 모임 경기 전적 칩)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 20, 8),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -263,29 +272,15 @@ class CourtOperationScreen extends ConsumerWidget {
                           onPressed: () => AppTheme.openDrawer(context),
                           tooltip: '메뉴 열기',
                           visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                           style: IconButton.styleFrom(
                             backgroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
+                          icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 20),
                         ),
-                        const SizedBox(width: 10),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: AppTheme.pastelPeriwinkle,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              '⚡',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,7 +291,7 @@ class CourtOperationScreen extends ConsumerWidget {
                                     child: Text(
                                       currentClub.clubName,
                                       style: const TextStyle(
-                                        fontSize: 18,
+                                        fontSize: 16,
                                         fontWeight: FontWeight.w800,
                                         color: AppTheme.textDark,
                                       ),
@@ -313,7 +308,7 @@ class CourtOperationScreen extends ConsumerWidget {
                                     child: const Text(
                                       '실시간 대진',
                                       style: TextStyle(
-                                        fontSize: 10,
+                                        fontSize: 9.5,
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.pastelMintDark,
                                       ),
@@ -323,26 +318,37 @@ class CourtOperationScreen extends ConsumerWidget {
                               ),
                               Text(
                                 '운영 코트 ${session.courtCount}면 · ${session.matchFormat.label} · ${session.matchMode.label}${session.partnerMode == PartnerMode.fixedAll ? ' · 전원 고정 페어' : session.fixedPairs.isNotEmpty ? ' · 고정 페어 ${session.fixedPairs.length}팀' : ''}',
-                                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
                         IconButton(
                           key: const Key('court_header_live_viewer_button'),
-                          icon: const Icon(Icons.live_tv_rounded, color: AppTheme.primaryDark),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: const Icon(Icons.live_tv_rounded, color: AppTheme.primaryDark, size: 20),
                           tooltip: '실시간 전광판 웹뷰어',
                           onPressed: () {
                             ref.read(currentTabProvider.notifier).setTab(3);
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.leaderboard_rounded, color: AppTheme.textDark),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: const Icon(Icons.leaderboard_rounded, color: AppTheme.textDark, size: 20),
                           tooltip: '실시간 랭킹 순위표',
                           onPressed: () => _showRankingsDialog(context, ref, allMatches, allMembers),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.share_rounded, color: AppTheme.textDark),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: const Icon(Icons.share_rounded, color: AppTheme.textDark, size: 19),
                           tooltip: '일반 회원용 웹 링크 복사',
                           onPressed: () {
                             Clipboard.setData(
@@ -355,496 +361,504 @@ class CourtOperationScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    // 1-2. 진행 중 세션 실시간 코트 수 증감 제어 바 (한 줄 Row 배치)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
+                    const SizedBox(height: 5),
+                    // 1-2. [코트 설정 및 전적 바 콤팩트화] 한 줄 미니 툴바 (칩 형태)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.pastelYellow,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '운영 코트 ${session.courtCount}면',
+                          InkWell(
+                            key: const Key('open_court_change_dialog_button'),
+                            onTap: () => _showCourtCountChangeDialog(context, ref, memberMap),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppTheme.pastelYellowDark.withValues(alpha: 0.45)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '🏟️ ${session.courtCount}코트 변경 ⚙️',
                                     style: const TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.w800,
-                                      color: AppTheme.pastelYellowDark,
-                                    ),
-                                  ),
-                                ),
-                                if (!isPastCompletedRound && emptyCourtNumbers.isNotEmpty) ...[
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.pastelMint,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        '빈 코트 ${emptyCourtNumbers.length}면',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppTheme.pastelMintDark,
-                                        ),
-                                      ),
+                                      color: AppTheme.textDark,
                                     ),
                                   ),
                                 ],
-                              ],
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              OutlinedButton.icon(
-                                key: const Key('decrease_court_button'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: session.courtCount > 1
-                                      ? AppTheme.pastelCoralDark
-                                      : Colors.grey,
-                                  side: BorderSide(
-                                    color: session.courtCount > 1
-                                        ? AppTheme.pastelCoralDark.withValues(alpha: 0.45)
-                                        : Colors.grey.shade300,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                                  minimumSize: const Size(0, 30),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.remove_circle_outline_rounded, size: 14),
-                                label: const Text(
-                                  '- 코트 축소',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
-                                ),
-                                onPressed: () => _handleDecreaseCourt(
-                                  context: context,
-                                  ref: ref,
-                                  session: session,
-                                  selectedRound: selectedRound,
-                                  roundMatches: roundMatches,
-                                  emptyCourtNumbers: emptyCourtNumbers,
-                                  memberMap: memberMap,
+                          if (!isPastCompletedRound && emptyCourtNumbers.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: AppTheme.pastelMint,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '빈 코트 ${emptyCourtNumbers.length}면',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.pastelMintDark,
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              ElevatedButton.icon(
-                                key: const Key('increase_court_button'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryMint,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                                  minimumSize: const Size(0, 30),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.add_circle_outline_rounded, size: 14),
-                                label: const Text(
-                                  '+ 코트 추가',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
-                                ),
-                                onPressed: () => _handleIncreaseCourt(
-                                  context: context,
-                                  ref: ref,
-                                  session: session,
-                                ),
+                            ),
+                          ],
+                          const SizedBox(width: 6),
+                          InkWell(
+                            key: const Key('open_match_history_dialog_button'),
+                            onTap: () => _showSessionMatchHistoryDialog(
+                              context,
+                              allMatches,
+                              memberMap,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.grey.shade300),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.sports_tennis_rounded,
+                                    size: 13,
+                                    color: AppTheme.pastelPeriwinkleDark,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '모임 경기 전적 ($finishedMatchesCount/${allMatches.length}완료 · ${existingRounds.length}R)',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 14,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    // 1-3. 모임 경기 전적 요약 카드 (대진표 탭 상단 배치)
-                    _SessionMatchHistoryCard(
-                      matches: allMatches,
-                      memberMap: memberMap,
                     ),
                   ],
                 ),
               ),
             ),
 
-            // 2. 파스텔 벤토 상단 요약 카드 (컴팩트 슬림화 & 인원 터치 상세 팝업 연동)
+            // 2. 상단 설정/통계 영역 접이식(Accordion) 카드 (기본 Collapsed 상태)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppTheme.pastelPeriwinkle,
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                      Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
                               isTournament
                                   ? '🏆 토너먼트 $selectedRound라운드'
                                   : '라운드 $selectedRound 운영 중',
                               style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
                                 color: AppTheme.pastelPeriwinkleDark,
                               ),
                             ),
                           ),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: AppTheme.textDark,
-                                  side: BorderSide(color: Colors.grey.shade300),
-                                  minimumSize: const Size(0, 32),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                                ),
-                                icon: const Icon(Icons.add_circle_outline, size: 14, color: AppTheme.primaryDark),
-                                label: const Text(
-                                  '+ 특별 매치 추가',
-                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                ),
-                                onPressed: () => _showAddCustomMatchModal(
-                                  context,
-                                  ref,
-                                  session,
-                                  selectedRound,
-                                  roundMatches,
-                                  allMembers,
-                                ),
-                              ),
-                              OutlinedButton.icon(
-                                key: const Key('court_reshuffle_remaining_button'),
-                                style: OutlinedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: AppTheme.accentBlue,
-                                  side: BorderSide(color: AppTheme.accentBlue.withValues(alpha: 0.45)),
-                                  minimumSize: const Size(0, 32),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                                ),
-                                icon: const Icon(Icons.autorenew_rounded, size: 14),
-                                label: const Text(
-                                  '남은 라운드 재편성',
-                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                ),
-                                onPressed: () {
-                                  final count = ref
-                                      .read(matchesProvider.notifier)
-                                      .reshuffleRemainingMatches(targetRound: selectedRound);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: AppTheme.primaryDark,
-                                      content: Text(
-                                        '✅ 완료된 코트 기록은 보존하고 대기 코트/남은 라운드($count경기)를 현재 출석 인원으로 재편성했습니다.',
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              ElevatedButton.icon(
-                                key: const Key('court_auto_or_next_round_button'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryDark,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  minimumSize: const Size(0, 32),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                ),
-                                icon: Icon(
-                                  hasInProgressOrCompletedMatches
-                                      ? Icons.sync_rounded
-                                      : Icons.auto_awesome,
-                                  size: 14,
-                                ),
-                                label: Text(
-                                  hasInProgressOrCompletedMatches
-                                      ? '🔄 다음 라운드 스마트 편성'
-                                      : '✨ 대진표 자동 생성',
-                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                ),
-                                onPressed: () {
-                                  if (hasInProgressOrCompletedMatches) {
-                                    final maxRoundHasLocked = allMatches.any(
-                                      (m) =>
-                                          m.round == maxRound &&
-                                          (m.isFinished ||
-                                              m.status == MatchStatus.playing ||
-                                              m.scoreA > 0 ||
-                                              m.scoreB > 0),
-                                    );
-                                    final nextTargetRound =
-                                        maxRoundHasLocked ? maxRound + 1 : maxRound;
-                                    _handleGenerateRound(
-                                      context: context,
-                                      ref: ref,
-                                      targetRound: nextTargetRound,
-                                      isTournament: isTournament,
-                                      allMatches: allMatches,
-                                      switchRound: true,
-                                    );
-                                  } else if (roundMatches.isNotEmpty) {
-                                    _showResetAndRegenerateConfirmDialog(context, ref, session);
-                                  } else {
-                                    _handleGenerateRound(
-                                      context: context,
-                                      ref: ref,
-                                      targetRound: selectedRound,
-                                      isTournament: isTournament,
-                                      allMatches: allMatches,
-                                    );
-                                  }
-                                },
-                              ),
-                              if (allMatches.isNotEmpty)
-                                OutlinedButton.icon(
-                                  key: const Key('court_reset_and_regenerate_button'),
-                                  style: OutlinedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: AppTheme.errorRed,
-                                    side: BorderSide(color: AppTheme.errorRed.withValues(alpha: 0.45)),
-                                    minimumSize: const Size(0, 32),
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                                  ),
-                                  icon: const Icon(Icons.restart_alt_rounded, size: 14),
-                                  label: const Text(
-                                    '대진표 초기화 후 재생성',
-                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                                  ),
-                                  onPressed: () =>
-                                      _showResetAndRegenerateConfirmDialog(context, ref, session),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
+                          const SizedBox(width: 6),
                           Expanded(
-                            child: _buildMetricItem(
-                              '출전 인원',
-                              '${playingPlayerIds.length}명',
-                              '배정 ${roundMatches.length}/${session.courtCount}코트',
-                              onTap: () => _showRoundMemberListPopup(
-                                context: context,
-                                title: '출전 인원 명단',
-                                subtitle: '$selectedRound라운드 코트 배정 선수 (${playingMembers.length}명)',
-                                members: playingMembers,
+                            child: Text(
+                              '출전 ${playingPlayerIds.length} · 휴식 ${restingMembers.length} · 출석 ${session.activeAttendees.length}명',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.pastelPeriwinkleDark,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          InkWell(
+                            key: const Key('toggle_operation_summary_button'),
+                            onTap: () => setState(() => _isSummaryExpanded = !_isSummaryExpanded),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                _isSummaryExpanded ? '운영 요약 및 설정 ⌃' : '운영 요약 및 설정 ⌵',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.primaryDark,
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          if (isTournament)
-                            Expanded(
-                              child: _buildMetricItem(
-                                '탈락 인원',
-                                '${eliminatedMembers.length}명',
-                                '패배 팀 자동 탈락',
-                                onTap: () => _showRoundMemberListPopup(
-                                  context: context,
-                                  title: '탈락 인원 명단',
-                                  subtitle: '토너먼트 패배 탈락 선수 (${eliminatedMembers.length}명)',
-                                  members: eliminatedMembers,
-                                ),
-                              ),
-                            )
-                          else
-                            Expanded(
-                              child: _buildMetricItem(
-                                '휴식 인원',
-                                '${restingMembers.length}명',
-                                '다음 라운드 우선',
-                                onTap: () => _showRoundMemberListPopup(
-                                  context: context,
-                                  title: '휴식 인원 명단',
-                                  subtitle: '$selectedRound라운드 대기/휴식 선수 (${restingMembers.length}명)',
-                                  members: restingMembers,
-                                ),
-                              ),
-                            ),
-                          const SizedBox(width: 6),
-                          if (isTournament && selectedRound > 1)
-                            Expanded(
-                              child: _buildMetricItem(
-                                '부전승 대기',
-                                '${restingMembers.length}명',
-                                '차기 라운드 진출',
-                                onTap: () => _showRoundMemberListPopup(
-                                  context: context,
-                                  title: '부전승 대기 명단',
-                                  subtitle: '차기 라운드 진출 대기 선수 (${restingMembers.length}명)',
-                                  members: restingMembers,
-                                ),
-                              ),
-                            )
-                          else
-                            Expanded(
-                              child: _buildMetricItem(
-                                '출석 인원',
-                                '${session.activeAttendees.length}명',
-                                '총원 대비 실시간',
-                                onTap: () => _showRoundMemberListPopup(
-                                  context: context,
-                                  title: '출석 인원 명단',
-                                  subtitle: '현재 모임 출전 가능 출석자 (${activeAttendeeMembers.length}명)',
-                                  members: activeAttendeeMembers,
-                                ),
-                              ),
-                            ),
                         ],
                       ),
+                      if (_isSummaryExpanded) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildMetricItem(
+                                '출전 인원',
+                                '${playingPlayerIds.length}명',
+                                '배정 ${roundMatches.length}/${session.courtCount}코트',
+                                onTap: () => _showRoundMemberListPopup(
+                                  context: context,
+                                  title: '출전 인원 명단',
+                                  subtitle: '$selectedRound라운드 코트 배정 선수 (${playingMembers.length}명)',
+                                  members: playingMembers,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            if (isTournament)
+                              Expanded(
+                                child: _buildMetricItem(
+                                  '탈락 인원',
+                                  '${eliminatedMembers.length}명',
+                                  '패배 팀 자동 탈락',
+                                  onTap: () => _showRoundMemberListPopup(
+                                    context: context,
+                                    title: '탈락 인원 명단',
+                                    subtitle: '토너먼트 패배 탈락 선수 (${eliminatedMembers.length}명)',
+                                  members: eliminatedMembers,
+                                  ),
+                                ),
+                              )
+                            else
+                              Expanded(
+                                child: _buildMetricItem(
+                                  '휴식 인원',
+                                  '${restingMembers.length}명',
+                                  '다음 라운드 우선',
+                                  onTap: () => _showRoundMemberListPopup(
+                                    context: context,
+                                    title: '휴식 인원 명단',
+                                    subtitle: '$selectedRound라운드 대기/휴식 선수 (${restingMembers.length}명)',
+                                    members: restingMembers,
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(width: 6),
+                            if (isTournament && selectedRound > 1)
+                              Expanded(
+                                child: _buildMetricItem(
+                                  '부전승 대기',
+                                  '${restingMembers.length}명',
+                                  '차기 라운드 진출',
+                                  onTap: () => _showRoundMemberListPopup(
+                                    context: context,
+                                    title: '부전승 대기 명단',
+                                    subtitle: '차기 라운드 진출 대기 선수 (${restingMembers.length}명)',
+                                    members: restingMembers,
+                                  ),
+                                ),
+                              )
+                            else
+                              Expanded(
+                                child: _buildMetricItem(
+                                  '출석 인원',
+                                  '${session.activeAttendees.length}명',
+                                  '총원 대비 실시간',
+                                  onTap: () => _showRoundMemberListPopup(
+                                    context: context,
+                                    title: '출석 인원 명단',
+                                    subtitle: '현재 모임 출전 가능 출석자 (${activeAttendeeMembers.length}명)',
+                                    members: activeAttendeeMembers,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            OutlinedButton.icon(
+                              key: const Key('court_reshuffle_remaining_button'),
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: AppTheme.accentBlue,
+                                side: BorderSide(color: AppTheme.accentBlue.withValues(alpha: 0.45)),
+                                minimumSize: const Size(0, 28),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                              ),
+                              icon: const Icon(Icons.autorenew_rounded, size: 13),
+                              label: const Text(
+                                '남은 라운드 재편성',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                              onPressed: () {
+                                final count = ref
+                                    .read(matchesProvider.notifier)
+                                    .reshuffleRemainingMatches(targetRound: selectedRound);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: AppTheme.primaryDark,
+                                    content: Text(
+                                      '✅ 완료된 코트 기록은 보존하고 대기 코트/남은 라운드($count경기)를 현재 출석 인원으로 재편성했습니다.',
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            if (allMatches.isNotEmpty)
+                              OutlinedButton.icon(
+                                key: const Key('court_reset_and_regenerate_button'),
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: AppTheme.errorRed,
+                                  side: BorderSide(color: AppTheme.errorRed.withValues(alpha: 0.45)),
+                                  minimumSize: const Size(0, 28),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                ),
+                                icon: const Icon(Icons.restart_alt_rounded, size: 13),
+                                label: const Text(
+                                  '대진표 초기화 후 재생성',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                                onPressed: () =>
+                                    _showResetAndRegenerateConfirmDialog(context, ref, session),
+                              ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
             ),
 
-            // 3. 라운드 선택 탭 (가로 스크롤)
+            // 3. 라운드 선택 탭 + 미니 액션 버튼 바 (한 줄 정렬로 코트 가시성 극대화)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      ...existingRounds.map(
-                        (r) => Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: InkWell(
-                            onTap: () {
-                              ref.read(selectedRoundProvider.notifier).setRound(r);
-                            },
-                            borderRadius: BorderRadius.circular(20),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                              decoration: BoxDecoration(
-                                color: selectedRound == r ? AppTheme.primaryDark : Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: selectedRound == r ? Colors.transparent : Colors.grey.shade200,
-                                ),
-                              ),
-                              child: Text(
-                                '$r 라운드',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: selectedRound == r ? Colors.white : AppTheme.textDark,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ...existingRounds.map(
+                              (r) => Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: InkWell(
+                                  onTap: () {
+                                    ref.read(selectedRoundProvider.notifier).setRound(r);
+                                  },
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: selectedRound == r ? AppTheme.primaryDark : Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: selectedRound == r ? Colors.transparent : Colors.grey.shade200,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '$r 라운드',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: selectedRound == r ? Colors.white : AppTheme.textDark,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                            // 새 라운드 추가 미니 칩
+                            InkWell(
+                              onTap: () {
+                                final nextRound = (existingRounds.isEmpty ? 0 : existingRounds.last) + 1;
+                                _handleGenerateRound(
+                                  context: context,
+                                  ref: ref,
+                                  targetRound: nextRound,
+                                  isTournament: isTournament,
+                                  allMatches: allMatches,
+                                  switchRound: true,
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.pastelMint,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add, size: 14, color: AppTheme.pastelMintDark),
+                                    SizedBox(width: 2),
+                                    Text(
+                                      '새 라운드 추가',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.pastelMintDark,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      // 새 라운드 추가 버튼
-                      InkWell(
-                        onTap: () {
-                          final nextRound = (existingRounds.isEmpty ? 0 : existingRounds.last) + 1;
+                    ),
+                    const SizedBox(width: 6),
+                    // 우측 미니 버튼: [+ 특별 매치 추가], [✨ 대진표 자동 생성 / 🔄 다음 라운드 스마트 편성]
+                    OutlinedButton.icon(
+                      key: const Key('court_add_custom_match_button'),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppTheme.textDark,
+                        side: BorderSide(color: Colors.grey.shade300),
+                        minimumSize: const Size(0, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                      ),
+                      icon: const Icon(Icons.add_circle_outline, size: 12, color: AppTheme.primaryDark),
+                      label: const Text(
+                        '+ 특별 매치 추가',
+                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () => _showAddCustomMatchModal(
+                        context,
+                        ref,
+                        session,
+                        selectedRound,
+                        roundMatches,
+                        allMembers,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    ElevatedButton.icon(
+                      key: const Key('court_auto_or_next_round_button'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryDark,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        minimumSize: const Size(0, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      ),
+                      icon: Icon(
+                        hasInProgressOrCompletedMatches
+                            ? Icons.sync_rounded
+                            : Icons.auto_awesome,
+                        size: 12,
+                      ),
+                      label: Text(
+                        hasInProgressOrCompletedMatches
+                            ? '🔄 다음 라운드 스마트 편성'
+                            : '✨ 대진표 자동 생성',
+                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () {
+                        if (hasInProgressOrCompletedMatches) {
+                          final maxRoundHasLocked = allMatches.any(
+                            (m) =>
+                                m.round == maxRound &&
+                                (m.isFinished ||
+                                    m.status == MatchStatus.playing ||
+                                    m.scoreA > 0 ||
+                                    m.scoreB > 0),
+                          );
+                          final nextTargetRound =
+                              maxRoundHasLocked ? maxRound + 1 : maxRound;
                           _handleGenerateRound(
                             context: context,
                             ref: ref,
-                            targetRound: nextRound,
+                            targetRound: nextTargetRound,
                             isTournament: isTournament,
                             allMatches: allMatches,
                             switchRound: true,
                           );
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: AppTheme.pastelMint,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.add, size: 16, color: AppTheme.pastelMintDark),
-                              SizedBox(width: 4),
-                              Text(
-                                '새 라운드 추가',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.pastelMintDark,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                        } else if (roundMatches.isNotEmpty) {
+                          _showResetAndRegenerateConfirmDialog(context, ref, session);
+                        } else {
+                          _handleGenerateRound(
+                            context: context,
+                            ref: ref,
+                            targetRound: selectedRound,
+                            isTournament: isTournament,
+                            allMatches: allMatches,
+                          );
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),
 
-            // 4. 휴식(또는 부전승) 및 토너먼트 탈락 선수 안내 바
+            // 4. 휴식(또는 부전승) 및 토너먼트 탈락 선수 안내 바 (초슬림 1줄)
             if (restingMembers.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey.shade200),
                     ),
                     child: Row(
@@ -853,16 +867,16 @@ class CourtOperationScreen extends ConsumerWidget {
                           isTournament && selectedRound > 1
                               ? Icons.emoji_events_outlined
                               : Icons.pause_circle_outline,
-                          size: 18,
+                          size: 15,
                           color: isTournament && selectedRound > 1
                               ? AppTheme.pastelMintDark
                               : AppTheme.textMuted,
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Text(
                           isTournament && selectedRound > 1 ? '부전승 대기: ' : '현재 휴식 중: ',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: isTournament && selectedRound > 1
                                 ? AppTheme.pastelMintDark
@@ -872,7 +886,7 @@ class CourtOperationScreen extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             restingMembers.map((m) => '${m.name}(${m.tier.label})').join(', '),
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textDark),
+                            style: const TextStyle(fontSize: 11, color: AppTheme.textDark),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -885,22 +899,22 @@ class CourtOperationScreen extends ConsumerWidget {
             if (isTournament && eliminatedMembers.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: AppTheme.pastelRose.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppTheme.pastelRoseDark.withValues(alpha: 0.25)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.cancel_outlined, size: 16, color: AppTheme.pastelRoseDark),
-                        const SizedBox(width: 8),
+                        const Icon(Icons.cancel_outlined, size: 14, color: AppTheme.pastelRoseDark),
+                        const SizedBox(width: 6),
                         Text(
                           '토너먼트 탈락 (${eliminatedMembers.length}명): ',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.pastelRoseDark,
                           ),
@@ -908,7 +922,7 @@ class CourtOperationScreen extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             eliminatedMembers.map((m) => m.name).join(', '),
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -977,7 +991,7 @@ class CourtOperationScreen extends ConsumerWidget {
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -1021,6 +1035,314 @@ class CourtOperationScreen extends ConsumerWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// [2. 코트 설정 콤팩트화] `[🏟️ N코트 변경 ⚙️]` 클릭 시 열리는 실시간 코트 수 변경 다이얼로그
+  void _showCourtCountChangeDialog(
+    BuildContext parentContext,
+    WidgetRef ref,
+    Map<String, Member> memberMap,
+  ) {
+    showDialog(
+      context: parentContext,
+      builder: (dialogCtx) => Consumer(
+        builder: (ctx, dialogRef, _) {
+          final liveSession = dialogRef.watch(sessionProvider);
+          if (liveSession == null) return const SizedBox.shrink();
+          final liveMatches = dialogRef.watch(matchesProvider);
+          final liveSelectedRound = dialogRef.watch(selectedRoundProvider);
+          final liveRoundMatches = liveMatches
+              .where((m) => m.round == liveSelectedRound)
+              .toList()
+            ..sort((a, b) => a.courtNumber.compareTo(b.courtNumber));
+          final startCourt = liveSession.startCourtNumber;
+          final activeCourts = List.generate(liveSession.courtCount, (i) => startCourt + i);
+          final occupiedCourts = liveRoundMatches.map((m) => m.courtNumber).toSet();
+          final emptyCourts = activeCourts.where((c) => !occupiedCourts.contains(c)).toList();
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+            title: const Row(
+              children: [
+                Icon(Icons.stadium_rounded, color: AppTheme.primaryDark, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '실시간 운영 코트 변경',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppTheme.pastelYellow,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '운영 코트 ${liveSession.courtCount}면',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.pastelYellowDark,
+                        ),
+                      ),
+                    ),
+                    if (emptyCourts.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppTheme.pastelMint,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '빈 코트 ${emptyCourts.length}면',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.pastelMintDark,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '코트 추가 시 빈 코트 슬롯이 즉시 생성되며, 코트 축소 시 빈 코트부터 안전하게 제거됩니다.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('decrease_court_button'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: liveSession.courtCount > 1
+                              ? AppTheme.pastelCoralDark
+                              : Colors.grey,
+                          side: BorderSide(
+                            color: liveSession.courtCount > 1
+                                ? AppTheme.pastelCoralDark.withValues(alpha: 0.45)
+                                : Colors.grey.shade300,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.remove_circle_outline_rounded, size: 16),
+                        label: const Text(
+                          '- 코트 축소',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        ),
+                        onPressed: () {
+                          final activeInRound = liveRoundMatches.where((m) => !m.isFinished).toList();
+                          if (liveSession.courtCount > 1 &&
+                              emptyCourts.isEmpty &&
+                              activeInRound.isNotEmpty) {
+                            Navigator.pop(dialogCtx);
+                          }
+                          _handleDecreaseCourt(
+                            context: parentContext,
+                            ref: ref,
+                            session: liveSession,
+                            selectedRound: liveSelectedRound,
+                            roundMatches: liveRoundMatches,
+                            emptyCourtNumbers: emptyCourts,
+                            memberMap: memberMap,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        key: const Key('increase_court_button'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryMint,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                        label: const Text(
+                          '+ 코트 추가',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        ),
+                        onPressed: () => _handleIncreaseCourt(
+                          context: parentContext,
+                          ref: ref,
+                          session: liveSession,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text(
+                  '닫기',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// [2. 전적 바 콤팩트화] 미니 툴바의 `[모임 경기 전적]` 칩 클릭 시 열리는 전적 상세 팝업
+  void _showSessionMatchHistoryDialog(
+    BuildContext context,
+    List<GameMatch> matches,
+    Map<String, Member> memberMap,
+  ) {
+    final finishedMatches = matches.where((m) => m.isFinished).toList();
+    final rounds = matches.map((m) => m.round).toSet().toList()..sort();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Row(
+          children: [
+            const Icon(Icons.sports_tennis_rounded, color: AppTheme.pastelPeriwinkleDark, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '모임 경기 전적 (${finishedMatches.length}/${matches.length}경기 완료 · 총 ${rounds.length}R)',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 440,
+          child: matches.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    '아직 기록된 대진 경기가 없습니다.',
+                    style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                  ),
+                )
+              : ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.55,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: matches.map((m) {
+                        final teamANames = m.teamA.map((id) => memberMap[id]?.name ?? '선수').join('·');
+                        final teamBNames = m.teamB.map((id) => memberMap[id]?.name ?? '선수').join('·');
+                        final aWon = m.isTeamAWon || (m.isFinished && m.scoreA > m.scoreB);
+                        final bWon = m.isTeamBWon || (m.isFinished && m.scoreB > m.scoreA);
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.background,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${m.round}R · ${m.courtNumber}코트',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.textDark,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  teamANames,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: aWon ? FontWeight.w900 : FontWeight.w600,
+                                    color: aWon ? AppTheme.primaryDark : AppTheme.textDark,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.right,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: m.isFinished ? AppTheme.pastelMint : AppTheme.pastelYellow,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    m.isFinished ? '${m.scoreA} : ${m.scoreB}' : '진행중',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: m.isFinished
+                                          ? AppTheme.pastelMintDark
+                                          : AppTheme.pastelYellowDark,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  teamBNames,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: bWon ? FontWeight.w900 : FontWeight.w600,
+                                    color: bWon ? AppTheme.primaryDark : AppTheme.textDark,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              '닫기',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3977,192 +4299,6 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
                 ),
               );
             }),
-        ],
-      ),
-    );
-  }
-}
-
-/// 대진표 탭 상단에 배치되는 '모임 경기 전적' 요약 카드 (접기/펼치기 지원)
-class _SessionMatchHistoryCard extends StatefulWidget {
-  final List<GameMatch> matches;
-  final Map<String, Member> memberMap;
-
-  const _SessionMatchHistoryCard({
-    required this.matches,
-    required this.memberMap,
-  });
-
-  @override
-  State<_SessionMatchHistoryCard> createState() => _SessionMatchHistoryCardState();
-}
-
-class _SessionMatchHistoryCardState extends State<_SessionMatchHistoryCard> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final matches = widget.matches;
-    final memberMap = widget.memberMap;
-    final finishedMatches = matches.where((m) => m.isFinished).toList();
-    final rounds = matches.map((m) => m.round).toSet().toList()..sort();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isExpanded = !_isExpanded;
-              });
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.pastelPeriwinkle,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.sports_tennis_rounded,
-                    size: 15,
-                    color: AppTheme.pastelPeriwinkleDark,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '모임 경기 전적 (${finishedMatches.length}/${matches.length}경기 완료 · 총 ${rounds.length}R)',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textDark,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Text(
-                  _isExpanded ? '접기' : '전적 펼쳐보기',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textMuted,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                  size: 18,
-                  color: AppTheme.textMuted,
-                ),
-              ],
-            ),
-          ),
-          if (_isExpanded) ...[
-            const SizedBox(height: 10),
-            if (matches.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                decoration: BoxDecoration(
-                  color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  '아직 기록된 대진 경기가 없습니다.',
-                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                ),
-              )
-            else
-              ...matches.map((m) {
-                final teamANames = m.teamA.map((id) => memberMap[id]?.name ?? '선수').join('·');
-                final teamBNames = m.teamB.map((id) => memberMap[id]?.name ?? '선수').join('·');
-                final aWon = m.isTeamAWon || (m.isFinished && m.scoreA > m.scoreB);
-                final bWon = m.isTeamBWon || (m.isFinished && m.scoreB > m.scoreA);
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.background,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${m.round}R · ${m.courtNumber}코트',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textDark,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          teamANames,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: aWon ? FontWeight.w900 : FontWeight.w600,
-                            color: aWon ? AppTheme.primaryDark : AppTheme.textDark,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: m.isFinished ? AppTheme.pastelMint : AppTheme.pastelYellow,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            m.isFinished ? '${m.scoreA} : ${m.scoreB}' : '진행중',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w900,
-                              color: m.isFinished
-                                  ? AppTheme.pastelMintDark
-                                  : AppTheme.pastelYellowDark,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          teamBNames,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: bWon ? FontWeight.w900 : FontWeight.w600,
-                            color: bWon ? AppTheme.primaryDark : AppTheme.textDark,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-          ],
         ],
       ),
     );
