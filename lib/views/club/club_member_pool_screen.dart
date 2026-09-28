@@ -60,6 +60,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     final clubMembers = ref.watch(currentClubMembersProvider);
     final filteredMembers = ref.watch(filteredMembersProvider);
     final activeFilter = ref.watch(memberFilterProvider);
+    final pagePalette = AppTheme.getPagePalette(0);
 
     final bool isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0 ||
         View.of(context).viewInsets.bottom > 0;
@@ -72,108 +73,138 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
           children: [
             CustomScrollView(
               slivers: [
-                // 1. 컴팩트 상단 헤더 & 빠른 액션
+                // 1. 컴팩트 상단 헤더 & 빠른 액션 (TEAL/GRAY 테마 #455A64 / #80CBC4 & 페이지 인디케이터 ● ○ ○ ○ ○)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-                    child: Row(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        IconButton(
-                          onPressed: () => AppTheme.openDrawer(context),
-                          tooltip: '메뉴 열기',
-                          visualDensity: VisualDensity.compact,
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
+                        Row(
+                          children: [
+                            AppTheme.buildSlimPageIndicator(currentIndex: 0),
+                            const Spacer(),
+                            Text(
+                              pagePalette.toneLabel,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: pagePalette.primary.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => _showClubSwitchBottomSheet(context, ref),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => AppTheme.openDrawer(context),
+                              tooltip: '메뉴 열기',
+                              visualDensity: VisualDensity.compact,
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: pagePalette.primary.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                              ),
+                              icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 22),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _showClubSwitchBottomSheet(context, ref),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Flexible(
-                                        child: Text(
-                                          currentClub.clubName,
-                                          style: const TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppTheme.textDark,
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              currentClub.clubName,
+                                              style: const TextStyle(
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.w800,
+                                                color: AppTheme.textDark,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 2),
-                                      const Icon(
-                                        Icons.arrow_drop_down_rounded,
-                                        size: 24,
-                                        color: AppTheme.primaryDark,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.pastelMint,
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: Text(
-                                          '총 ${clubMembers.length}명',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.pastelMintDark,
+                                          const SizedBox(width: 2),
+                                          Icon(
+                                            Icons.arrow_drop_down_rounded,
+                                            size: 24,
+                                            color: pagePalette.primary,
                                           ),
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: pagePalette.softTint,
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: pagePalette.secondary.withValues(alpha: 0.6),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              '총 ${clubMembers.length}명',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: pagePalette.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        currentClub.description ?? '회원 명부 및 주소록 관리 (터치하여 모임 전환)',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textMuted,
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
-                                  Text(
-                                    currentClub.description ?? '회원 명부 및 주소록 관리 (터치하여 모임 전환)',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.textMuted,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.account_balance_wallet_rounded,
-                            size: 20,
-                            color: AppTheme.primaryDark,
-                          ),
-                          tooltip: '연간/월별 회비 납부 현황표',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () =>
-                              ref.read(currentTabProvider.notifier).setTab(4),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.sms_rounded, size: 21, color: AppTheme.primaryMint),
-                          tooltip: '단체 문자 발송',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => _showGroupSmsDialog(context, clubMembers),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.person_add_alt_1_rounded, size: 21),
-                          tooltip: '신규 회원 직접 등록',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => _showAddMemberDialog(context),
-                        ),
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert_rounded, size: 22, color: AppTheme.textDark),
+                            IconButton(
+                              icon: Icon(
+                                Icons.account_balance_wallet_rounded,
+                                size: 20,
+                                color: AppTheme.getPagePalette(4).primary,
+                              ),
+                              tooltip: '연간/월별 회비 납부 현황표',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () =>
+                                  ref.read(currentTabProvider.notifier).setTab(4),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.sms_rounded, size: 21, color: pagePalette.primary),
+                              tooltip: '단체 문자 발송',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _showGroupSmsDialog(context, clubMembers),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.person_add_alt_1_rounded,
+                                size: 21,
+                                color: pagePalette.primary,
+                              ),
+                              tooltip: '신규 회원 직접 등록',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _showAddMemberDialog(context),
+                            ),
+                            PopupMenuButton<String>(
+                              icon: Icon(Icons.more_vert_rounded, size: 22, color: pagePalette.primary),
                           tooltip: '더보기 메뉴',
                           offset: const Offset(0, 44),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -289,8 +320,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
+              ),
+            ),
 
                 // 2. 실시간 이름/초성 검색창 + 우측 컴팩트 정렬 버튼(⇅)
                 SliverToBoxAdapter(
@@ -451,10 +484,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                             const SizedBox(width: 6),
                             Text(
                               '(${filteredMembers.length}명)',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryMint,
+                                color: pagePalette.primary,
                               ),
                             ),
                             if (activeFilter.hasActiveFilters) ...[
@@ -499,21 +532,21 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: AppTheme.pastelMint,
+                              color: pagePalette.primary,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.primaryMint.withValues(alpha: 0.3)),
+                              border: Border.all(color: pagePalette.secondary.withValues(alpha: 0.45)),
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.sms_outlined, size: 14, color: AppTheme.pastelMintDark),
+                                Icon(Icons.sms_outlined, size: 14, color: Colors.white),
                                 SizedBox(width: 4),
                                 Text(
                                   '단체 문자 발송',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
-                                    color: AppTheme.pastelMintDark,
+                                    color: Colors.white,
                                   ),
                                 ),
                               ],
@@ -578,6 +611,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
   /// - 선택 옵션: 이름순 (가나다) [기본], 급수순 (상위 급수 우선: A -> 초심), 회원 구분순 (운영진 -> 정회원 -> 준회원), 최근 등록순
   Widget _buildMemberSortButton(MemberSortBy currentSort) {
     final bool isCustomSort = currentSort != MemberSortBy.nameAsc;
+    final pagePalette = AppTheme.getPagePalette(0);
     return PopupMenuButton<MemberSortBy>(
       tooltip: '회원명부 정렬',
       offset: const Offset(0, 44),
@@ -599,7 +633,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
               Icon(
                 isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
                 size: 16,
-                color: isSelected ? AppTheme.primaryMint : Colors.grey.shade400,
+                color: isSelected ? pagePalette.primary : Colors.grey.shade400,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -608,7 +642,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                    color: isSelected ? AppTheme.pastelMintDark : AppTheme.textDark,
+                    color: isSelected ? pagePalette.primary : AppTheme.textDark,
                   ),
                 ),
               ),
@@ -621,12 +655,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
         height: 44,
         padding: const EdgeInsets.symmetric(horizontal: 11),
         decoration: BoxDecoration(
-          color: isCustomSort
-              ? AppTheme.pastelMint.withValues(alpha: 0.35)
-              : Colors.white,
+          color: isCustomSort ? pagePalette.softTint : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isCustomSort ? AppTheme.primaryMint : Colors.grey.shade300,
+            color: isCustomSort ? pagePalette.primary : Colors.grey.shade300,
             width: isCustomSort ? 1.5 : 1.0,
           ),
           boxShadow: [
@@ -645,14 +677,14 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: isCustomSort ? FontWeight.w900 : FontWeight.w800,
-                color: isCustomSort ? AppTheme.pastelMintDark : AppTheme.textDark,
+                color: isCustomSort ? pagePalette.primary : AppTheme.textDark,
               ),
             ),
             const SizedBox(width: 2),
             Icon(
               Icons.arrow_drop_down_rounded,
               size: 18,
-              color: isCustomSort ? AppTheme.pastelMintDark : AppTheme.textMuted,
+              color: isCustomSort ? pagePalette.primary : AppTheme.textMuted,
             ),
           ],
         ),
@@ -671,6 +703,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     required List<({String key, String label})> items,
     required ValueChanged<String> onSelected,
   }) {
+    final pagePalette = AppTheme.getPagePalette(0);
     return PopupMenuButton<String>(
       tooltip: '$filterTitle 필터 선택',
       offset: const Offset(0, 42),
@@ -688,7 +721,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
               Icon(
                 isItemSelected ? Icons.check_rounded : Icons.circle_outlined,
                 size: 15,
-                color: isItemSelected ? AppTheme.primaryMint : Colors.transparent,
+                color: isItemSelected ? pagePalette.primary : Colors.transparent,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -697,7 +730,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: isItemSelected ? FontWeight.w900 : FontWeight.w600,
-                    color: isItemSelected ? AppTheme.pastelMintDark : AppTheme.textDark,
+                    color: isItemSelected ? pagePalette.primary : AppTheme.textDark,
                   ),
                 ),
               ),
@@ -709,12 +742,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         decoration: BoxDecoration(
-          color: isActive
-              ? AppTheme.pastelMint.withValues(alpha: 0.35)
-              : Colors.white,
+          color: isActive ? pagePalette.softTint : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? AppTheme.primaryMint : Colors.grey.shade300,
+            color: isActive ? pagePalette.primary : Colors.grey.shade300,
             width: isActive ? 1.6 : 1.0,
           ),
           boxShadow: [
@@ -733,7 +764,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isActive ? FontWeight.w900 : FontWeight.w700,
-                color: isActive ? AppTheme.pastelMintDark : AppTheme.textDark,
+                color: isActive ? pagePalette.primary : AppTheme.textDark,
               ),
             ),
           ),

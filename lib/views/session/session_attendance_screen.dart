@@ -319,6 +319,8 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
         View.of(context).viewInsets.bottom > 0 ||
         _searchFocusNode.hasFocus;
 
+    final pagePalette = AppTheme.getPagePalette(1);
+
     if (session == null) {
       return Scaffold(
         backgroundColor: AppTheme.background,
@@ -326,66 +328,91 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
           bottom: false,
           child: CustomScrollView(
             slivers: [
-              // 상단 헤더
+              // 상단 헤더 (SAGE 그린 테마 #527F5B / #A3C9A8 & 페이지 인디케이터 ○ ● ○ ○ ○)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 20, 8),
-                  child: Row(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      IconButton(
-                        onPressed: () => AppTheme.openDrawer(context),
-                        tooltip: '메뉴 열기',
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
+                      Row(
+                        children: [
+                          AppTheme.buildSlimPageIndicator(currentIndex: 1),
+                          const Spacer(),
+                          Text(
+                            pagePalette.toneLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: pagePalette.primary.withValues(alpha: 0.75),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppTheme.pastelMint,
-                          borderRadius: BorderRadius.circular(13),
-                        ),
-                        child: const Icon(Icons.edit_calendar_rounded, color: AppTheme.pastelMintDark, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => AppTheme.openDrawer(context),
+                            tooltip: '메뉴 열기',
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: pagePalette.primary.withValues(alpha: 0.2),
+                                ),
+                              ),
+                            ),
+                            icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 22),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: pagePalette.softTint,
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: Icon(Icons.edit_calendar_rounded, color: pagePalette.primary, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.pastelMint,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    currentClub.clubName,
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.pastelMintDark,
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: pagePalette.softTint,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        currentClub.clubName,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: pagePalette.primary,
+                                        ),
+                                      ),
                                     ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  '오늘 모임 & 출석부',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.textDark,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              '오늘 모임 & 출석부',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.textDark,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -415,13 +442,13 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                         width: 68,
                         height: 68,
                         decoration: BoxDecoration(
-                          color: AppTheme.pastelMint,
+                          color: pagePalette.softTint,
                           borderRadius: BorderRadius.circular(24),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.sports_tennis_rounded,
                           size: 36,
-                          color: AppTheme.primaryMint,
+                          color: pagePalette.primary,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -452,7 +479,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                         height: 48,
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryMint,
+                            backgroundColor: pagePalette.primary,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             elevation: 0,
@@ -974,8 +1001,9 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
 
   /// 1. 상단 모임 헤더 (좌측 햄버거 메뉴, 모임 타이틀 편집, 참가비 정보, 모임 목록 전환 및 영구 삭제 메뉴)
   Widget _buildSessionHeader(BuildContext context, GameSession session, Club currentClub) {
+    final pagePalette = AppTheme.getPagePalette(1);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -987,79 +1015,97 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconButton(
-            onPressed: () => AppTheme.openDrawer(context),
-            tooltip: '메뉴 열기',
-            visualDensity: VisualDensity.compact,
-            style: IconButton.styleFrom(
-              backgroundColor: AppTheme.background,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 21),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.pastelMint,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        currentClub.clubName,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.pastelMintDark,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: session.isCompleted ? AppTheme.pastelPeriwinkle : AppTheme.primaryDark,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        session.isCompleted ? '지난 모임' : '진행 모임',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                          color: session.isCompleted ? AppTheme.pastelPeriwinkleDark : Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        session.displayTitle,
-                        style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.textDark,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: () => _showEditTitleDialog(context, ref, session),
-                      borderRadius: BorderRadius.circular(8),
-                      child: const Padding(
-                        padding: EdgeInsets.all(2),
-                        child: Icon(Icons.drive_file_rename_outline_rounded, size: 15, color: AppTheme.textMuted),
-                      ),
-                    ),
-                  ],
+          Row(
+            children: [
+              AppTheme.buildSlimPageIndicator(currentIndex: 1),
+              const Spacer(),
+              Text(
+                pagePalette.toneLabel,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  color: pagePalette.primary.withValues(alpha: 0.75),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => AppTheme.openDrawer(context),
+                tooltip: '메뉴 열기',
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  backgroundColor: pagePalette.softTint,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 21),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: pagePalette.softTint,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            currentClub.clubName,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: pagePalette.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: session.isCompleted ? AppTheme.pastelPeriwinkle : pagePalette.primary,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            session.isCompleted ? '지난 모임' : '진행 모임',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: session.isCompleted ? AppTheme.pastelPeriwinkleDark : Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            session.displayTitle,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.textDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: () => _showEditTitleDialog(context, ref, session),
+                          borderRadius: BorderRadius.circular(8),
+                          child: const Padding(
+                            padding: EdgeInsets.all(2),
+                            child: Icon(Icons.drive_file_rename_outline_rounded, size: 15, color: AppTheme.textMuted),
+                          ),
+                        ),
+                      ],
+                    ),
                 const SizedBox(height: 3),
                 Wrap(
                   spacing: 4,
@@ -1177,7 +1223,9 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
           ),
         ],
       ),
-    );
+    ],
+  ),
+);
   }
 
   /// 모임 세션 종료 확인 다이얼로그 (데이터 삭제 없이 [지난 모임]으로 안전하게 보관)
@@ -1316,6 +1364,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     required int unpaidCount,
     required int exemptCount,
   }) {
+    final pagePalette = AppTheme.getPagePalette(1);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
@@ -1341,7 +1390,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.how_to_reg_rounded, size: 15, color: AppTheme.primaryMint),
+                  Icon(Icons.how_to_reg_rounded, size: 15, color: pagePalette.primary),
                   const SizedBox(width: 5),
                   const Text(
                     '당일 출석 인원',
@@ -1357,8 +1406,8 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               ),
               _buildSummaryStatusChip(
                 label: '출전 $activeCount명',
-                bg: AppTheme.pastelMint,
-                fg: AppTheme.pastelMintDark,
+                bg: pagePalette.softTint,
+                fg: pagePalette.primary,
               ),
               _buildSummaryStatusChip(
                 label: '휴식 $restingCount명',
@@ -1376,7 +1425,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
           // 2단: 회비 수납 현황 요약 + [미납자 안내 문자 발송] 버튼 + 가로 칩 Row/Wrap
           Row(
             children: [
-              const Icon(Icons.account_balance_wallet_rounded, size: 15, color: AppTheme.pastelYellowDark),
+              Icon(Icons.account_balance_wallet_rounded, size: 15, color: AppTheme.getPagePalette(4).primary),
               const SizedBox(width: 5),
               const Text(
                 '회비 수납 현황',
@@ -1442,13 +1491,13 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             children: [
               _buildSummaryStatusChip(
                 label: unpaidCount > 0 ? '미납 $unpaidCount명' : '전원 수납완료!',
-                bg: unpaidCount > 0 ? AppTheme.pastelRose : AppTheme.pastelMint,
-                fg: unpaidCount > 0 ? AppTheme.pastelRoseDark : AppTheme.pastelMintDark,
+                bg: unpaidCount > 0 ? AppTheme.pastelRose : pagePalette.softTint,
+                fg: unpaidCount > 0 ? AppTheme.pastelRoseDark : pagePalette.primary,
               ),
               _buildSummaryStatusChip(
                 label: '완납 $paidCount명',
-                bg: AppTheme.pastelMint.withValues(alpha: 0.55),
-                fg: AppTheme.pastelMintDark,
+                bg: pagePalette.softTint,
+                fg: pagePalette.primary,
               ),
               _buildSummaryStatusChip(
                 label: '면제 $exemptCount명',
@@ -1461,7 +1510,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryDark,
+                    color: AppTheme.getPagePalette(4).primary,
                     borderRadius: BorderRadius.circular(7),
                   ),
                   child: const Text(
@@ -1516,13 +1565,14 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     List<Member> attendeeMembers,
     GameSession session,
   ) {
+    final pagePalette = AppTheme.getPagePalette(1);
     return Row(
       children: [
         // [+ 회원 불러오기]
         Expanded(
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryDark,
+              backgroundColor: pagePalette.primary,
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1544,12 +1594,12 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             style: OutlinedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: AppTheme.textDark,
-              side: const BorderSide(color: AppTheme.primaryMint, width: 1.5),
+              side: BorderSide(color: pagePalette.primary, width: 1.5),
               elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
-            icon: const Icon(Icons.person_add_rounded, size: 17, color: AppTheme.primaryMint),
+            icon: Icon(Icons.person_add_rounded, size: 17, color: pagePalette.primary),
             label: const Text(
               '게스트 즉시 추가',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: AppTheme.textDark),
@@ -1863,6 +1913,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
   /// - 선택 옵션: 급수순 (A -> 초심) [기본], 이름순 (가나다), 출전 상태순 (출전 -> 휴식 -> 조퇴), 회비 상태순 (미납자 최우선 정렬)
   Widget _buildAttendanceSortButton() {
     final bool isCustomSort = _selectedSortBy != AttendanceSortBy.tierDesc;
+    final pagePalette = AppTheme.getPagePalette(1);
     return PopupMenuButton<AttendanceSortBy>(
       tooltip: '출석부 정렬',
       offset: const Offset(0, 44),
@@ -1884,7 +1935,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               Icon(
                 isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
                 size: 16,
-                color: isSelected ? AppTheme.primaryMint : Colors.grey.shade400,
+                color: isSelected ? pagePalette.primary : Colors.grey.shade400,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1893,7 +1944,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                    color: isSelected ? AppTheme.pastelMintDark : AppTheme.textDark,
+                    color: isSelected ? pagePalette.primary : AppTheme.textDark,
                   ),
                 ),
               ),
@@ -1906,12 +1957,10 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
         height: 44,
         padding: const EdgeInsets.symmetric(horizontal: 11),
         decoration: BoxDecoration(
-          color: isCustomSort
-              ? AppTheme.pastelMint.withValues(alpha: 0.35)
-              : Colors.white,
+          color: isCustomSort ? pagePalette.softTint : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isCustomSort ? AppTheme.primaryMint : Colors.grey.shade300,
+            color: isCustomSort ? pagePalette.primary : Colors.grey.shade300,
             width: isCustomSort ? 1.5 : 1.0,
           ),
         ),
@@ -1923,14 +1972,14 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: isCustomSort ? FontWeight.w900 : FontWeight.w800,
-                color: isCustomSort ? AppTheme.pastelMintDark : AppTheme.textDark,
+                color: isCustomSort ? pagePalette.primary : AppTheme.textDark,
               ),
             ),
             const SizedBox(width: 2),
             Icon(
               Icons.arrow_drop_down_rounded,
               size: 18,
-              color: isCustomSort ? AppTheme.pastelMintDark : AppTheme.textMuted,
+              color: isCustomSort ? pagePalette.primary : AppTheme.textMuted,
             ),
           ],
         ),
@@ -1947,6 +1996,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     required List<({String key, String label})> items,
     required ValueChanged<String> onSelected,
   }) {
+    final pagePalette = AppTheme.getPagePalette(1);
     return PopupMenuButton<String>(
       tooltip: '$filterTitle 필터 선택',
       offset: const Offset(0, 42),
@@ -1964,7 +2014,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               Icon(
                 isItemSelected ? Icons.check_rounded : Icons.circle_outlined,
                 size: 15,
-                color: isItemSelected ? AppTheme.primaryMint : Colors.transparent,
+                color: isItemSelected ? pagePalette.primary : Colors.transparent,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1973,7 +2023,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: isItemSelected ? FontWeight.w900 : FontWeight.w600,
-                    color: isItemSelected ? AppTheme.pastelMintDark : AppTheme.textDark,
+                    color: isItemSelected ? pagePalette.primary : AppTheme.textDark,
                   ),
                 ),
               ),
@@ -1985,12 +2035,10 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         decoration: BoxDecoration(
-          color: isActive
-              ? AppTheme.pastelMint.withValues(alpha: 0.35)
-              : Colors.white,
+          color: isActive ? pagePalette.softTint : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? AppTheme.primaryMint : Colors.grey.shade300,
+            color: isActive ? pagePalette.primary : Colors.grey.shade300,
             width: isActive ? 1.6 : 1.0,
           ),
           boxShadow: [
@@ -2009,7 +2057,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isActive ? FontWeight.w900 : FontWeight.w700,
-                color: isActive ? AppTheme.pastelMintDark : AppTheme.textDark,
+                color: isActive ? pagePalette.primary : AppTheme.textDark,
               ),
             ),
           ),
@@ -2026,13 +2074,14 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     required VoidCallback onTap,
     bool isAlert = false,
   }) {
+    final pagePalette = AppTheme.getPagePalette(1);
     Color bg;
     Color textColor;
     Color badgeBg;
     Color badgeText;
 
     if (isSelected) {
-      bg = AppTheme.primaryDark;
+      bg = pagePalette.primary;
       textColor = Colors.white;
       badgeBg = Colors.white.withValues(alpha: 0.2);
       badgeText = Colors.white;
@@ -2059,7 +2108,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? AppTheme.primaryDark
+                ? pagePalette.primary
                 : (isAlert ? AppTheme.pastelRoseDark.withValues(alpha: 0.35) : Colors.grey.shade300),
           ),
         ),
@@ -2691,19 +2740,20 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     final canGenerate = activeCount >= 4;
     final matches = ref.watch(matchesProvider);
     final hasOngoingBracket = matches.isNotEmpty;
+    final pagePalette = AppTheme.getPagePalette(1);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF7565E8), Color(0xFF6151D8)],
+        gradient: LinearGradient(
+          colors: [pagePalette.primary, const Color(0xFF406948)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6151D8).withValues(alpha: 0.28),
+            color: pagePalette.primary.withValues(alpha: 0.28),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -2760,7 +2810,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   ? Colors.white
                   : Colors.white.withValues(alpha: 0.25),
               foregroundColor: (hasOngoingBracket || canGenerate)
-                  ? AppTheme.primaryDark
+                  ? pagePalette.primary
                   : Colors.white70,
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

@@ -137,6 +137,149 @@ class AppTheme {
   static const Color statusPlaying = Color(0xFF7565E8);
   static const Color statusFinished = Color(0xFF38B6C8);
 
+  // ===========================================================================
+  // [시범 적용] 5개 핵심 페이지별 포인트 컬러(Accent Color) 시스템
+  // - 추후 언제든 단일 톤으로 즉시 롤백할 수 있도록 스위치 플래그 및 팔레트 객체로 분리
+  // ===========================================================================
+  static bool usePageSpecificAccentThemes = true;
+
+  /// 단일 톤 롤백 시 사용되는 기본 팔레트
+  static const PageAccentPalette unifiedDefaultPalette = PageAccentPalette(
+    pageIndex: 0,
+    pageName: '콕매치',
+    toneLabel: '기본 라벤더 톤',
+    primary: primaryDark,
+    secondary: primaryMint,
+    softTint: pastelPeriwinkle,
+    borderTint: Color(0xFFD2CCFA),
+  );
+
+  /// 5개 핵심 페이지별 포인트 테마 팔레트 매핑 (HEX)
+  /// 0: 회원 명단 - TEAL/GRAY 계열 (#455A64, 보조 #80CBC4)
+  /// 1: 출석부 - SAGE 그린 계열 (#527F5B, 보조 #A3C9A8)
+  /// 2: 대진표 운영 - LAVENDER 퍼플 계열 (#5E4B8B, 보조 #7D6CC4)
+  /// 3: 실시간 웹뷰어(전광판) - ARCTIC 블루 계열 (#1E88E5, 보조 #64B5F6)
+  /// 4: 월회비 관리(PRO) - MUSTARD 골드 계열 (#D4A017, 보조 #F0C94C)
+  static const List<PageAccentPalette> pagePalettes = [
+    PageAccentPalette(
+      pageIndex: 0,
+      pageName: '회원 명단',
+      toneLabel: 'TEAL/GRAY 명부 톤',
+      primary: Color(0xFF455A64),
+      secondary: Color(0xFF80CBC4),
+      softTint: Color(0xFFE4F2F0),
+      borderTint: Color(0xFF80CBC4),
+    ),
+    PageAccentPalette(
+      pageIndex: 1,
+      pageName: '출석부',
+      toneLabel: 'SAGE 그린 활동 톤',
+      primary: Color(0xFF527F5B),
+      secondary: Color(0xFFA3C9A8),
+      softTint: Color(0xFFEAF3EC),
+      borderTint: Color(0xFFA3C9A8),
+    ),
+    PageAccentPalette(
+      pageIndex: 2,
+      pageName: '대진표 운영',
+      toneLabel: 'LAVENDER 코트 운영 톤',
+      primary: Color(0xFF5E4B8B),
+      secondary: Color(0xFF7D6CC4),
+      softTint: Color(0xFFEDE9F8),
+      borderTint: Color(0xFF7D6CC4),
+    ),
+    PageAccentPalette(
+      pageIndex: 3,
+      pageName: '실시간 웹뷰어',
+      toneLabel: 'ARCTIC 스포츠 블루 톤',
+      primary: Color(0xFF1E88E5),
+      secondary: Color(0xFF64B5F6),
+      softTint: Color(0xFFE3F2FD),
+      borderTint: Color(0xFF64B5F6),
+    ),
+    PageAccentPalette(
+      pageIndex: 4,
+      pageName: '월회비 관리(PRO)',
+      toneLabel: 'MUSTARD 골드 PRO 톤',
+      primary: Color(0xFFD4A017),
+      secondary: Color(0xFFF0C94C),
+      softTint: Color(0xFFFFF8E1),
+      borderTint: Color(0xFFF0C94C),
+    ),
+  ];
+
+  /// 현재 페이지 인덱스(0~4)에 맞는 포인트 컬러 팔레트 반환
+  /// `usePageSpecificAccentThemes == false` 설정 시 즉시 단일 톤으로 롤백됨
+  static PageAccentPalette getPagePalette(int pageIndex) {
+    final safeIndex = pageIndex.clamp(0, pagePalettes.length - 1);
+    if (!usePageSpecificAccentThemes) {
+      return PageAccentPalette(
+        pageIndex: safeIndex,
+        pageName: pagePalettes[safeIndex].pageName,
+        toneLabel: unifiedDefaultPalette.toneLabel,
+        primary: unifiedDefaultPalette.primary,
+        secondary: unifiedDefaultPalette.secondary,
+        softTint: unifiedDefaultPalette.softTint,
+        borderTint: unifiedDefaultPalette.borderTint,
+      );
+    }
+    return pagePalettes[safeIndex];
+  }
+
+  /// 현재 페이지 인덱스(0~4)의 텍스트형 도트 문자열 반환 (예: "● ○ ○ ○ ○")
+  static String buildDotIndicatorString(int currentIndex) {
+    final safeIndex = currentIndex.clamp(0, 4);
+    return List.generate(5, (i) => i == safeIndex ? '●' : '○').join(' ');
+  }
+
+  /// 상단 헤더 영역에 배치되는 슬림한 페이지 위치 인디케이터 (`● ○ ○ ○ ○`)
+  static Widget buildSlimPageIndicator({
+    required int currentIndex,
+    ValueChanged<int>? onPageTap,
+  }) {
+    final palette = getPagePalette(currentIndex);
+    final dotText = buildDotIndicatorString(currentIndex);
+
+    return Container(
+      key: Key('top_page_dot_indicator_$currentIndex'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: palette.softTint,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: palette.primary.withValues(alpha: 0.25),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            dotText,
+            key: const Key('slim_page_dots_text'),
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w900,
+              color: palette.primary,
+              letterSpacing: 0.5,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '${currentIndex.clamp(0, 4) + 1}/5 ${palette.pageName}',
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              color: palette.primary,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -170,3 +313,25 @@ class AppTheme {
     );
   }
 }
+
+/// 페이지별 포인트 컬러(Accent Color) 설정 모델
+class PageAccentPalette {
+  final int pageIndex;
+  final String pageName;
+  final String toneLabel;
+  final Color primary;
+  final Color secondary;
+  final Color softTint;
+  final Color borderTint;
+
+  const PageAccentPalette({
+    required this.pageIndex,
+    required this.pageName,
+    required this.toneLabel,
+    required this.primary,
+    required this.secondary,
+    required this.softTint,
+    required this.borderTint,
+  });
+}
+

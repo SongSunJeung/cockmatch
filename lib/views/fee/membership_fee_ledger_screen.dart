@@ -215,6 +215,7 @@ class _MembershipFeeLedgerScreenState
     required ClubFeePolicy policy,
     required MonthlyFeeSummary summary,
   }) {
+    final pagePalette = AppTheme.getPagePalette(4);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
       child: Row(
@@ -227,51 +228,60 @@ class _MembershipFeeLedgerScreenState
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: pagePalette.borderTint),
               ),
             ),
-            icon: const Icon(
+            icon: Icon(
               Icons.menu_rounded,
-              color: AppTheme.textDark,
+              color: pagePalette.primary,
               size: 20,
             ),
           ),
           const SizedBox(width: 6),
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
-                  child: Text(
-                    '연간/월별 회비 납부 현황표',
-                    style: const TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.textDark,
-                      letterSpacing: -0.3,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '연간/월별 회비 납부 현황표',
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.textDark,
+                          letterSpacing: -0.3,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1.5,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [pagePalette.primary, pagePalette.secondary],
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'PRO 장부',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 5),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 1.5,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppTheme.primaryDark, AppTheme.primaryMint],
-                    ),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    'PRO 장부',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 2),
+                AppTheme.buildSlimPageIndicator(currentIndex: 4),
               ],
             ),
           ),
@@ -280,10 +290,10 @@ class _MembershipFeeLedgerScreenState
           OutlinedButton(
             key: const Key('fee_export_menu_button'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppTheme.primaryDark,
-              backgroundColor: AppTheme.pastelPeriwinkle.withValues(alpha: 0.7),
+              foregroundColor: pagePalette.primary,
+              backgroundColor: pagePalette.softTint,
               side: BorderSide(
-                color: AppTheme.primaryDark.withValues(alpha: 0.28),
+                color: pagePalette.borderTint,
               ),
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
               minimumSize: Size.zero,
@@ -308,10 +318,10 @@ class _MembershipFeeLedgerScreenState
           const SizedBox(width: 5),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppTheme.primaryDark,
+              foregroundColor: pagePalette.primary,
               backgroundColor: Colors.white,
               side: BorderSide(
-                color: AppTheme.primaryDark.withValues(alpha: 0.35),
+                color: pagePalette.borderTint,
               ),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               minimumSize: Size.zero,
@@ -351,6 +361,7 @@ class _MembershipFeeLedgerScreenState
     required ClubFeePolicy policy,
     required MonthlyFeeSummary summary,
   }) {
+    final pagePalette = AppTheme.getPagePalette(4);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -419,7 +430,7 @@ class _MembershipFeeLedgerScreenState
                     ),
                     _buildActionToolbarButton(
                       label: '📸 장부 이미지 내보내기',
-                      bgColor: AppTheme.primaryDark,
+                      bgColor: pagePalette.primary,
                       fgColor: Colors.white,
                       onTap: () {
                         Navigator.pop(sheetCtx);
@@ -476,6 +487,7 @@ class _MembershipFeeLedgerScreenState
     Club currentClub,
     ClubFeePolicy policy,
   ) {
+    final pagePalette = AppTheme.getPagePalette(4);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -497,12 +509,12 @@ class _MembershipFeeLedgerScreenState
                   ),
                   decoration: BoxDecoration(
                     color: _isPolicyExpanded
-                        ? AppTheme.pastelPeriwinkle
+                        ? pagePalette.softTint
                         : Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: _isPolicyExpanded
-                          ? AppTheme.primaryDark.withValues(alpha: 0.4)
+                          ? pagePalette.borderTint
                           : const Color(0xFFE4E7F4),
                     ),
                   ),
@@ -513,10 +525,10 @@ class _MembershipFeeLedgerScreenState
                           _isPolicyExpanded
                               ? '⚙️ 정책 및 계좌 설정 접기 ⌃'
                               : '⚙️ 정책 및 계좌 설정 열기 ⌵',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w900,
-                            color: AppTheme.primaryDark,
+                            color: pagePalette.primary,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -921,6 +933,7 @@ class _MembershipFeeLedgerScreenState
     required MonthlyFeeSummary summary,
     required int familyDiscountCount,
   }) {
+    final pagePalette = AppTheme.getPagePalette(4);
     final ratePercent = summary.collectionRate.toStringAsFixed(1);
     final totalRegularCount = members.where((m) => !m.isGuest).length;
 
@@ -950,22 +963,23 @@ class _MembershipFeeLedgerScreenState
                       vertical: 1,
                     ),
                     decoration: BoxDecoration(
-                      color: AppTheme.pastelPeriwinkle,
+                      color: pagePalette.softTint,
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: pagePalette.borderTint),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<int>(
                         value: _selectedYear,
                         isDense: true,
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_drop_down_rounded,
                           size: 16,
-                          color: AppTheme.primaryDark,
+                          color: pagePalette.primary,
                         ),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w900,
-                          color: AppTheme.primaryDark,
+                          color: pagePalette.primary,
                         ),
                         items: [2024, 2025, 2026, 2027].map((yr) {
                           return DropdownMenuItem<int>(
@@ -1022,10 +1036,10 @@ class _MembershipFeeLedgerScreenState
                   const SizedBox(width: 6),
                   Text(
                     '총 납부율 $ratePercent%',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w900,
-                      color: AppTheme.primaryDark,
+                      color: pagePalette.primary,
                     ),
                   ),
                 ],
@@ -1292,11 +1306,12 @@ class _MembershipFeeLedgerScreenState
     required FeeLedgerFilter filter,
     required String label,
   }) {
+    final pagePalette = AppTheme.getPagePalette(4);
     final isSelected = _selectedFilter == filter;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
-      selectedColor: AppTheme.primaryDark,
+      selectedColor: pagePalette.primary,
       backgroundColor: AppTheme.background,
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1309,7 +1324,7 @@ class _MembershipFeeLedgerScreenState
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: isSelected ? AppTheme.primaryDark : const Color(0xFFDCE0F0),
+          color: isSelected ? pagePalette.primary : const Color(0xFFDCE0F0),
         ),
       ),
       onSelected: (_) {
@@ -1328,6 +1343,7 @@ class _MembershipFeeLedgerScreenState
     required ClubFeePolicy policy,
     required bool isReadOnly,
   }) {
+    final pagePalette = AppTheme.getPagePalette(4);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1342,10 +1358,10 @@ class _MembershipFeeLedgerScreenState
             padding: const EdgeInsets.fromLTRB(12, 9, 12, 7),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.table_chart_rounded,
                   size: 16,
-                  color: AppTheme.primaryDark,
+                  color: pagePalette.primary,
                 ),
                 const SizedBox(width: 5),
                 Expanded(
@@ -1373,27 +1389,27 @@ class _MembershipFeeLedgerScreenState
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AppTheme.pastelPeriwinkle,
+                      color: pagePalette.softTint,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: AppTheme.primaryDark.withValues(alpha: 0.25),
+                        color: pagePalette.borderTint,
                       ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.swap_vert_rounded,
                           size: 13,
-                          color: AppTheme.primaryDark,
+                          color: pagePalette.primary,
                         ),
                         const SizedBox(width: 3),
                         Text(
                           _sortByNameAsc ? '가나다순 정렬' : '등록순 정렬',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w900,
-                            color: AppTheme.primaryDark,
+                            color: pagePalette.primary,
                           ),
                         ),
                         Text(

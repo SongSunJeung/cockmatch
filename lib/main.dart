@@ -109,6 +109,8 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
       );
     }
 
+    final activePalette = AppTheme.getPagePalette(currentTab);
+
     return Scaffold(
       key: AppTheme.rootScaffoldKey,
       backgroundColor: AppTheme.background,
@@ -121,18 +123,36 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
         sessionTitle: activeSession?.title,
         isProUser: isProUser,
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: (currentTab == 4 && isProUser) ? 1080 : 700,
+      body: Column(
+        children: [
+          // 상단 페이지별 포인트 컬러 슬림 스트립 (스와이프 시 직관적 구분)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            height: 3.5,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [activePalette.primary, activePalette.secondary],
+              ),
+            ),
           ),
-          child: activeBody,
-        ),
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: (currentTab == 4 && isProUser) ? 1080 : 700,
+                ),
+                child: activeBody,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   void _showProFeeFeatureGuideModal(BuildContext context, WidgetRef ref) {
+    final feePalette = AppTheme.getPagePalette(4);
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -144,12 +164,12 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppTheme.pastelPeriwinkle,
+                color: feePalette.softTint,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.workspace_premium_rounded,
-                color: AppTheme.primaryDark,
+                color: feePalette.primary,
                 size: 22,
               ),
             ),
@@ -174,15 +194,15 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.pastelMint.withValues(alpha: 0.5),
+                color: feePalette.softTint,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Text(
+              child: Text(
                 '🔒 [월회비 관리]는 PRO 구독 클럽 전용 프리미엄 재정 관리 기능입니다.',
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w800,
-                  color: AppTheme.pastelMintDark,
+                  color: feePalette.primary,
                 ),
               ),
             ),
@@ -216,7 +236,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
           ElevatedButton.icon(
             key: const Key('activate_pro_and_open_fee_ledger_button'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryDark,
+              backgroundColor: feePalette.primary,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -247,6 +267,8 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
     required String? sessionTitle,
     required bool isProUser,
   }) {
+    final activePalette = AppTheme.getPagePalette(currentTab);
+
     return Drawer(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
@@ -259,20 +281,20 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 드로어 상단 클럽 헤더
+            // 드로어 상단 클럽 헤더 (현재 페이지 테마 컬러 반영)
             Container(
               margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF7565E8), Color(0xFF8E7FF2)],
+                gradient: LinearGradient(
+                  colors: [activePalette.primary, activePalette.secondary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF7565E8).withValues(alpha: 0.25),
+                    color: activePalette.primary.withValues(alpha: 0.25),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -442,7 +464,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                   Icon(
                     isProUser ? Icons.verified_rounded : Icons.lock_outline_rounded,
                     size: 16,
-                    color: isProUser ? AppTheme.primaryMint : AppTheme.textMuted,
+                    color: isProUser ? AppTheme.getPagePalette(4).primary : AppTheme.textMuted,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -458,7 +480,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                   Switch(
                     key: const Key('drawer_pro_status_switch'),
                     value: isProUser,
-                    activeThumbColor: AppTheme.primaryMint,
+                    activeThumbColor: AppTheme.getPagePalette(4).primary,
                     onChanged: (val) {
                       ref.read(isProUserProvider.notifier).setProStatus(val);
                       if (!val && ref.read(currentTabProvider) == 4) {
@@ -504,6 +526,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
     VoidCallback? onCustomTap,
   }) {
     final isSelected = currentTab == index;
+    final itemPalette = AppTheme.getPagePalette(index);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
@@ -518,7 +541,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
-            color: isSelected ? AppTheme.pastelPeriwinkle : Colors.transparent,
+            color: isSelected ? itemPalette.softTint : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -527,13 +550,13 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.primaryMint : AppTheme.surfaceGrey,
+                  color: isSelected ? itemPalette.primary : itemPalette.softTint,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
                   size: 20,
-                  color: isSelected ? Colors.white : AppTheme.textDark,
+                  color: isSelected ? Colors.white : itemPalette.primary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -546,7 +569,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
-                        color: AppTheme.textDark,
+                        color: isSelected ? itemPalette.primary : AppTheme.textDark,
                       ),
                     ),
                     const SizedBox(height: 1),
@@ -561,9 +584,9 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                 ),
               ),
               if (isSelected)
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
-                  color: AppTheme.primaryDark,
+                  color: itemPalette.primary,
                   size: 20,
                 ),
             ],

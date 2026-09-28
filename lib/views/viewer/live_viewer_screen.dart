@@ -358,6 +358,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     required MatchFormat activeFormat,
     required bool isCompletedView,
   }) {
+    final pagePalette = AppTheme.getPagePalette(3);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 20, 8),
       child: Column(
@@ -372,22 +373,26 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                 visualDensity: VisualDensity.compact,
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: pagePalette.borderTint),
+                  ),
                 ),
-                icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
+                icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 22),
               ),
               const SizedBox(width: 10),
               Container(
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: isCompletedView ? AppTheme.pastelPeriwinkle : AppTheme.pastelMint,
+                  color: pagePalette.softTint,
                   borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: pagePalette.borderTint),
                 ),
                 child: Center(
                   child: Icon(
                     isCompletedView ? Icons.emoji_events_rounded : Icons.live_tv_rounded,
-                    color: isCompletedView ? AppTheme.pastelPeriwinkleDark : AppTheme.pastelMintDark,
+                    color: pagePalette.primary,
                     size: 20,
                   ),
                 ),
@@ -414,17 +419,16 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: isCompletedView ? AppTheme.pastelPeriwinkle : AppTheme.pastelMint,
+                            color: pagePalette.softTint,
                             borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: pagePalette.borderTint),
                           ),
                           child: Text(
                             isCompletedView ? '모임 완료 리포트' : 'LIVE 전광판',
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w900,
-                              color: isCompletedView
-                                  ? AppTheme.pastelPeriwinkleDark
-                                  : AppTheme.pastelMintDark,
+                              color: pagePalette.primary,
                             ),
                           ),
                         ),
@@ -443,6 +447,8 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   ],
                 ),
               ),
+              const SizedBox(width: 6),
+              AppTheme.buildSlimPageIndicator(currentIndex: 3),
             ],
           ),
           const SizedBox(height: 12),
@@ -453,18 +459,18 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _copyWebViewerLink(targetSession),
-                  icon: const Icon(Icons.link_rounded, size: 17, color: AppTheme.primaryDark),
-                  label: const Text(
+                  icon: Icon(Icons.link_rounded, size: 17, color: pagePalette.primary),
+                  label: Text(
                     '웹 링크 복사',
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.primaryDark,
+                      color: pagePalette.primary,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    side: BorderSide(color: Colors.grey.shade300),
+                    side: BorderSide(color: pagePalette.borderTint),
                     padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -490,7 +496,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryDark,
+                    backgroundColor: pagePalette.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
@@ -532,7 +538,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 9),
                           decoration: BoxDecoration(
-                            color: !isCompletedView ? AppTheme.primaryMint : AppTheme.surfaceGrey,
+                            color: !isCompletedView ? pagePalette.primary : AppTheme.surfaceGrey,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -576,7 +582,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 9),
                           decoration: BoxDecoration(
-                            color: isCompletedView ? AppTheme.primaryDark : AppTheme.surfaceGrey,
+                            color: isCompletedView ? pagePalette.primary : AppTheme.surfaceGrey,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -624,7 +630,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                               ),
                             ),
                             selected: isSelected,
-                            selectedColor: AppTheme.primaryDark,
+                            selectedColor: pagePalette.primary,
                             backgroundColor: AppTheme.surfaceGrey,
                             showCheckmark: false,
                             visualDensity: VisualDensity.compact,
@@ -659,6 +665,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     required List<GameMatch> matches,
     required List<Member> members,
   }) {
+    final pagePalette = AppTheme.getPagePalette(3);
     final memberMap = {for (final m in members) m.id: m};
     final rounds = matches.map((m) => m.round).toSet().toList()..sort();
     if (rounds.isEmpty) rounds.add(session.currentRound);
@@ -767,7 +774,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryDark,
+                      color: pagePalette.primary,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Text(
@@ -802,10 +809,10 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: selected ? AppTheme.primaryMint : Colors.white,
+                            color: selected ? pagePalette.primary : Colors.white,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: selected ? AppTheme.primaryMint : Colors.grey.shade300,
+                              color: selected ? pagePalette.secondary : Colors.grey.shade300,
                             ),
                           ),
                           child: Text(

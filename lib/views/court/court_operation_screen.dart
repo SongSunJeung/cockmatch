@@ -27,6 +27,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
   Widget build(BuildContext context) {
     final currentClub = ref.watch(currentClubProvider);
     final session = ref.watch(sessionProvider);
+    final pagePalette = AppTheme.getPagePalette(2);
 
     if (session == null) {
       return Scaffold(
@@ -35,75 +36,100 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
           bottom: false,
           child: Column(
             children: [
-              // 1. 상단 앱바 & 헤더
+              // 1. 상단 앱바 & 헤더 (LAVENDER 퍼플 #5E4B8B / #7D6CC4 & 인디케이터 ○ ○ ● ○ ○)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 20, 6),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(16, 8, 20, 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    IconButton(
-                      onPressed: () => AppTheme.openDrawer(context),
-                      tooltip: '메뉴 열기',
-                      visualDensity: VisualDensity.compact,
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 22),
+                    Row(
+                      children: [
+                        AppTheme.buildSlimPageIndicator(currentIndex: 2),
+                        const Spacer(),
+                        Text(
+                          pagePalette.toneLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: pagePalette.primary.withValues(alpha: 0.75),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppTheme.pastelMint,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Center(
-                        child: Text('🏸', style: TextStyle(fontSize: 18)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  currentClub.clubName,
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.textDark,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => AppTheme.openDrawer(context),
+                          tooltip: '메뉴 열기',
+                          visualDensity: VisualDensity.compact,
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: pagePalette.primary.withValues(alpha: 0.2),
                               ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.pastelYellow,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  '모임 대기 중',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.pastelYellowDark,
+                            ),
+                          ),
+                          icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 22),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: pagePalette.softTint,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Center(
+                            child: Text('🏸', style: TextStyle(fontSize: 18)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      currentClub.clubName,
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppTheme.textDark,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: pagePalette.softTint,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '모임 대기 중',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: pagePalette.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Text(
+                                '진행 중인 모임 세션이 없습니다',
+                                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                               ),
                             ],
                           ),
-                          const Text(
-                            '진행 중인 모임 세션이 없습니다',
-                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -119,13 +145,13 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           width: 80,
                           height: 80,
                           decoration: BoxDecoration(
-                            color: AppTheme.pastelMint,
+                            color: pagePalette.softTint,
                             borderRadius: BorderRadius.circular(28),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.sports_tennis_rounded,
                             size: 44,
-                            color: AppTheme.primaryMint,
+                            color: pagePalette.primary,
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -151,7 +177,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                         const SizedBox(height: 24),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryMint,
+                            backgroundColor: pagePalette.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -259,7 +285,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
         bottom: false,
         child: CustomScrollView(
           slivers: [
-            // 1. 슬림 상단 앱바 & 1줄 미니 툴바 (코트 변경 칩 + 모임 경기 전적 칩)
+            // 1. 슬림 상단 앱바 & 1줄 미니 툴바 (페이지 인디케이터 + 코트 변경 칩 + 모임 경기 전적 칩)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
@@ -276,9 +302,12 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                           style: IconButton.styleFrom(
                             backgroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: BorderSide(color: pagePalette.borderTint),
+                            ),
                           ),
-                          icon: const Icon(Icons.menu_rounded, color: AppTheme.textDark, size: 20),
+                          icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 20),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -302,15 +331,16 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.pastelMint,
+                                      color: pagePalette.softTint,
                                       borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: pagePalette.borderTint),
                                     ),
-                                    child: const Text(
+                                    child: Text(
                                       '실시간 대진',
                                       style: TextStyle(
                                         fontSize: 9.5,
                                         fontWeight: FontWeight.bold,
-                                        color: AppTheme.pastelMintDark,
+                                        color: pagePalette.primary,
                                       ),
                                     ),
                                   ),
@@ -330,7 +360,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.all(6),
                           constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                          icon: const Icon(Icons.live_tv_rounded, color: AppTheme.primaryDark, size: 20),
+                          icon: Icon(Icons.live_tv_rounded, color: pagePalette.primary, size: 20),
                           tooltip: '실시간 전광판 웹뷰어',
                           onPressed: () {
                             ref.read(currentTabProvider.notifier).setTab(3);
@@ -362,11 +392,13 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                       ],
                     ),
                     const SizedBox(height: 5),
-                    // 1-2. [코트 설정 및 전적 바 콤팩트화] 한 줄 미니 툴바 (칩 형태)
+                    // 1-2. [코트 설정 및 전적 바 콤팩트화 + 페이지 인디케이터] 한 줄 미니 툴바 (칩 형태)
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
+                          AppTheme.buildSlimPageIndicator(currentIndex: 2),
+                          const SizedBox(width: 6),
                           InkWell(
                             key: const Key('open_court_change_dialog_button'),
                             onTap: () => _showCourtCountChangeDialog(context, ref, memberMap),
@@ -376,17 +408,17 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppTheme.pastelYellowDark.withValues(alpha: 0.45)),
+                                border: Border.all(color: pagePalette.borderTint),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     '🏟️ ${session.courtCount}코트 변경 ⚙️',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
-                                      color: AppTheme.textDark,
+                                      color: pagePalette.primary,
                                     ),
                                   ),
                                 ],
@@ -430,10 +462,10 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.sports_tennis_rounded,
                                     size: 13,
-                                    color: AppTheme.pastelPeriwinkleDark,
+                                    color: pagePalette.primary,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
@@ -470,8 +502,9 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppTheme.pastelPeriwinkle,
+                    color: pagePalette.softTint,
                     borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: pagePalette.borderTint),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -488,10 +521,10 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                               isTournament
                                   ? '🏆 토너먼트 $selectedRound라운드'
                                   : '라운드 $selectedRound 운영 중',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
-                                color: AppTheme.pastelPeriwinkleDark,
+                                color: pagePalette.primary,
                               ),
                             ),
                           ),
@@ -499,10 +532,10 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           Expanded(
                             child: Text(
                               '출전 ${playingPlayerIds.length} · 휴식 ${restingMembers.length} · 출석 ${session.activeAttendees.length}명',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: AppTheme.pastelPeriwinkleDark,
+                                color: pagePalette.primary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -514,15 +547,15 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.85),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
                                 _isSummaryExpanded ? '운영 요약 및 설정 ⌃' : '운영 요약 및 설정 ⌵',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
-                                  color: AppTheme.primaryDark,
+                                  color: pagePalette.primary,
                                 ),
                               ),
                             ),
@@ -615,8 +648,8 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                               key: const Key('court_reshuffle_remaining_button'),
                               style: OutlinedButton.styleFrom(
                                 backgroundColor: Colors.white,
-                                foregroundColor: AppTheme.accentBlue,
-                                side: BorderSide(color: AppTheme.accentBlue.withValues(alpha: 0.45)),
+                                foregroundColor: pagePalette.primary,
+                                side: BorderSide(color: pagePalette.borderTint),
                                 minimumSize: const Size(0, 28),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 shape: RoundedRectangleBorder(
@@ -635,7 +668,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                                     .reshuffleRemainingMatches(targetRound: selectedRound);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    backgroundColor: AppTheme.primaryDark,
+                                    backgroundColor: pagePalette.primary,
                                     content: Text(
                                       '✅ 완료된 코트 기록은 보존하고 대기 코트/남은 라운드($count경기)를 현재 출석 인원으로 재편성했습니다.',
                                     ),
@@ -697,10 +730,10 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                                     duration: const Duration(milliseconds: 180),
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: selectedRound == r ? AppTheme.primaryDark : Colors.white,
+                                      color: selectedRound == r ? pagePalette.primary : Colors.white,
                                       borderRadius: BorderRadius.circular(14),
                                       border: Border.all(
-                                        color: selectedRound == r ? Colors.transparent : Colors.grey.shade200,
+                                        color: selectedRound == r ? pagePalette.secondary : Colors.grey.shade200,
                                       ),
                                     ),
                                     child: Text(
@@ -732,20 +765,21 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.pastelMint,
+                                  color: pagePalette.softTint,
                                   borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: pagePalette.borderTint),
                                 ),
-                                child: const Row(
+                                child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.add, size: 14, color: AppTheme.pastelMintDark),
-                                    SizedBox(width: 2),
+                                    Icon(Icons.add, size: 14, color: pagePalette.primary),
+                                    const SizedBox(width: 2),
                                     Text(
                                       '새 라운드 추가',
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: AppTheme.pastelMintDark,
+                                        color: pagePalette.primary,
                                       ),
                                     ),
                                   ],
@@ -771,7 +805,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
                       ),
-                      icon: const Icon(Icons.add_circle_outline, size: 12, color: AppTheme.primaryDark),
+                      icon: Icon(Icons.add_circle_outline, size: 12, color: pagePalette.primary),
                       label: const Text(
                         '+ 특별 매치 추가',
                         style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
@@ -789,7 +823,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                     ElevatedButton.icon(
                       key: const Key('court_auto_or_next_round_button'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryDark,
+                        backgroundColor: pagePalette.primary,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         minimumSize: const Size(0, 28),
