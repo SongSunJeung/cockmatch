@@ -2174,3 +2174,81 @@ final currentClubEventsProvider = Provider<List<ClubEvent>>((ref) {
   final allEvents = ref.watch(clubEventsProvider);
   return allEvents.where((e) => e.clubId == clubId).toList();
 });
+
+// ============================================================================
+// [PRO 장부] 일반운영비 (일상 지출: 코트 대관료·셔틀콕·비품 / 일반 수입: 가입비·찬조금) 상태 관리
+// ============================================================================
+
+const String kGeneralOperationLedgerStorageKey =
+    'cockmatch_general_op_ledger_v1';
+
+class GeneralOperationLedgerNotifier extends Notifier<List<EventExpenseItem>> {
+  @override
+  List<EventExpenseItem> build() {
+    _loadFromStorageAsync();
+    return List<EventExpenseItem>.from(MockData.initialGeneralOperationItems);
+  }
+
+  Future<void> _loadFromStorageAsync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kGeneralOperationLedgerStorageKey);
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw) as List<dynamic>;
+        final loaded = <EventExpenseItem>[];
+        for (final item in decoded) {
+          if (item is Map<String, dynamic>) {
+            loaded.add(EventExpenseItem.fromMap(item));
+          }
+        }
+        if (loaded.isNotEmpty) {
+          state = loaded;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist(List<EventExpenseItem> current) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = current.map((e) => e.toMap()).toList();
+      await prefs.setString(
+        kGeneralOperationLedgerStorageKey,
+        jsonEncode(list),
+      );
+    } catch (_) {}
+  }
+
+  void addItem(EventExpenseItem item) {
+    final next = [item, ...state];
+    state = next;
+    _persist(next);
+  }
+
+  void updateItem(EventExpenseItem updatedItem) {
+    final next = state
+        .map((item) => item.id == updatedItem.id ? updatedItem : item)
+        .toList();
+    state = next;
+    _persist(next);
+  }
+
+  void deleteItem(String itemId) {
+    final next = state.where((i) => i.id != itemId).toList();
+    state = next;
+    _persist(next);
+  }
+}
+
+final generalOperationItemsProvider = NotifierProvider<
+    GeneralOperationLedgerNotifier, List<EventExpenseItem>>(
+  GeneralOperationLedgerNotifier.new,
+);
+
+/// 현재 선택된 클럽의 일반운영비 입출금 내역 목록 Provider (eventId 필드를 clubId로 활용)
+final currentClubGeneralOperationItemsProvider =
+    Provider<List<EventExpenseItem>>((ref) {
+  final clubId = ref.watch(currentClubIdProvider);
+  final allItems = ref.watch(generalOperationItemsProvider);
+  return allItems.where((i) => i.eventId == clubId).toList();
+});

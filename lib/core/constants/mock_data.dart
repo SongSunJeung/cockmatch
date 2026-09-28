@@ -944,4 +944,58 @@ class MockData {
       createdAt: DateTime(2026, 9, 20),
     ),
   ];
+
+  /// [PRO 장부] 일반운영비(코트 대관료, 셔틀콕, 비품, 가입비, 찬조금 등) 초기 목업 데이터
+  static final List<EventExpenseItem> initialGeneralOperationItems = [
+    EventExpenseItem(
+      id: 'gen_op_1',
+      eventId: 'club_mega',
+      title: '신입 회원 가입비 수납 (2명)',
+      amount: 100000,
+      isIncome: true,
+      date: '2026.09.05',
+      memo: '신규 가입비 1인당 50,000원',
+      createdAt: DateTime(2026, 9, 5, 10, 0),
+    ),
+    EventExpenseItem(
+      id: 'gen_op_2',
+      eventId: 'club_mega',
+      title: '임원단 클럽 운영 찬조금',
+      amount: 150000,
+      isIncome: true,
+      date: '2026.09.10',
+      memo: '하반기 운영기금 찬조',
+      createdAt: DateTime(2026, 9, 10, 11, 0),
+    ),
+    EventExpenseItem(
+      id: 'gen_op_3',
+      eventId: 'club_mega',
+      title: '9월 구립체육관 정기 코트 대관료',
+      amount: 240000,
+      isIncome: false,
+      date: '2026.09.12',
+      memo: '평일 저녁 정기 대관 정산',
+      createdAt: DateTime(2026, 9, 12, 15, 0),
+    ),
+    EventExpenseItem(
+      id: 'gen_op_4',
+      eventId: 'club_mega',
+      title: '공용 셔틀콕 5타 구매',
+      amount: 165000,
+      isIncome: false,
+      date: '2026.09.16',
+      memo: '정기모임 공용구 비치',
+      createdAt: DateTime(2026, 9, 16, 17, 0),
+    ),
+    EventExpenseItem(
+      id: 'gen_op_5',
+      eventId: 'club_mega',
+      title: '구급함 스포츠 테이프 및 비품 구매',
+      amount: 25000,
+      isIncome: false,
+      date: '2026.09.19',
+      memo: '에어파스·테이핑 보충',
+      createdAt: DateTime(2026, 9, 19, 18, 0),
+    ),
+  ];
 }
