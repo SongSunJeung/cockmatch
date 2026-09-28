@@ -375,7 +375,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                           const SizedBox(width: 10),
                           const Expanded(
                             child: Text(
-                              '오늘 모임 & 출석부',
+                              '오늘 모임 & 일정/모임',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
@@ -436,7 +436,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        '관리 중인 클럽을 선택하고 오늘 참석할 정회원을 출석부에 등록하여 활기찬 모임을 시작해 보세요.',
+                        '관리 중인 클럽을 선택하고 오늘 참석할 정회원을 일정/모임에 등록하여 활기찬 모임을 시작해 보세요.',
                         style: TextStyle(
                           fontSize: 12.5,
                           color: AppTheme.textMuted,
@@ -660,7 +660,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                           const SizedBox(height: 6),
                           Text(
                             attendeeMembers.isEmpty
-                                ? '위 [+ 회원 불러오기] 또는 [+ 게스트 추가]를 눌러 출석부를 시작하세요.'
+                                ? '위 [+ 회원 불러오기] 또는 [+ 게스트 추가]를 눌러 일정/모임을 시작하세요.'
                                 : '검색어를 지우거나 필터를 [전체]로 변경해 보세요.',
                             style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                             textAlign: TextAlign.center,
@@ -1214,7 +1214,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
           ],
         ),
         content: Text(
-          '\'${session.displayTitle}\' 모임을 종료하시겠습니까?\n\n모임이 종료되어도 출석부, 회비 정산 내역, 경기 전적은 삭제되지 않고 [지난 모임]에 안전하게 보관되어 언제든 다시 조회할 수 있습니다.',
+          '\'${session.displayTitle}\' 모임을 종료하시겠습니까?\n\n모임이 종료되어도 일정/모임, 회비 정산 내역, 경기 전적은 삭제되지 않고 [지난 모임]에 안전하게 보관되어 언제든 다시 조회할 수 있습니다.',
           style: const TextStyle(fontSize: 13.5, height: 1.5, color: AppTheme.textDark),
         ),
         actions: [
@@ -1908,7 +1908,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     final bool isCustomSort = _selectedSortBy != AttendanceSortBy.tierDesc;
     final pagePalette = AppTheme.getPagePalette(1);
     return PopupMenuButton<AttendanceSortBy>(
-      tooltip: '출석부 정렬',
+      tooltip: '일정/모임 정렬',
       offset: const Offset(0, 44),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: Colors.white,
@@ -2627,7 +2627,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                     Navigator.pop(dialogCtx);
                     ref.read(sessionProvider.notifier).removeAttendee(member.id);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${member.name} 님이 오늘 출석부에서 제외되었습니다.')),
+                      SnackBar(content: Text('${member.name} 님이 오늘 일정/모임에서 제외되었습니다.')),
                     );
                   },
                   icon: const Icon(Icons.person_remove_rounded, size: 16, color: Colors.red),
@@ -3233,7 +3233,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                       children: [
                         const Icon(Icons.group_add_rounded, color: AppTheme.primaryMint, size: 22),
                         const SizedBox(width: 8),
-                        const Text('정회원 출석부로 불러오기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                        const Text('정회원 일정/모임으로 불러오기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                         const Spacer(),
                         TextButton(
                           onPressed: () {
@@ -3342,11 +3342,11 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                           ref.read(sessionProvider.notifier).addAttendees(tempSelected.toList());
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('총 ${tempSelected.length}명의 회원이 출석부에 등록되었습니다!')),
+                            SnackBar(content: Text('총 ${tempSelected.length}명의 회원이 일정/모임에 등록되었습니다!')),
                           );
                         },
                         child: Text(
-                          '선택한 ${tempSelected.length}명 출석부 등록',
+                          '선택한 ${tempSelected.length}명 일정/모임 등록',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                       ),
@@ -3526,7 +3526,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
 
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('게스트 $name 님이 출석부에 추가되었습니다!')),
+                  SnackBar(content: Text('게스트 $name 님이 일정/모임에 추가되었습니다!')),
                 );
               },
               child: const Text('추가하기'),
@@ -5546,7 +5546,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                                             ? '다음: 모임 정보 설정 (2단계) →'
                                             : currentStep == 2
                                                 ? '다음: 참석자 등록 (3단계) →'
-                                                : '모임 시작 & 출석부 열기 (${selectedMemberIds.length}명) 🏸',
+                                                : '모임 시작 & 일정/모임 열기 (${selectedMemberIds.length}명) 🏸',
                                         style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                                       ),
                                     ],
@@ -6093,7 +6093,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               ),
               const SizedBox(height: 4),
               const Text(
-                '체크된 회원이 오늘 출석부에 바로 등록됩니다. (미체크 회원은 불참 처리)',
+                '체크된 회원이 오늘 일정/모임에 바로 등록됩니다. (미체크 회원은 불참 처리)',
                 style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
               ),
               const SizedBox(height: 10),

@@ -2117,7 +2117,7 @@ class ClubEventsNotifier extends Notifier<List<ClubEvent>> {
     _persist(next);
   }
 
-  /// 출석부 모임 세션 데이터로부터 행사비 출납부 원클릭 생성/불러오기
+  /// 일정/모임 세션 데이터로부터 행사비 출납부 원클릭 생성/불러오기
   ClubEvent importFromSession({
     required GameSession session,
     required List<Member> members,
@@ -2137,7 +2137,7 @@ class ClubEventsNotifier extends Notifier<List<ClubEvent>> {
           amount: collected,
           isIncome: true,
           date: session.sessionDate,
-          memo: '출석부 회비 수납 내역 자동 집계',
+          memo: '일정/모임 회비 수납 내역 자동 집계',
           createdAt: now,
         ),
       );
@@ -2151,7 +2151,7 @@ class ClubEventsNotifier extends Notifier<List<ClubEvent>> {
           : '${session.sessionDate} 정기모임 정산',
       eventDate: session.sessionDate,
       linkedSessionId: session.id,
-      memo: '출석부 모임(${session.displayTitle}) 자동 연동',
+      memo: '일정/모임(${session.displayTitle}) 자동 연동',
       items: items,
       createdAt: now,
     );

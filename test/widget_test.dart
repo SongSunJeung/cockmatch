@@ -14,9 +14,9 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // 1. 앱 실행 시 초기(기본) 화면: 출석부 탭 (Index 1) & 좌측 햄버거 메뉴 아이콘 노출 확인
+    // 1. 앱 실행 시 초기(기본) 화면: 일정/모임 탭 (Index 1) & 좌측 햄버거 메뉴 아이콘 노출 확인
     expect(find.byIcon(Icons.menu_rounded), findsWidgets);
-    expect(find.text('오늘 모임 & 출석부'), findsOneWidget);
+    expect(find.text('오늘 모임 & 일정/모임'), findsOneWidget);
     expect(find.text('+ 새 모임 시작하기'), findsOneWidget);
     expect(find.text('[진행 모임]'), findsOneWidget);
     expect(find.text('[지난 모임]'), findsOneWidget);
@@ -323,13 +323,13 @@ void main() {
 
     // 대진표 화면 (세션 미시작 상태)
     expect(find.text('진행 중인 모임 세션이 없습니다'), findsWidgets);
-    final startFromAttendanceBtn = find.text('출석부에서 새 모임 시작하기');
+    final startFromAttendanceBtn = find.text('일정/모임에서 새 모임 시작하기');
     expect(startFromAttendanceBtn, findsOneWidget);
 
-    // 대진표 화면에서 출석부 바로가기 터치 시 출석부 탭(Index 1)으로 복귀 검증
+    // 대진표 화면에서 일정/모임 바로가기 터치 시 일정/모임 탭(Index 1)으로 복귀 검증
     await tester.tap(startFromAttendanceBtn);
     await tester.pumpAndSettle();
-    expect(find.text('오늘 모임 & 출석부'), findsOneWidget);
+    expect(find.text('오늘 모임 & 일정/모임'), findsOneWidget);
 
     // 4. 좌측 햄버거 메뉴(Drawer)를 열어 3번 메뉴: [웹뷰어]로 이동
     await tester.tap(find.byTooltip('메뉴 열기').first);
@@ -379,7 +379,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 0. [+ 새 모임 시작하기]를 통해 모임 생성 후 출석부 진입
+    // 0. [+ 새 모임 시작하기]를 통해 모임 생성 후 일정/모임 진입
     await tester.tap(find.text('+ 새 모임 시작하기'));
     await tester.pumpAndSettle();
     expect(find.text('새 모임 시작하기'), findsOneWidget);
@@ -389,10 +389,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('다음: 참석자 등록'));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('모임 시작 & 출석부 열기'));
+    await tester.tap(find.textContaining('모임 시작 & 일정/모임 열기'));
     await tester.pumpAndSettle();
 
-    // 출석부 하단 [대진표 설정수정] 버튼 클릭 -> '오늘 모임 세션 & 대진 설정' 바텀시트 오픈
+    // 일정/모임 하단 [대진표 설정수정] 버튼 클릭 -> '오늘 모임 세션 & 대진 설정' 바텀시트 오픈
     final startSessionBtn = find.text('대진표 설정수정');
     expect(startSessionBtn, findsOneWidget);
     await tester.tap(startSessionBtn);
@@ -459,7 +459,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('다음: 참석자 등록'));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('모임 시작 & 출석부 열기'));
+    await tester.tap(find.textContaining('모임 시작 & 일정/모임 열기'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('대진표 설정수정'));
@@ -818,7 +818,7 @@ void main() {
 
     // 2. 3개 메인 스와이프 페이지 타이틀 및 3도트 인디케이터 문자열 검증
     expect(AppTheme.getMainPageTitle(0), '회원 명부');
-    expect(AppTheme.getMainPageTitle(1), '출석부');
+    expect(AppTheme.getMainPageTitle(1), '일정/모임');
     expect(AppTheme.getMainPageTitle(2), '대진표');
     expect(AppTheme.buildDotIndicatorString(0), '● ○ ○');
     expect(AppTheme.buildDotIndicatorString(1), '○ ● ○');
@@ -834,12 +834,12 @@ void main() {
 
     final double screenCenterX = tester.view.physicalSize.width / tester.view.devicePixelRatio / 2;
 
-    // 기본 진입(Page 1 출석부): '출석부' + 정중앙 '○ ● ○'
+    // 기본 진입(Page 1 일정/모임): '일정/모임' + 정중앙 '○ ● ○'
     final title1Finder = find.byKey(const Key('app_bar_page_title_1'));
     final dot1Finder = find.byKey(const Key('top_page_dot_indicator_1'));
     expect(title1Finder, findsOneWidget);
     expect(dot1Finder, findsOneWidget);
-    expect(find.text('출석부'), findsWidgets);
+    expect(find.text('일정/모임'), findsWidgets);
     expect(find.text('○ ● ○'), findsOneWidget);
     expect(tester.getCenter(dot1Finder).dx, closeTo(screenCenterX, 0.5));
     // 임시 텍스트 뱃지 완전 삭제 확인
@@ -897,7 +897,7 @@ void main() {
     expect(dot2TopLeft, equals(dot1TopLeft));
   });
 
-  testWidgets('[월회비 관리 PRO] 상단 고정 월별 수납 요약 행, 회원 상세 팝업 연동, 그룹화 보기 토글, 행사비/모임비 출납부 탭 검증', (WidgetTester tester) async {
+  testWidgets('[월회비 관리 PRO] 전체 잔액 요약 헤더, 상단 고정 월별 수납 요약 행([고정] 뱃지 제거), 회원 상세 팝업 연동, 그룹화 보기 토글, 행사비/모임비 출납부 드롭다운 탭 검증', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: CockMatchApp(),
@@ -913,12 +913,21 @@ void main() {
     await tester.tap(find.byKey(const Key('activate_pro_and_open_fee_ledger_button')));
     await tester.pumpAndSettle();
 
-    // 1. 상단 서브탭([연간 월회비 장부] / [행사비/모임비 출납부]) 및 상단 고정된 '월별 수납 요약' 행 확인
+    // 0. 장부 전체 잔액 요약(Header Summary: 클럽 총 잔액 = 기초 이월금 + 월회비 누적 + 일반운영비 + 행사정산) 노출 확인
+    expect(find.byKey(const Key('ledger_total_balance_header_summary')), findsOneWidget);
+    expect(find.text('클럽 총 잔액'), findsOneWidget);
+    expect(find.textContaining('기초 이월금'), findsOneWidget);
+    expect(find.textContaining('월회비 누적'), findsOneWidget);
+    expect(find.textContaining('일반운영비'), findsOneWidget);
+    expect(find.textContaining('행사정산'), findsOneWidget);
+
+    // 1. 상단 서브탭([연간 월회비 장부] / [행사비/모임비 출납부]) 및 상단 고정된 '월별 수납 요약' 행('[고정]' 뱃지 제거) 확인
     expect(find.byKey(const Key('subtab_annual_fee_ledger')), findsOneWidget);
     expect(find.byKey(const Key('subtab_event_expense_ledger')), findsOneWidget);
     final pinnedSummaryFinder = find.byKey(const Key('pinned_monthly_summary_row'));
     expect(pinnedSummaryFinder, findsOneWidget);
     expect(find.text('월별 수납 요약'), findsOneWidget);
+    expect(find.text('고정'), findsNothing);
 
     // 2. 좌측 회원명 터치 시 '회원 상세 카드' 팝업('특이사항:' 라벨) 및 전화/문자 버튼 노출 확인
     final memberTrigger = find.byKey(const Key('member_detail_trigger_m06')); // 강호동
@@ -952,14 +961,24 @@ void main() {
     expect(find.byKey(const Key('group_header_regular')), findsOneWidget);
     expect(find.byKey(const Key('group_header_resting_exempt')), findsOneWidget);
 
-    // 4. [행사비/모임비 출납부] 탭 전환 시 행사 목록, 출석부 불러오기, 수입/지출 내역 및 엑셀 다운로드 버튼 노출 확인
+    // 4. [행사비/모임비 출납부] 탭 전환 시 '행사 리스트', '일정/모임에서 가져오기', 드롭다운 선택형, 중복 엑셀 버튼 삭제, '입출금 상세 내역' 우측 [+ 내역 추가] 버튼 노출 확인
     await tester.tap(find.byKey(const Key('subtab_event_expense_ledger')));
     await tester.pumpAndSettle();
 
+    expect(find.text('행사 리스트'), findsOneWidget);
+    expect(find.text('행사비 / 모임비 정산 선택'), findsNothing);
     expect(find.byKey(const Key('create_club_event_button')), findsOneWidget);
     expect(find.byKey(const Key('import_session_event_button')), findsOneWidget);
-    expect(find.byKey(const Key('export_event_expense_csv_btn')), findsOneWidget);
+    expect(find.text('일정/모임에서 가져오기'), findsOneWidget);
+    expect(find.byKey(const Key('club_event_selector_dropdown')), findsOneWidget);
+    expect(find.text('엑셀 다운로드 (CSV)'), findsNothing);
+    expect(find.byKey(const Key('export_event_expense_csv_btn')), findsNothing);
     expect(find.byKey(const Key('add_event_expense_item_btn')), findsOneWidget);
+    expect(find.text('입출금 상세 내역'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const Key('add_event_expense_item_btn'))).dx,
+      greaterThan(tester.getTopLeft(find.text('입출금 상세 내역')).dx),
+    );
     expect(find.textContaining('2026년 가을 친선 교류전 및 정산'), findsWidgets);
   });
 }

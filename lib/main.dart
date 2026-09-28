@@ -392,8 +392,8 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                     currentTab: currentTab,
                     index: 1,
                     icon: Icons.checklist_rtl_rounded,
-                    label: '출석부',
-                    subtitle: '당일 출석 체크 및 회비 수납',
+                    label: '일정/모임',
+                    subtitle: '당일 모임 생성·출석 체크 및 회비 수납',
                   ),
                   _buildDrawerMenuItem(
                     context: context,
@@ -480,7 +480,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '좌우 스와이프: 회원명부 ↔ 출석부 ↔ 대진표 전환',
+                      '좌우 스와이프: 회원명부 ↔ 일정/모임 ↔ 대진표 전환',
                       style: TextStyle(
                         fontSize: 11,
                         color: AppTheme.textMuted.withValues(alpha: 0.9),

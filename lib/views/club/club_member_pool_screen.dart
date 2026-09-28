@@ -1922,7 +1922,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                             ),
                             const SizedBox(height: 4),
                             const Text(
-                              '• 휴면 회원은 당일 모임 [출석부 목록]에서 기본 제외됩니다.\n'
+                              '• 휴면 회원은 당일 [일정/모임 목록]에서 기본 제외됩니다.\n'
                               '• 회비 청구 대상에서 자동으로 \'휴회 면제\' 상태로 연동됩니다.',
                               style: TextStyle(
                                 fontSize: 10.5,
@@ -3841,7 +3841,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
             ),
             const SizedBox(height: 4),
             const Text(
-              '관리할 모임을 선택하면 회원명부, 오늘 모임 출석부, 대진표가 즉시 전환됩니다.',
+              '관리할 모임을 선택하면 회원명부, 일정/모임, 대진표가 즉시 전환됩니다.',
               style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
             ),
             const Divider(height: 24),

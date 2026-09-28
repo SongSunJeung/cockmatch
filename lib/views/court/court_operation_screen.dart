@@ -123,7 +123,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          '[오늘 모임 출석부] 탭에서 새 모임을 시작하고 출석 인원을 확정하면 실시간 코트 대진표가 생성됩니다.',
+                          '[일정/모임] 탭에서 새 모임을 시작하고 출석 인원을 확정하면 실시간 코트 대진표가 생성됩니다.',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppTheme.textMuted,
@@ -142,7 +142,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           ),
                           icon: const Icon(Icons.checklist_rtl_rounded, size: 20),
                           label: const Text(
-                            '출석부에서 새 모임 시작하기',
+                            '일정/모임에서 새 모임 시작하기',
                             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                           ),
                           onPressed: () {

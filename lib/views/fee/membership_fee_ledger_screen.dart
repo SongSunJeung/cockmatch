@@ -162,6 +162,15 @@ class _MembershipFeeLedgerScreenState
               summary: monthlySummary,
             ),
 
+            // 0-1. 장부 전체 잔액 요약 (Header Summary: 기초 이월금 + 월회비 누적 + 일반운영비 + 행사정산)
+            _buildLedgerTotalBalanceHeaderSummary(
+              context: context,
+              currentClub: currentClub,
+              members: clubMembers,
+              ledgerMap: ledgerMap,
+              policy: policy,
+            ),
+
             // 서브 탭 선택 바 ([📊 연간 월회비 장부] vs [🧾 행사비/모임비 출납부])
             _buildSubTabSelector(),
 
@@ -230,6 +239,267 @@ class _MembershipFeeLedgerScreenState
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 0-1. 장부 화면 최상단 전체 잔액 요약(Header Summary) 바
+  /// 클럽 총 잔액 = 기초 이월금 + 월회비 누적 + 일반운영비 + 행사정산
+  Widget _buildLedgerTotalBalanceHeaderSummary({
+    required BuildContext context,
+    required Club currentClub,
+    required List<Member> members,
+    required Map<String, MonthlyFeeRecord> ledgerMap,
+    required ClubFeePolicy policy,
+  }) {
+    final pagePalette = AppTheme.getPagePalette(4);
+    final events = ref.watch(currentClubEventsProvider);
+
+    final int carryover = policy.carryoverBalance;
+    final int annualFeeTotal =
+        FeeLedgerCalculator.calculateClubAnnualCollectedTotal(
+      ledgerMap: ledgerMap,
+      clubId: currentClub.id,
+      year: _selectedYear,
+      members: members,
+      policy: policy,
+    );
+    final int generalOp = policy.generalOperationBalance;
+    final int eventSettlementTotal =
+        events.fold<int>(0, (sum, ev) => sum + ev.balance);
+    final int totalClubBalance =
+        carryover + annualFeeTotal + generalOp + eventSettlementTotal;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 2, 12, 3),
+      child: InkWell(
+        key: const Key('ledger_total_balance_header_summary'),
+        onTap: () => _showEditBaseBalanceDialog(context, policy),
+        borderRadius: BorderRadius.circular(11),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                pagePalette.softTint.withValues(alpha: 0.85),
+                Colors.white,
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: pagePalette.borderTint),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: pagePalette.primary,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      '클럽 총 잔액',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      FeeLedgerCalculator.formatWon(totalClubBalance),
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w900,
+                        color: totalClubBalance >= 0
+                            ? AppTheme.primaryDark
+                            : Colors.red.shade700,
+                        letterSpacing: -0.3,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '기초/운영비 설정',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: pagePalette.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.tune_rounded,
+                        size: 12,
+                        color: pagePalette.primary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildBalanceFormulaPart(
+                      label: '기초 이월금',
+                      amount: carryover,
+                    ),
+                    _buildBalanceFormulaOperator('+'),
+                    _buildBalanceFormulaPart(
+                      label: '월회비 누적',
+                      amount: annualFeeTotal,
+                      highlight: true,
+                    ),
+                    _buildBalanceFormulaOperator('+'),
+                    _buildBalanceFormulaPart(
+                      label: '일반운영비',
+                      amount: generalOp,
+                    ),
+                    _buildBalanceFormulaOperator('+'),
+                    _buildBalanceFormulaPart(
+                      label: '행사정산',
+                      amount: eventSettlementTotal,
+                      highlight: true,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBalanceFormulaPart({
+    required String label,
+    required int amount,
+    bool highlight = false,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$label ',
+          style: const TextStyle(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textMuted,
+          ),
+        ),
+        Text(
+          FeeLedgerCalculator.formatWon(amount),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            color: highlight ? AppTheme.textDark : AppTheme.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBalanceFormulaOperator(String op) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        op,
+        style: const TextStyle(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w900,
+          color: AppTheme.textMuted,
+        ),
+      ),
+    );
+  }
+
+  void _showEditBaseBalanceDialog(BuildContext context, ClubFeePolicy policy) {
+    final carryoverCtrl = TextEditingController(
+      text: policy.carryoverBalance.toString(),
+    );
+    final generalOpCtrl = TextEditingController(
+      text: policy.generalOperationBalance.toString(),
+    );
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          '기초 이월금 및 일반운영비 설정',
+          style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w900),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: carryoverCtrl,
+              keyboardType: const TextInputType.numberWithOptions(signed: true),
+              decoration: const InputDecoration(
+                labelText: '기초 이월금 (원)',
+                hintText: '예: 1500000',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: generalOpCtrl,
+              keyboardType: const TextInputType.numberWithOptions(signed: true),
+              decoration: const InputDecoration(
+                labelText: '일반운영비 정산액 (원, 지출 시 음수 입력 가능)',
+                hintText: '예: -120000',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final nextCarryover = int.tryParse(
+                    carryoverCtrl.text.replaceAll(',', '').trim(),
+                  ) ??
+                  policy.carryoverBalance;
+              final nextGeneralOp = int.tryParse(
+                    generalOpCtrl.text.replaceAll(',', '').trim(),
+                  ) ??
+                  policy.generalOperationBalance;
+              ref.read(clubFeePoliciesProvider.notifier).updatePolicy(
+                    policy.copyWith(
+                      carryoverBalance: nextCarryover,
+                      generalOperationBalance: nextGeneralOp,
+                    ),
+                  );
+              Navigator.pop(dialogCtx);
+            },
+            child: const Text('저장'),
+          ),
+        ],
       ),
     );
   }
@@ -388,6 +658,10 @@ class _MembershipFeeLedgerScreenState
     required MonthlyFeeSummary summary,
   }) {
     final pagePalette = AppTheme.getPagePalette(4);
+    final events = ref.read(currentClubEventsProvider);
+    final currentEvent = events
+        .where((e) => e.id == (_selectedEventId ?? events.firstOrNull?.id))
+        .firstOrNull;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -488,13 +762,17 @@ class _MembershipFeeLedgerScreenState
                       fgColor: AppTheme.pastelMintDark,
                       onTap: () {
                         Navigator.pop(sheetCtx);
-                        _showExcelExportDialog(
-                          context: context,
-                          club: club,
-                          members: members,
-                          ledgerMap: ledgerMap,
-                          policy: policy,
-                        );
+                        if (_activeSubTab == 1 && currentEvent != null) {
+                          _exportEventCsv(context, club, currentEvent);
+                        } else {
+                          _showExcelExportDialog(
+                            context: context,
+                            club: club,
+                            members: members,
+                            ledgerMap: ledgerMap,
+                            policy: policy,
+                          );
+                        }
                       },
                     ),
                   ],
@@ -1542,7 +1820,6 @@ class _MembershipFeeLedgerScreenState
     required ClubFeePolicy policy,
     required bool isReadOnly,
   }) {
-    final pagePalette = AppTheme.getPagePalette(4);
     const double memberColWidth = 145;
     const double baseFeeColWidth = 98;
     const double monthColWidth = 68;
@@ -1593,41 +1870,16 @@ class _MembershipFeeLedgerScreenState
             children: [
               SizedBox(
                 width: memberColWidth,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: pagePalette.primary,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          '고정',
-                          style: TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Expanded(
-                        child: Text(
-                          '월별 수납 요약',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.primaryDark,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(
+                    '월별 수납 요약',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.primaryDark,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
@@ -2626,7 +2878,7 @@ class _MembershipFeeLedgerScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1) 행사 선택 및 상단 등록/연동 바
+        // 1) 행사 리스트(드롭다운 선택형) 및 상단 등록/연동 바
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -2647,7 +2899,7 @@ class _MembershipFeeLedgerScreenState
                   const SizedBox(width: 6),
                   const Expanded(
                     child: Text(
-                      '행사비 / 모임비 정산 선택',
+                      '행사 리스트',
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w900,
@@ -2687,7 +2939,7 @@ class _MembershipFeeLedgerScreenState
                     ),
                   ),
                   const SizedBox(width: 6),
-                  // [📥 출석부 모임 불러오기] 버튼
+                  // [📥 일정/모임에서 가져오기] 버튼
                   InkWell(
                     key: const Key('import_session_event_button'),
                     onTap: () =>
@@ -2713,7 +2965,7 @@ class _MembershipFeeLedgerScreenState
                           ),
                           const SizedBox(width: 2),
                           Text(
-                            '출석부 불러오기',
+                            '일정/모임에서 가져오기',
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w900,
@@ -2728,57 +2980,71 @@ class _MembershipFeeLedgerScreenState
               ),
               if (events.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: events.map((ev) {
-                      final isSel = ev.id == _selectedEventId;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ChoiceChip(
-                          key: Key('event_chip_${ev.id}'),
-                          selected: isSel,
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F7FC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: pagePalette.borderTint),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      key: const Key('club_event_selector_dropdown'),
+                      value: currentEvent?.id ?? events.first.id,
+                      isExpanded: true,
+                      isDense: false,
+                      icon: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: pagePalette.primary,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      dropdownColor: Colors.white,
+                      items: events.map((ev) {
+                        return DropdownMenuItem<String>(
+                          value: ev.id,
+                          child: Row(
                             children: [
                               if (ev.linkedSessionId != null) ...[
-                                const Icon(Icons.link_rounded, size: 12),
-                                const SizedBox(width: 3),
+                                Icon(
+                                  Icons.link_rounded,
+                                  size: 13,
+                                  color: pagePalette.primary,
+                                ),
+                                const SizedBox(width: 4),
                               ],
-                              Text(ev.title),
-                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  ev.title,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.textDark,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
                               Text(
                                 ev.eventDate,
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  color: isSel
-                                      ? Colors.white70
-                                      : AppTheme.textMuted,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textMuted,
                                 ),
                               ),
                             ],
                           ),
-                          selectedColor: pagePalette.primary,
-                          backgroundColor: const Color(0xFFF0F2FA),
-                          labelStyle: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight:
-                                isSel ? FontWeight.w900 : FontWeight.w700,
-                            color: isSel ? Colors.white : AppTheme.textDark,
-                          ),
-                          side: BorderSide(
-                            color: isSel
-                                ? pagePalette.primary
-                                : const Color(0xFFE2E6F2),
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() => _selectedEventId = ev.id);
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
+                      onChanged: (selectedId) {
+                        if (selectedId != null) {
+                          setState(() => _selectedEventId = selectedId);
+                        }
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -2814,7 +3080,7 @@ class _MembershipFeeLedgerScreenState
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  '새 행사를 직접 등록하거나, 일반 모드 [출석부]에서 진행한 모임 데이터를\n원클릭으로 불러와 수입/지출 및 영수증을 스마트하게 정산해 보세요.',
+                  '새 행사를 직접 등록하거나, 일반 모드 [일정/모임]에서 진행한 모임 데이터를\n원클릭으로 불러와 수입/지출 및 영수증을 스마트하게 정산해 보세요.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11.5,
@@ -2863,7 +3129,7 @@ class _MembershipFeeLedgerScreenState
                       ),
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: const Text(
-                        '출석부 모임 불러오기',
+                        '일정/모임에서 가져오기',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 12,
@@ -2889,13 +3155,12 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// 행사 정산 재정 요약 카드
+  /// 행사 정산 재정 요약 카드 (내부 중복 엑셀 다운로드 버튼 제거 및 간결화)
   Widget _buildEventSummaryCard(
     BuildContext context,
     Club club,
     ClubEvent event,
   ) {
-    final pagePalette = AppTheme.getPagePalette(4);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2951,7 +3216,7 @@ class _MembershipFeeLedgerScreenState
                                 ),
                                 SizedBox(width: 2),
                                 Text(
-                                  '출석부 연동',
+                                  '일정/모임 연동',
                                   style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w900,
@@ -3146,52 +3411,6 @@ class _MembershipFeeLedgerScreenState
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          // Action Buttons: [+ 내역 추가] and [📊 엑셀 다운로드 (CSV)]
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  key: const Key('add_event_expense_item_btn'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryDark,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
-                  label: const Text(
-                    '수입/지출 내역 추가',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-                  ),
-                  onPressed: () =>
-                      _showAddEditExpenseItemDialog(context, event),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                key: const Key('export_event_expense_csv_btn'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: pagePalette.primary,
-                  side: BorderSide(color: pagePalette.borderTint),
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                icon: const Icon(Icons.file_download_outlined, size: 15),
-                label: const Text(
-                  '엑셀 다운로드 (CSV)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-                ),
-                onPressed: () => _exportEventCsv(context, club, event),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -3219,7 +3438,7 @@ class _MembershipFeeLedgerScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Filter bar
+          // Header bar: '입출금 상세 내역' + 필터 칩 + 우측 [+ 내역 추가] 버튼
           Row(
             children: [
               const Text(
@@ -3239,6 +3458,38 @@ class _MembershipFeeLedgerScreenState
                   _buildSmallFilterChip('수입', 'income', event.incomeCount),
                   _buildSmallFilterChip('지출', 'expense', event.expenseCount),
                 ],
+              ),
+              const SizedBox(width: 6),
+              // 우측 배치: [+ 수입/지출 내역 추가] 버튼 (+ 버튼 형태)
+              InkWell(
+                key: const Key('add_event_expense_item_btn'),
+                onTap: () => _showAddEditExpenseItemDialog(context, event),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryDark,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_rounded, size: 14, color: Colors.white),
+                      SizedBox(width: 2),
+                      Text(
+                        '내역 추가',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -3552,7 +3803,7 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// [📥 출석부 모임 불러오기] 다이얼로그 (일반 모드 출석부 데이터 원클릭 연동)
+  /// [📥 일정/모임에서 가져오기] 다이얼로그 (일반 모드 일정/모임 데이터 원클릭 연동)
   void _showImportFromSessionDialog(
     BuildContext context,
     Club club,
@@ -3571,7 +3822,7 @@ class _MembershipFeeLedgerScreenState
             Icon(Icons.download_rounded, color: AppTheme.primaryDark),
             SizedBox(width: 8),
             Text(
-              '출석부 모임 데이터 불러오기',
+              '일정/모임 데이터 가져오기',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
             ),
           ],
@@ -3583,7 +3834,7 @@ class _MembershipFeeLedgerScreenState
                   padding: EdgeInsets.symmetric(vertical: 24),
                   child: Center(
                     child: Text(
-                      '불러올 수 있는 출석부 모임 기록이 없습니다.\n[출석부]에서 모임을 먼저 생성해 보세요.',
+                      '가져올 수 있는 일정/모임 기록이 없습니다.\n[일정/모임]에서 모임을 먼저 생성해 보세요.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppTheme.textMuted),
                     ),

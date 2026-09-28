@@ -166,7 +166,7 @@ class AppTheme {
     ),
     PageAccentPalette(
       pageIndex: 1,
-      pageName: '출석부',
+      pageName: '일정/모임',
       toneLabel: 'SAGE 그린 활동 톤',
       primary: Color(0xFF527F5B),
       secondary: Color(0xFFA3C9A8),
@@ -219,13 +219,13 @@ class AppTheme {
     return pagePalettes[safeIndex];
   }
 
-  /// 스와이프 3대 메인 페이지(0: 회원 명부, 1: 출석부, 2: 대진표)의 AppBar 좌측 페이지명 반환
+  /// 스와이프 3대 메인 페이지(0: 회원 명부, 1: 일정/모임, 2: 대진표)의 AppBar 좌측 페이지명 반환
   static String getMainPageTitle(int currentIndex) {
     switch (currentIndex.clamp(0, 2)) {
       case 0:
         return '회원 명부';
       case 1:
-        return '출석부';
+        return '일정/모임';
       case 2:
       default:
         return '대진표';
@@ -267,7 +267,7 @@ class AppTheme {
     );
   }
 
-  /// 3개 스와이프 화면(회원 명부 · 출석부 · 대진표) 최상단 AppBar 좌측 고정 헤더
+  /// 3개 스와이프 화면(회원 명부 · 일정/모임 · 대진표) 최상단 AppBar 좌측 고정 헤더
   /// - [☰ 햄버거 메뉴] + [고정 폭 페이지 타이틀]
   static Widget buildMainAppBarLeftHeader({
     required BuildContext context,
@@ -304,7 +304,7 @@ class AppTheme {
         ),
         const SizedBox(width: 8),
         SizedBox(
-          width: 72,
+          width: 84,
           child: Text(
             pageTitle,
             key: Key('app_bar_page_title_$safeIndex'),

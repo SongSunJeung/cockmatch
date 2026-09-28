@@ -14,6 +14,8 @@ class ClubFeePolicy {
   final String accountNumber; // 계좌번호 (예: 3333-01-2345678)
   final String accountHolder; // 예금주 (예: 김민수(메가배드민턴))
   final String rulesAndMemo; // 클럽 회비 회칙 & 메모란 (아코디언 영구 저장)
+  final int carryoverBalance; // 기초 이월금
+  final int generalOperationBalance; // 일반운영비 정산액
 
   const ClubFeePolicy({
     required this.clubId,
@@ -23,6 +25,8 @@ class ClubFeePolicy {
     this.accountNumber = '3333-01-5829104',
     this.accountHolder = '정수진(총무)',
     this.rulesAndMemo = defaultRulesText,
+    this.carryoverBalance = 0,
+    this.generalOperationBalance = 0,
   });
 
   static const String defaultRulesText =
@@ -47,6 +51,8 @@ class ClubFeePolicy {
     String? accountNumber,
     String? accountHolder,
     String? rulesAndMemo,
+    int? carryoverBalance,
+    int? generalOperationBalance,
   }) {
     return ClubFeePolicy(
       clubId: clubId ?? this.clubId,
@@ -56,6 +62,9 @@ class ClubFeePolicy {
       accountNumber: accountNumber ?? this.accountNumber,
       accountHolder: accountHolder ?? this.accountHolder,
       rulesAndMemo: rulesAndMemo ?? this.rulesAndMemo,
+      carryoverBalance: carryoverBalance ?? this.carryoverBalance,
+      generalOperationBalance:
+          generalOperationBalance ?? this.generalOperationBalance,
     );
   }
 
@@ -68,6 +77,8 @@ class ClubFeePolicy {
       'accountNumber': accountNumber,
       'accountHolder': accountHolder,
       'rulesAndMemo': rulesAndMemo,
+      'carryoverBalance': carryoverBalance,
+      'generalOperationBalance': generalOperationBalance,
     };
   }
 
@@ -80,6 +91,8 @@ class ClubFeePolicy {
       accountNumber: json['accountNumber'] as String? ?? '3333-01-5829104',
       accountHolder: json['accountHolder'] as String? ?? '정수진(총무)',
       rulesAndMemo: json['rulesAndMemo'] as String? ?? defaultRulesText,
+      carryoverBalance: json['carryoverBalance'] as int? ?? 0,
+      generalOperationBalance: json['generalOperationBalance'] as int? ?? 0,
     );
   }
 }
@@ -418,6 +431,28 @@ class FeeLedgerCalculator {
       );
       sum += resolveMonthPaidAmount(
         record: rec,
+        member: member,
+        policy: policy,
+      );
+    }
+    return sum;
+  }
+
+  /// 클럽 전체 회원의 1월~12월 [월회비 누적 수납 총액] 계산
+  static int calculateClubAnnualCollectedTotal({
+    required Map<String, MonthlyFeeRecord> ledgerMap,
+    required String clubId,
+    required int year,
+    required List<Member> members,
+    required ClubFeePolicy policy,
+  }) {
+    int sum = 0;
+    for (final member in members) {
+      if (member.isGuest) continue;
+      sum += calculateMemberAnnualTotal(
+        ledgerMap: ledgerMap,
+        clubId: clubId,
+        year: year,
         member: member,
         policy: policy,
       );
