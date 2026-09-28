@@ -1490,27 +1490,6 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                 bg: AppTheme.pastelPeriwinkle.withValues(alpha: 0.65),
                 fg: AppTheme.pastelPeriwinkleDark,
               ),
-              InkWell(
-                onTap: () => ref.read(currentTabProvider.notifier).setTab(4),
-                borderRadius: BorderRadius.circular(7),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppTheme.getPagePalette(4).primary,
-                    borderRadius: BorderRadius.circular(7),
-                  ),
-                  child: const Text(
-                    '📊 연간/월별 회비 현황표 →',
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ],

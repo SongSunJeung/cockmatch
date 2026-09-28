@@ -628,7 +628,7 @@ void main() {
         customFeeLabel: '가족할인',
         customFeeAmount: 20000,
       );
-      expect(discountedMember.feePolicyBadgeText, equals('가족할인 20,000원'));
+      expect(discountedMember.feePolicyBadgeText, equals('가족회원'));
 
       final periodExemptMember = Member(
         id: 'm_exempt_period',

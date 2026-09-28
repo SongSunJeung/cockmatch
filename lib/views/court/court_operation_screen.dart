@@ -229,13 +229,6 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
     final isPastCompletedRound = selectedRound < maxRound &&
         roundMatches.isNotEmpty &&
         roundMatches.every((m) => m.isFinished);
-    final bool hasInProgressOrCompletedMatches = allMatches.any(
-      (m) =>
-          m.isFinished ||
-          m.status == MatchStatus.playing ||
-          m.scoreA > 0 ||
-          m.scoreB > 0,
-    );
     final int finishedMatchesCount = allMatches.where((m) => m.isFinished).length;
 
     // 현재 라운드에 표시할 코트 번호 목록 (운영 코트 범위 + 범위 밖 특별 매치 코트 번호 합집합, 오름차순 정렬)
@@ -578,67 +571,6 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                               ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            OutlinedButton.icon(
-                              key: const Key('court_reshuffle_remaining_button'),
-                              style: OutlinedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: pagePalette.primary,
-                                side: BorderSide(color: pagePalette.borderTint),
-                                minimumSize: const Size(0, 28),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                              ),
-                              icon: const Icon(Icons.autorenew_rounded, size: 13),
-                              label: const Text(
-                                '남은 라운드 재편성',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                              onPressed: () {
-                                final count = ref
-                                    .read(matchesProvider.notifier)
-                                    .reshuffleRemainingMatches(targetRound: selectedRound);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    backgroundColor: pagePalette.primary,
-                                    content: Text(
-                                      '✅ 완료된 코트 기록은 보존하고 대기 코트/남은 라운드($count경기)를 현재 출석 인원으로 재편성했습니다.',
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            if (allMatches.isNotEmpty)
-                              OutlinedButton.icon(
-                                key: const Key('court_reset_and_regenerate_button'),
-                                style: OutlinedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: AppTheme.errorRed,
-                                  side: BorderSide(color: AppTheme.errorRed.withValues(alpha: 0.45)),
-                                  minimumSize: const Size(0, 28),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                ),
-                                icon: const Icon(Icons.restart_alt_rounded, size: 13),
-                                label: const Text(
-                                  '대진표 초기화 후 재생성',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
-                                onPressed: () =>
-                                    _showResetAndRegenerateConfirmDialog(context, ref, session),
-                              ),
-                          ],
-                        ),
                       ],
                     ],
                   ),
@@ -646,10 +578,10 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
               ),
             ),
 
-            // 3. 라운드 선택 탭 + 미니 액션 버튼 바 (한 줄 정렬로 코트 가시성 극대화)
+            // 3. 라운드 선택 탭 ('1 라운드' 옆 '+ 라운드 추가' 첫 화면 즉시 노출) + [+ 특별 매치 추가]
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                 child: Row(
                   children: [
                     Expanded(
@@ -659,18 +591,18 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           children: [
                             ...existingRounds.map(
                               (r) => Padding(
-                                padding: const EdgeInsets.only(right: 6),
+                                padding: const EdgeInsets.only(right: 5),
                                 child: InkWell(
                                   onTap: () {
                                     ref.read(selectedRoundProvider.notifier).setRound(r);
                                   },
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(12),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 180),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                     decoration: BoxDecoration(
                                       color: selectedRound == r ? pagePalette.primary : Colors.white,
-                                      borderRadius: BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                         color: selectedRound == r ? pagePalette.secondary : Colors.grey.shade200,
                                       ),
@@ -678,7 +610,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                                     child: Text(
                                       '$r 라운드',
                                       style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 11.5,
                                         fontWeight: FontWeight.bold,
                                         color: selectedRound == r ? Colors.white : AppTheme.textDark,
                                       ),
@@ -687,8 +619,9 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                                 ),
                               ),
                             ),
-                            // 새 라운드 추가 미니 칩
+                            // '+ 라운드 추가' 버튼 (가로 스크롤 뒤로 숨지 않고 첫 화면에서 즉시 노출)
                             InkWell(
+                              key: const Key('court_add_round_button'),
                               onTap: () {
                                 final nextRound = (existingRounds.isEmpty ? 0 : existingRounds.last) + 1;
                                 _handleGenerateRound(
@@ -700,28 +633,21 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                                   switchRound: true,
                                 );
                               },
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
                                   color: pagePalette.softTint,
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(12),
                                   border: Border.all(color: pagePalette.borderTint),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.add, size: 14, color: pagePalette.primary),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      '새 라운드 추가',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: pagePalette.primary,
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  '+ 라운드 추가',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: pagePalette.primary,
+                                  ),
                                 ),
                               ),
                             ),
@@ -730,7 +656,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    // 우측 미니 버튼: [+ 특별 매치 추가], [✨ 대진표 자동 생성 / 🔄 다음 라운드 스마트 편성]
+                    // 우측 미니 버튼: [+ 특별 매치 추가] ([다음 라운드 스마트 편성] 중복 버튼 제거)
                     OutlinedButton.icon(
                       key: const Key('court_add_custom_match_button'),
                       style: OutlinedButton.styleFrom(
@@ -742,7 +668,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                       ),
                       icon: Icon(Icons.add_circle_outline, size: 12, color: pagePalette.primary),
                       label: const Text(
@@ -758,64 +684,66 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                         allMembers,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    ElevatedButton.icon(
-                      key: const Key('court_auto_or_next_round_button'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: pagePalette.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        minimumSize: const Size(0, 28),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  ],
+                ),
+              ),
+            ),
+
+            // 3-2. 핵심 운영 버튼 외부 상시 노출 바 ([남은 라운드 재편성] / [대진표 초기화 후 재생성])
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('court_reshuffle_remaining_button'),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: pagePalette.primary,
+                          side: BorderSide(color: pagePalette.borderTint),
+                          minimumSize: const Size(0, 28),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        icon: const Icon(Icons.autorenew_rounded, size: 13),
+                        label: const Text(
+                          '남은 라운드 재편성',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                        ),
+                        onPressed: () => _showReshuffleRemainingConfirmDialog(
+                          context,
+                          ref,
+                          selectedRound,
+                        ),
                       ),
-                      icon: Icon(
-                        hasInProgressOrCompletedMatches
-                            ? Icons.sync_rounded
-                            : Icons.auto_awesome,
-                        size: 12,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('court_reset_and_regenerate_button'),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppTheme.errorRed,
+                          side: BorderSide(color: AppTheme.errorRed.withValues(alpha: 0.45)),
+                          minimumSize: const Size(0, 28),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        ),
+                        icon: const Icon(Icons.restart_alt_rounded, size: 13),
+                        label: const Text(
+                          '대진표 초기화 후 재생성',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                        ),
+                        onPressed: () =>
+                            _showResetAndRegenerateConfirmDialog(context, ref, session),
                       ),
-                      label: Text(
-                        hasInProgressOrCompletedMatches
-                            ? '🔄 다음 라운드 스마트 편성'
-                            : '✨ 대진표 자동 생성',
-                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () {
-                        if (hasInProgressOrCompletedMatches) {
-                          final maxRoundHasLocked = allMatches.any(
-                            (m) =>
-                                m.round == maxRound &&
-                                (m.isFinished ||
-                                    m.status == MatchStatus.playing ||
-                                    m.scoreA > 0 ||
-                                    m.scoreB > 0),
-                          );
-                          final nextTargetRound =
-                              maxRoundHasLocked ? maxRound + 1 : maxRound;
-                          _handleGenerateRound(
-                            context: context,
-                            ref: ref,
-                            targetRound: nextTargetRound,
-                            isTournament: isTournament,
-                            allMatches: allMatches,
-                            switchRound: true,
-                          );
-                        } else if (roundMatches.isNotEmpty) {
-                          _showResetAndRegenerateConfirmDialog(context, ref, session);
-                        } else {
-                          _handleGenerateRound(
-                            context: context,
-                            ref: ref,
-                            targetRound: selectedRound,
-                            isTournament: isTournament,
-                            allMatches: allMatches,
-                          );
-                        }
-                      },
                     ),
                   ],
                 ),
@@ -1921,6 +1849,89 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
     );
   }
 
+  /// [남은 라운드 재편성] 클릭 시 확인 경고 팝업
+  void _showReshuffleRemainingConfirmDialog(
+    BuildContext context,
+    WidgetRef ref,
+    int selectedRound,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.autorenew_rounded, color: AppTheme.primaryDark, size: 22),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '남은 라운드 재편성',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          '진행 중/완료된 경기는 유지되며, 대기 중인 라운드만 현재 출석 인원으로 재편성됩니다. 진행하시겠습니까?',
+          style: TextStyle(
+            fontSize: 13.5,
+            height: 1.45,
+            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('court_cancel_reshuffle_button'),
+            onPressed: () => Navigator.pop(dCtx),
+            child: const Text(
+              '취소',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            key: const Key('court_confirm_reshuffle_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(dCtx);
+              final count = ref
+                  .read(matchesProvider.notifier)
+                  .reshuffleRemainingMatches(targetRound: selectedRound);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: AppTheme.primaryDark,
+                    content: Text(
+                      '✅ 완료된 코트 기록은 보존하고 대기 코트/남은 라운드($count경기)를 현재 출석 인원으로 재편성했습니다.',
+                    ),
+                  ),
+                );
+              }
+            },
+            child: const Text(
+              '재편성 진행',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 전체 대진표 1라운드부터 초기화 재생성 시 2단계 안전 확인 모달
   void _showResetAndRegenerateConfirmDialog(
     BuildContext context,
@@ -1948,7 +1959,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
           ],
         ),
         content: const Text(
-          '⚠️ 완료된 경기 기록과 현재 점수가 모두 영구 삭제됩니다. 전체 대진표를 처음부터 다시 생성하시겠습니까?',
+          '⚠️ 완료된 경기 기록과 현재 점수가 모두 삭제됩니다. 처음부터 다시 생성하시겠습니까?',
           style: TextStyle(
             fontSize: 13.5,
             height: 1.45,

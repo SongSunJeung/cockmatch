@@ -149,7 +149,7 @@ void main() {
     expect(find.byIcon(Icons.phone_in_talk_rounded), findsNothing);
     expect(find.text('⇅ 이름순 (가나다)'), findsOneWidget);
     expect(find.text('010-6666-7777'), findsOneWidget);
-    expect(find.text('가족할인 20,000원'), findsOneWidget);
+    expect(find.text('가족회원'), findsOneWidget);
     // 회원 명부 카드 우측 급수 뱃지: 내부 점수 표기 없이 급수 명칭만 깔끔하게 노출되는지 확인
     expect(find.text('A조 (5점)'), findsNothing);
     expect(find.text('B조 (4점)'), findsNothing);
@@ -679,17 +679,20 @@ void main() {
     await tester.tap(archivedCard);
     await tester.pumpAndSettle();
 
-    // 1. 이미 대진표가 생성된 상태이므로 하단 기본 버튼이 [📋 현재 대진표 이어보기]로 표시되는지 확인
+    // 1. [출석부] 상단 회비 수납 현황 카드 내 [연간/월별 회비 현황표 ->] 버튼이 삭제되었는지 확인
+    expect(find.textContaining('연간/월별 회비 현황표'), findsNothing);
+
+    // 2. 이미 대진표가 생성된 상태이므로 하단 기본 버튼이 [📋 현재 대진표 이어보기]로 표시되는지 확인
     expect(find.text('📋 현재 대진표 이어보기'), findsOneWidget);
 
-    // 2. [대진 설정 & 이동] 모달 내부에서도 [📋 현재 대진표 이어보기], [남은 라운드 재편성], [대진표 초기화 후 재생성] 분리 확인
+    // 3. [대진 설정 & 이동] 모달 내부에서도 [📋 현재 대진표 이어보기], [남은 라운드 재편성], [대진표 초기화 후 재생성] 분리 확인
     await tester.tap(find.text('대진 설정 & 이동'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('continue_existing_bracket_button')), findsOneWidget);
     expect(find.byKey(const Key('reshuffle_remaining_rounds_button')), findsOneWidget);
     expect(find.text('대진표 초기화 후 재생성'), findsOneWidget);
 
-    // 3. [대진표 초기화 후 재생성] 클릭 시 2단계 파괴적 액션 방지 경고 모달 필수 노출 확인
+    // [대진표 초기화 후 재생성] 클릭 시 2단계 파괴적 액션 방지 경고 모달 필수 노출 확인
     await tester.tap(find.text('대진표 초기화 후 재생성'));
     await tester.pumpAndSettle();
     expect(
@@ -708,25 +711,38 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('court_header_live_viewer_button')), findsOneWidget);
 
-    // 4. 라운드 라인 우측 미니 버튼: 이미 완료된 경기가 있으므로 [🔄 다음 라운드 스마트 편성] 및 [+ 특별 매치 추가] 노출 확인
-    expect(find.text('🔄 다음 라운드 스마트 편성'), findsOneWidget);
+    // 4. [대진표] 라운드 가시성 & 중복 버튼 제거 검증:
+    // - '1 라운드' 옆에 '+ 라운드 추가' 버튼이 첫 화면에서 즉시 노출
+    // - [다음 라운드 스마트 편성] 버튼 완전 제거 확인
+    expect(find.text('1 라운드'), findsOneWidget);
+    expect(find.byKey(const Key('court_add_round_button')), findsOneWidget);
+    expect(find.text('+ 라운드 추가'), findsOneWidget);
     expect(find.text('+ 특별 매치 추가'), findsOneWidget);
-    expect(find.text('✨ 대진표 자동 생성'), findsNothing);
+    expect(find.text('🔄 다음 라운드 스마트 편성'), findsNothing);
 
-    // 5. [운영 요약 및 설정 ⌵] 아코디언을 펼치면 [남은 라운드 재편성] 및 [대진표 초기화 후 재생성] 노출 확인
-    await tester.tap(find.byKey(const Key('toggle_operation_summary_button')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('court_reshuffle_remaining_button')), findsOneWidget);
-
+    // 5. [남은 라운드 재편성] 및 [대진표 초기화 후 재생성] 버튼이 '운영 요약 펼침' 안이 아닌 바깥에 즉시 노출되는지 확인
+    final reshuffleBtn = find.byKey(const Key('court_reshuffle_remaining_button'));
     final courtResetBtn = find.byKey(const Key('court_reset_and_regenerate_button'));
+    expect(reshuffleBtn, findsOneWidget);
     expect(courtResetBtn, findsOneWidget);
-    await tester.ensureVisible(courtResetBtn);
+
+    // 6. [남은 라운드 재편성] 클릭 시 경고 팝업 필수 노출 검증
+    await tester.tap(reshuffleBtn);
     await tester.pumpAndSettle();
+    expect(
+      find.text('진행 중/완료된 경기는 유지되며, 대기 중인 라운드만 현재 출석 인원으로 재편성됩니다. 진행하시겠습니까?'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('court_cancel_reshuffle_button')), findsOneWidget);
+    expect(find.byKey(const Key('court_confirm_reshuffle_button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('court_cancel_reshuffle_button')));
+    await tester.pumpAndSettle();
+
+    // 7. [대진표 초기화 후 재생성] 클릭 시 경고 팝업 필수 노출 검증
     await tester.tap(courtResetBtn);
     await tester.pumpAndSettle();
-
     expect(
-      find.text('⚠️ 완료된 경기 기록과 현재 점수가 모두 영구 삭제됩니다. 전체 대진표를 처음부터 다시 생성하시겠습니까?'),
+      find.text('⚠️ 완료된 경기 기록과 현재 점수가 모두 삭제됩니다. 처음부터 다시 생성하시겠습니까?'),
       findsOneWidget,
     );
     expect(find.byKey(const Key('court_cancel_regenerate_button')), findsOneWidget);
@@ -735,7 +751,7 @@ void main() {
     // [취소] 클릭 시 기존 완료 경기 보존 확인
     await tester.tap(find.byKey(const Key('court_cancel_regenerate_button')));
     await tester.pumpAndSettle();
-    expect(find.text('🔄 다음 라운드 스마트 편성'), findsOneWidget);
+    expect(find.text('+ 라운드 추가'), findsOneWidget);
   });
 
   testWidgets('단일 퍼플 톤 원복, AppBar 좌측 페이지명 전환(회원 명부/출석부/대진표), 고정 위치 3도트 인디케이터(● ○ ○) 정렬 검증', (WidgetTester tester) async {
@@ -790,6 +806,8 @@ void main() {
     expect(dot0Finder, findsOneWidget);
     expect(find.text('회원 명부'), findsOneWidget);
     expect(find.text('● ○ ○'), findsOneWidget);
+    expect(find.text('가족회원'), findsWidgets);
+    expect(find.text('가족할인 20,000원'), findsNothing);
 
     final Offset title0TopLeft = tester.getTopLeft(title0Finder);
     final Offset dot0TopLeft = tester.getTopLeft(dot0Finder);

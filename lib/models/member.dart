@@ -131,7 +131,7 @@ class Member {
   /// 회원 명부 카드 표시용 [회비 혜택/면제] 뱃지 텍스트
   /// - 휴면 회원: "휴회 면제"
   /// - 회비 면제: "면제 (~26.12.31)" 또는 "면제 (영구)"
-  /// - 차등/할인 금액 지정: "가족할인 20,000원"
+  /// - 차등/할인(가족할인 등) 지정: "가족회원"
   String? get feePolicyBadgeText {
     if (status == MemberStatus.resting) {
       return '휴회 면제';
@@ -145,13 +145,7 @@ class Member {
       return '면제 (영구)';
     }
     if (feePolicy == FeePolicyType.discounted) {
-      final label = (customFeeLabel != null && customFeeLabel!.trim().isNotEmpty)
-          ? customFeeLabel!.trim()
-          : '가족할인';
-      if (customFeeAmount != null) {
-        return '$label ${formatCurrency(customFeeAmount!)}원';
-      }
-      return label;
+      return '가족회원';
     }
     return null;
   }
