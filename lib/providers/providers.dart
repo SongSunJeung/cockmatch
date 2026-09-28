@@ -2002,3 +2002,175 @@ final feeLedgerProvider =
     NotifierProvider<FeeLedgerNotifier, Map<String, MonthlyFeeRecord>>(
   FeeLedgerNotifier.new,
 );
+
+// ============================================================================
+// [PRO 장부] 특별 행사/정기모임 정산 금전출납부 상태 관리 (영구 저장 지원)
+// ============================================================================
+
+const String kClubEventsStorageKey = 'cockmatch_club_events_v1';
+
+class ClubEventsNotifier extends Notifier<List<ClubEvent>> {
+  @override
+  List<ClubEvent> build() {
+    _loadFromStorageAsync();
+    return List<ClubEvent>.from(MockData.initialClubEvents);
+  }
+
+  Future<void> _loadFromStorageAsync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kClubEventsStorageKey);
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw) as List<dynamic>;
+        final loaded = <ClubEvent>[];
+        for (final item in decoded) {
+          if (item is Map<String, dynamic>) {
+            loaded.add(ClubEvent.fromMap(item));
+          }
+        }
+        if (loaded.isNotEmpty) {
+          state = loaded;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist(List<ClubEvent> current) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = current.map((e) => e.toMap()).toList();
+      await prefs.setString(kClubEventsStorageKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
+  ClubEvent createEvent({
+    required String clubId,
+    required String title,
+    required String eventDate,
+    String? memo,
+    String? linkedSessionId,
+    List<EventExpenseItem> initialItems = const [],
+  }) {
+    final newEvent = ClubEvent(
+      id: 'event_${clubId}_${DateTime.now().millisecondsSinceEpoch}',
+      clubId: clubId,
+      title: title.trim(),
+      eventDate: eventDate.trim(),
+      memo: memo?.trim(),
+      linkedSessionId: linkedSessionId,
+      items: initialItems,
+      createdAt: DateTime.now(),
+    );
+    final next = [newEvent, ...state];
+    state = next;
+    _persist(next);
+    return newEvent;
+  }
+
+  void updateEvent(ClubEvent event) {
+    final next = state.map((e) => e.id == event.id ? event : e).toList();
+    state = next;
+    _persist(next);
+  }
+
+  void deleteEvent(String eventId) {
+    final next = state.where((e) => e.id != eventId).toList();
+    state = next;
+    _persist(next);
+  }
+
+  void addItem(String eventId, EventExpenseItem item) {
+    final next = state.map((event) {
+      if (event.id == eventId) {
+        return event.copyWith(items: [...event.items, item]);
+      }
+      return event;
+    }).toList();
+    state = next;
+    _persist(next);
+  }
+
+  void updateItem(String eventId, EventExpenseItem updatedItem) {
+    final next = state.map((event) {
+      if (event.id == eventId) {
+        final updatedItems = event.items
+            .map((item) => item.id == updatedItem.id ? updatedItem : item)
+            .toList();
+        return event.copyWith(items: updatedItems);
+      }
+      return event;
+    }).toList();
+    state = next;
+    _persist(next);
+  }
+
+  void deleteItem(String eventId, String itemId) {
+    final next = state.map((event) {
+      if (event.id == eventId) {
+        return event.copyWith(
+          items: event.items.where((i) => i.id != itemId).toList(),
+        );
+      }
+      return event;
+    }).toList();
+    state = next;
+    _persist(next);
+  }
+
+  /// 출석부 모임 세션 데이터로부터 행사비 출납부 원클릭 생성/불러오기
+  ClubEvent importFromSession({
+    required GameSession session,
+    required List<Member> members,
+  }) {
+    final collected = session.calculatePaidFee(members);
+    final count = session.attendees.length;
+    final now = DateTime.now();
+    final eventId = 'event_${session.clubId}_${now.millisecondsSinceEpoch}';
+
+    final items = <EventExpenseItem>[];
+    if (collected > 0) {
+      items.add(
+        EventExpenseItem(
+          id: 'item_${now.millisecondsSinceEpoch}',
+          eventId: eventId,
+          title: '모임 참가비 수납 ($count명 참석)',
+          amount: collected,
+          isIncome: true,
+          date: session.sessionDate,
+          memo: '출석부 회비 수납 내역 자동 집계',
+          createdAt: now,
+        ),
+      );
+    }
+
+    final newEvent = ClubEvent(
+      id: eventId,
+      clubId: session.clubId,
+      title: (session.title != null && session.title!.trim().isNotEmpty)
+          ? session.title!.trim()
+          : '${session.sessionDate} 정기모임 정산',
+      eventDate: session.sessionDate,
+      linkedSessionId: session.id,
+      memo: '출석부 모임(${session.displayTitle}) 자동 연동',
+      items: items,
+      createdAt: now,
+    );
+
+    final next = [newEvent, ...state];
+    state = next;
+    _persist(next);
+    return newEvent;
+  }
+}
+
+final clubEventsProvider =
+    NotifierProvider<ClubEventsNotifier, List<ClubEvent>>(
+  ClubEventsNotifier.new,
+);
+
+/// 현재 선택된 클럽에 등록된 행사/모임 출납부 목록 Provider
+final currentClubEventsProvider = Provider<List<ClubEvent>>((ref) {
+  final clubId = ref.watch(currentClubIdProvider);
+  final allEvents = ref.watch(clubEventsProvider);
+  return allEvents.where((e) => e.clubId == clubId).toList();
+});

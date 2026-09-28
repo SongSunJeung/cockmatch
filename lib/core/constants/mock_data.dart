@@ -870,4 +870,78 @@ class MockData {
 
     return map;
   }
+
+  /// [PRO 장부] 행사비/모임비 금전출납부 초기 목업 데이터
+  static final List<ClubEvent> initialClubEvents = [
+    ClubEvent(
+      id: 'event_mega_autumn_2026',
+      clubId: 'club_mega',
+      title: '2026년 가을 친선 교류전 및 정산',
+      eventDate: '2026.09.20',
+      memo: '인근 클럽 초청 교류전 및 뒤풀이 정산',
+      items: [
+        EventExpenseItem(
+          id: 'item_1',
+          eventId: 'event_mega_autumn_2026',
+          title: '교류전 참가비 수납 (16명)',
+          amount: 320000,
+          isIncome: true,
+          date: '2026.09.20',
+          memo: '1인당 20,000원 입금',
+          createdAt: DateTime(2026, 9, 20, 10, 0),
+        ),
+        EventExpenseItem(
+          id: 'item_2',
+          eventId: 'event_mega_autumn_2026',
+          title: '클럽 발전 찬조금 (회장)',
+          amount: 100000,
+          isIncome: true,
+          date: '2026.09.20',
+          memo: '이용대 회장 찬조',
+          createdAt: DateTime(2026, 9, 20, 10, 30),
+        ),
+        EventExpenseItem(
+          id: 'item_3',
+          eventId: 'event_mega_autumn_2026',
+          title: '체육관 4코트 대관료 (4시간)',
+          amount: 160000,
+          isIncome: false,
+          date: '2026.09.20',
+          memo: '구립체육관 1코트당 10,000원/h',
+          createdAt: DateTime(2026, 9, 20, 14, 0),
+        ),
+        EventExpenseItem(
+          id: 'item_4',
+          eventId: 'event_mega_autumn_2026',
+          title: '삼화 블랙 셔틀콕 2타 구매',
+          amount: 72000,
+          isIncome: false,
+          date: '2026.09.20',
+          memo: '공인구 2타 구입',
+          createdAt: DateTime(2026, 9, 20, 14, 30),
+        ),
+        EventExpenseItem(
+          id: 'item_5',
+          eventId: 'event_mega_autumn_2026',
+          title: '음료 및 이온음료/간식 구매',
+          amount: 35000,
+          isIncome: false,
+          date: '2026.09.20',
+          memo: '포카리스웨트 및 바나나',
+          createdAt: DateTime(2026, 9, 20, 15, 0),
+        ),
+        EventExpenseItem(
+          id: 'item_6',
+          eventId: 'event_mega_autumn_2026',
+          title: '교류전 뒤풀이 식대 (1차 식사)',
+          amount: 140000,
+          isIncome: false,
+          date: '2026.09.20',
+          memo: '참석자 14명 식사비 일부 지원',
+          createdAt: DateTime(2026, 9, 20, 19, 0),
+        ),
+      ],
+      createdAt: DateTime(2026, 9, 20),
+    ),
+  ];
 }

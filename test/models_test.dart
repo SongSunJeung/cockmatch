@@ -1141,10 +1141,81 @@ void main() {
       expect(round2Players.contains(guest1.id), isTrue);
       expect(round2Players.contains(guest2.id), isTrue);
     });
+
+    test('[PRO 행사비/모임비 금전출납부] 행사 생성, 출석부 원클릭 불러오기, 수입/지출/영수증 기록, 정산 및 CSV(UTF-8 BOM) 검증', () {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final initialEvents = container.read(currentClubEventsProvider);
+      expect(initialEvents, isNotEmpty);
+
+      // 1) 직접 새 행사 생성
+      final created = container.read(clubEventsProvider.notifier).createEvent(
+            clubId: 'club_mega',
+            title: '2026 추계 친선 교류전',
+            eventDate: '2026.10.15',
+            memo: '이웃 클럽 초청 교류전 정산',
+          );
+      expect(created.title, equals('2026 추계 친선 교류전'));
+      expect(created.balance, equals(0));
+
+      // 2) 수입/지출 항목 및 영수증 증빙 추가
+      container.read(clubEventsProvider.notifier).addItem(
+            created.id,
+            EventExpenseItem(
+              id: 'item_inc_1',
+              eventId: created.id,
+              title: '참가비 수납 (20명)',
+              amount: 200000,
+              isIncome: true,
+              date: '2026.10.15',
+              memo: '1인 10,000원',
+              createdAt: DateTime(2026, 10, 15),
+            ),
+          );
+      container.read(clubEventsProvider.notifier).addItem(
+            created.id,
+            EventExpenseItem(
+              id: 'item_exp_1',
+              eventId: created.id,
+              title: '셔틀콕 및 음료 구매',
+              amount: 135000,
+              isIncome: false,
+              date: '2026.10.15',
+              memo: '영수증 첨부 완료',
+              receiptBase64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+              receiptFileName: 'receipt_oct15.png',
+              createdAt: DateTime(2026, 10, 15),
+            ),
+          );
+
+      final updatedEvent = container
+          .read(currentClubEventsProvider)
+          .firstWhere((e) => e.id == created.id);
+      expect(updatedEvent.totalIncome, equals(200000));
+      expect(updatedEvent.totalExpense, equals(135000));
+      expect(updatedEvent.balance, equals(65000));
+      expect(updatedEvent.items.any((i) => i.hasReceipt), isTrue);
+
+      // 3) 일반 모드 [출석부] 모임 데이터 원클릭 불러오기 검증
+      final archivedSessions = container.read(currentClubArchivedSessionsProvider);
+      expect(archivedSessions, isNotEmpty);
+      final targetSession = archivedSessions.first;
+      final members = container.read(currentClubMembersProvider);
+
+      final importedEvent = container.read(clubEventsProvider.notifier).importFromSession(
+            session: targetSession,
+            members: members,
+          );
+      expect(importedEvent.linkedSessionId, equals(targetSession.id));
+      expect(importedEvent.items, isNotEmpty);
+      expect(importedEvent.totalIncome, greaterThan(0));
+
+      // 4) 엑셀/CSV (UTF-8 BOM) 바이트 생성 검증
+      final csvBytes = EventExpenseCalculator.buildEventCsvBytes(updatedEvent);
+      expect(csvBytes.sublist(0, 3), equals([0xEF, 0xBB, 0xBF]));
+    });
   });
 }
-
-
-
-
 

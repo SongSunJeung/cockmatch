@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/korean_search_util.dart';
@@ -38,6 +40,7 @@ class MembershipFeeLedgerScreen extends ConsumerStatefulWidget {
 
 class _MembershipFeeLedgerScreenState
     extends ConsumerState<MembershipFeeLedgerScreen> {
+  int _activeSubTab = 0; // 0: [📊 연간 월회비 장부], 1: [🧾 행사비/모임비 출납부]
   int _selectedYear = 2026;
   int _selectedMonth = 9; // 기준 월 (기본 9월)
   FeeLedgerFilter _selectedFilter = FeeLedgerFilter.all;
@@ -45,6 +48,10 @@ class _MembershipFeeLedgerScreenState
   bool _isRulesAccordionExpanded = false; // 기본 접힌 상태(Collapsed)
   bool _isEditingRules = false;
   bool _sortByNameAsc = true; // 기본: 이름 가나다순 오름차순 (false면 등록순)
+  bool _isGroupingEnabled = false; // 회원 그룹화(Grouping) 토글
+  final Set<String> _collapsedGroups = {}; // 접힌 그룹 키들
+  String? _selectedEventId; // 선택된 행사 출납부 ID
+  String _eventFilterType = 'all'; // 'all', 'income', 'expense'
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _rulesController = TextEditingController();
@@ -143,61 +150,82 @@ class _MembershipFeeLedgerScreenState
       backgroundColor: AppTheme.background,
       body: SafeArea(
         bottom: true,
-        child: CustomScrollView(
-          slivers: [
+        child: Column(
+          children: [
             // 0. 상단 슬림 앱바 영역 ([내보내기 📤] & [실시간 웹뷰어] 포함)
-            SliverToBoxAdapter(
-              child: _buildTopHeaderBar(
-                context: context,
-                currentClub: currentClub,
-                members: clubMembers,
-                ledgerMap: ledgerMap,
-                policy: policy,
-                summary: monthlySummary,
-              ),
+            _buildTopHeaderBar(
+              context: context,
+              currentClub: currentClub,
+              members: clubMembers,
+              ledgerMap: ledgerMap,
+              policy: policy,
+              summary: monthlySummary,
             ),
 
-            // 1 & 2. 슬림 아코디언 바: [⚙️ 정책 및 계좌 설정 열기 ⌵] + [📜 클럽 회비 회칙 & 메모란 ⌵]
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
-                child: _buildCompactPolicyAndRulesSection(
-                  context,
-                  currentClub,
-                  policy,
-                ),
-              ),
-            ),
+            // 서브 탭 선택 바 ([📊 연간 월회비 장부] vs [🧾 행사비/모임비 출납부])
+            _buildSubTabSelector(),
 
-            // 3 & 4. 통합 슬림 대시보드 ([통계 요약 칩] + 조회 필터 칩 + 검색창)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-                child: _buildDashboardAndToolbarCard(
-                  context: context,
-                  club: currentClub,
-                  members: clubMembers,
-                  ledgerMap: ledgerMap,
-                  policy: policy,
-                  summary: monthlySummary,
-                  familyDiscountCount: familyDiscountCount,
-                ),
-              ),
-            ),
+            Expanded(
+              child: CustomScrollView(
+                slivers: [
+                  if (_activeSubTab == 0) ...[
+                    // 1 & 2. 슬림 아코디언 바: [⚙️ 정책 및 계좌 설정 열기 ⌵] + [📜 클럽 회비 회칙 & 메모란 ⌵]
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
+                        child: _buildCompactPolicyAndRulesSection(
+                          context,
+                          currentClub,
+                          policy,
+                        ),
+                      ),
+                    ),
 
-            // 5. 연간 월별 회비 매트릭스 테이블 (페이지 진입 시 통계 요약 칩 바로 아래에 즉시 노출)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                child: _buildAnnualMatrixTableCard(
-                  context: context,
-                  club: currentClub,
-                  members: filteredMembers,
-                  allClubMembers: clubMembers,
-                  ledgerMap: ledgerMap,
-                  policy: policy,
-                  isReadOnly: false,
-                ),
+                    // 3 & 4. 통합 슬림 대시보드 ([통계 요약 칩] + 조회 필터 칩 + 검색창)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                        child: _buildDashboardAndToolbarCard(
+                          context: context,
+                          club: currentClub,
+                          members: clubMembers,
+                          ledgerMap: ledgerMap,
+                          policy: policy,
+                          summary: monthlySummary,
+                          familyDiscountCount: familyDiscountCount,
+                        ),
+                      ),
+                    ),
+
+                    // 5. 연간 월별 회비 매트릭스 테이블 (페이지 진입 시 통계 요약 칩 바로 아래에 즉시 노출)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                        child: _buildAnnualMatrixTableCard(
+                          context: context,
+                          club: currentClub,
+                          members: filteredMembers,
+                          allClubMembers: clubMembers,
+                          ledgerMap: ledgerMap,
+                          policy: policy,
+                          isReadOnly: false,
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    // [PRO 장부] 행사비/모임비 금전출납부 탭
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                        child: _buildEventExpenseLedgerView(
+                          context: context,
+                          club: currentClub,
+                          members: clubMembers,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -1411,11 +1439,58 @@ class _MembershipFeeLedgerScreenState
                           ),
                         ),
                         Text(
-                          _sortByNameAsc ? ' (등록순 전환)' : ' (가나다순 전환)',
+                          _sortByNameAsc ? ' (등록순)' : ' (가나다순)',
                           style: const TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w700,
                             color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                // [그룹화 보기 ⌵] 토글 버튼
+                InkWell(
+                  key: const Key('toggle_fee_matrix_grouping_button'),
+                  onTap: () {
+                    setState(() => _isGroupingEnabled = !_isGroupingEnabled);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _isGroupingEnabled
+                          ? pagePalette.primary
+                          : pagePalette.softTint,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: pagePalette.borderTint,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.folder_shared_outlined,
+                          size: 13,
+                          color: _isGroupingEnabled
+                              ? Colors.white
+                              : pagePalette.primary,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          _isGroupingEnabled ? '그룹화 켜짐' : '그룹화 보기 ⌵',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            color: _isGroupingEnabled
+                                ? Colors.white
+                                : pagePalette.primary,
                           ),
                         ),
                       ],
@@ -1467,12 +1542,24 @@ class _MembershipFeeLedgerScreenState
     required ClubFeePolicy policy,
     required bool isReadOnly,
   }) {
+    final pagePalette = AppTheme.getPagePalette(4);
     const double memberColWidth = 145;
     const double baseFeeColWidth = 98;
     const double monthColWidth = 68;
     const double totalColWidth = 106;
 
-    int grandTotalAnnual = 0;
+    final grandTotalAnnual = members.fold<int>(
+      0,
+      (sum, m) =>
+          sum +
+          FeeLedgerCalculator.calculateMemberAnnualTotal(
+            ledgerMap: ledgerMap,
+            clubId: club.id,
+            year: _selectedYear,
+            member: m,
+            policy: policy,
+          ),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1497,278 +1584,50 @@ class _MembershipFeeLedgerScreenState
         ),
         const Divider(height: 1, color: Color(0xFFE2E6F3)),
 
-        // 2) 회원별 행
-        ...members.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final member = entry.value;
-          final standardFee =
-              FeeLedgerCalculator.getMemberStandardMonthlyFee(member, policy);
-          final policySubLabel =
-              FeeLedgerCalculator.getMemberFeePolicySubLabel(member, policy);
-          final annualTotal = FeeLedgerCalculator.calculateMemberAnnualTotal(
-            ledgerMap: ledgerMap,
-            clubId: club.id,
-            year: _selectedYear,
-            member: member,
-            policy: policy,
-          );
-          final paidMonths = FeeLedgerCalculator.calculateMemberPaidMonthsCount(
-            ledgerMap: ledgerMap,
-            clubId: club.id,
-            year: _selectedYear,
-            member: member,
-            policy: policy,
-          );
-          grandTotalAnnual += annualTotal;
-
-          return Container(
-            decoration: BoxDecoration(
-              color: idx.isEven ? Colors.white : const Color(0xFFFAFBFD),
-              border: const Border(
-                bottom: BorderSide(color: Color(0xFFECEFF8), width: 1),
-              ),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              children: [
-                // [회원명 (직책/상태 뱃지)]
-                SizedBox(
-                  width: memberColWidth,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                member.name,
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.textDark,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: member.isExecutive
-                                    ? AppTheme.pastelPeriwinkle
-                                    : const Color(0xFFEEF1F8),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Text(
-                                member.displayRoleLabel,
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: member.isExecutive
-                                      ? AppTheme.primaryDark
-                                      : AppTheme.textMuted,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: member.status == MemberStatus.resting
-                                    ? AppTheme.pastelYellow
-                                    : AppTheme.pastelMint.withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Text(
-                                member.status == MemberStatus.resting
-                                    ? '휴면(${member.restingReason ?? "휴회"})'
-                                    : '${member.tier.label} · 활동',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
-                                  color: member.status == MemberStatus.resting
-                                      ? AppTheme.pastelYellowDark
-                                      : AppTheme.pastelMintDark,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // [월 회비 기준액]
-                SizedBox(
-                  width: baseFeeColWidth,
-                  child: Column(
+        // 2) [상단 고정 Pinning] 월별 수납 요약 행 (헤더 바로 아래에 배치되어 스크롤 없이 즉시 확인 가능)
+        Container(
+          key: const Key('pinned_monthly_summary_row'),
+          color: const Color(0xFFEDF2FB),
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Row(
+            children: [
+              SizedBox(
+                width: memberColWidth,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
                     children: [
-                      Text(
-                        FeeLedgerCalculator.formatWon(standardFee),
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w900,
-                          color: member.feePolicy == FeePolicyType.discounted
-                              ? AppTheme.pastelBlueDark
-                              : (standardFee == 0
-                                    ? AppTheme.textMuted
-                                    : AppTheme.textDark),
-                        ),
-                      ),
-                      const SizedBox(height: 1),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1,
+                          horizontal: 4,
+                          vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: member.feePolicy == FeePolicyType.discounted
-                              ? AppTheme.pastelBlue
-                              : (member.feePolicy == FeePolicyType.exempt ||
-                                        member.status == MemberStatus.resting
-                                    ? AppTheme.pastelPeriwinkle
-                                    : const Color(0xFFF2F4FA)),
-                          borderRadius: BorderRadius.circular(5),
+                          color: pagePalette.primary,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(
-                          policySubLabel,
+                        child: const Text(
+                          '고정',
                           style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: member.feePolicy == FeePolicyType.discounted
-                                ? AppTheme.pastelBlueDark
-                                : (member.feePolicy == FeePolicyType.exempt ||
-                                          member.status == MemberStatus.resting
-                                      ? AppTheme.primaryDark
-                                      : AppTheme.textMuted),
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Expanded(
+                        child: Text(
+                          '월별 수납 요약',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.primaryDark,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
-                  ),
-                ),
-
-                // [1월] ~ [12월] 납부 상태 셀
-                for (int m = 1; m <= 12; m++)
-                  _buildMonthStatusCell(
-                    context: context,
-                    club: club,
-                    member: member,
-                    month: m,
-                    width: monthColWidth,
-                    ledgerMap: ledgerMap,
-                    policy: policy,
-                    isReadOnly: isReadOnly,
-                  ),
-
-                // [연간 납부 합계 & 1년 일괄 완납 간편 액션]
-                SizedBox(
-                  width: totalColWidth,
-                  child: Column(
-                    children: [
-                      Text(
-                        FeeLedgerCalculator.formatWon(annualTotal),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.primaryDark,
-                        ),
-                      ),
-                      Text(
-                        '$paidMonths개월 완납',
-                        style: const TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                      if (!isReadOnly && paidMonths < 12) ...[
-                        const SizedBox(height: 3),
-                        InkWell(
-                          key: Key('annual_all_paid_btn_${member.id}'),
-                          borderRadius: BorderRadius.circular(6),
-                          onTap: () async {
-                            await ref
-                                .read(feeLedgerProvider.notifier)
-                                .markMemberPeriodAllPaid(
-                                  clubId: club.id,
-                                  year: _selectedYear,
-                                  member: member,
-                                  policy: policy,
-                                );
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: AppTheme.primaryDark,
-                                  content: Text(
-                                    '✅ ${member.name} 회원의 $_selectedYear년 1~12월 회비가 [1년 일괄 완납] 처리되었습니다.',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.pastelMint,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: AppTheme.pastelMintDark.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: const Text(
-                              '1년 일괄 완납',
-                              style: TextStyle(
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.pastelMintDark,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
-
-        // 3) 하단 월별 수납 합계 푸터 행
-        Container(
-          color: const Color(0xFFF3F4FB),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              const SizedBox(
-                width: memberColWidth,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(
-                    '월별 수납 요약',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.primaryDark,
-                    ),
                   ),
                 ),
               ),
@@ -1799,6 +1658,7 @@ class _MembershipFeeLedgerScreenState
                     return SizedBox(
                       width: monthColWidth,
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             '${mSum.paidCount}명 완납',
@@ -1824,6 +1684,7 @@ class _MembershipFeeLedgerScreenState
               SizedBox(
                 width: totalColWidth,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       FeeLedgerCalculator.formatWon(grandTotalAnnual),
@@ -1847,7 +1708,2596 @@ class _MembershipFeeLedgerScreenState
             ],
           ),
         ),
+        const Divider(height: 1, color: Color(0xFFD6DBED)),
+
+        // 3) 회원별 행 (일반 평면 목록 또는 그룹별 아코디언)
+        if (!_isGroupingEnabled)
+          ...members.asMap().entries.map((entry) {
+            return _buildMemberRow(
+              context: context,
+              club: club,
+              member: entry.value,
+              index: entry.key,
+              policy: policy,
+              ledgerMap: ledgerMap,
+              isReadOnly: isReadOnly,
+              memberColWidth: memberColWidth,
+              baseFeeColWidth: baseFeeColWidth,
+              monthColWidth: monthColWidth,
+              totalColWidth: totalColWidth,
+            );
+          })
+        else
+          ..._buildGroupedMatrixRows(
+            context: context,
+            club: club,
+            members: members,
+            policy: policy,
+            ledgerMap: ledgerMap,
+            isReadOnly: isReadOnly,
+            memberColWidth: memberColWidth,
+            baseFeeColWidth: baseFeeColWidth,
+            monthColWidth: monthColWidth,
+            totalColWidth: totalColWidth,
+            totalTableWidth:
+                memberColWidth + baseFeeColWidth + monthColWidth * 12 + totalColWidth,
+          ),
       ],
+    );
+  }
+
+  /// 개별 회원 행 렌더링 (회원명 탭 시 상세 팝업 호출 포함)
+  Widget _buildMemberRow({
+    required BuildContext context,
+    required Club club,
+    required Member member,
+    required int index,
+    required ClubFeePolicy policy,
+    required Map<String, MonthlyFeeRecord> ledgerMap,
+    required bool isReadOnly,
+    required double memberColWidth,
+    required double baseFeeColWidth,
+    required double monthColWidth,
+    required double totalColWidth,
+  }) {
+    final standardFee =
+        FeeLedgerCalculator.getMemberStandardMonthlyFee(member, policy);
+    final policySubLabel =
+        FeeLedgerCalculator.getMemberFeePolicySubLabel(member, policy);
+    final annualTotal = FeeLedgerCalculator.calculateMemberAnnualTotal(
+      ledgerMap: ledgerMap,
+      clubId: club.id,
+      year: _selectedYear,
+      member: member,
+      policy: policy,
+    );
+    final paidMonths = FeeLedgerCalculator.calculateMemberPaidMonthsCount(
+      ledgerMap: ledgerMap,
+      clubId: club.id,
+      year: _selectedYear,
+      member: member,
+      policy: policy,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: index.isEven ? Colors.white : const Color(0xFFFAFBFD),
+        border: const Border(
+          bottom: BorderSide(color: Color(0xFFECEFF8), width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          // [회원명 (직책/상태 뱃지)] - 탭 시 회원 상세 팝업 호출 (전화 걸기/문자 발송)
+          SizedBox(
+            width: memberColWidth,
+            child: InkWell(
+              key: Key('member_detail_trigger_${member.id}'),
+              onTap: () => _showMemberDetailPopup(context, ref, member),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            member.name,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.textDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: member.isExecutive
+                                ? AppTheme.pastelPeriwinkle
+                                : const Color(0xFFEEF1F8),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            member.displayRoleLabel,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: member.isExecutive
+                                  ? AppTheme.primaryDark
+                                  : AppTheme.textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: member.status == MemberStatus.resting
+                                ? AppTheme.pastelYellow
+                                : AppTheme.pastelMint.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            member.status == MemberStatus.resting
+                                ? '휴면(${member.restingReason ?? "휴회"})'
+                                : '${member.tier.label} · 활동',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: member.status == MemberStatus.resting
+                                  ? AppTheme.pastelYellowDark
+                                  : AppTheme.pastelMintDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // [월 회비 기준액]
+          SizedBox(
+            width: baseFeeColWidth,
+            child: Column(
+              children: [
+                Text(
+                  FeeLedgerCalculator.formatWon(standardFee),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                    color: member.feePolicy == FeePolicyType.discounted
+                        ? AppTheme.pastelBlueDark
+                        : (standardFee == 0
+                              ? AppTheme.textMuted
+                              : AppTheme.textDark),
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: member.feePolicy == FeePolicyType.discounted
+                        ? AppTheme.pastelBlue
+                        : (member.feePolicy == FeePolicyType.exempt ||
+                                  member.status == MemberStatus.resting
+                              ? AppTheme.pastelPeriwinkle
+                              : const Color(0xFFF2F4FA)),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(
+                    policySubLabel,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: member.feePolicy == FeePolicyType.discounted
+                          ? AppTheme.pastelBlueDark
+                          : (member.feePolicy == FeePolicyType.exempt ||
+                                    member.status == MemberStatus.resting
+                                ? AppTheme.primaryDark
+                                : AppTheme.textMuted),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // [1월] ~ [12월] 납부 상태 셀
+          for (int m = 1; m <= 12; m++)
+            _buildMonthStatusCell(
+              context: context,
+              club: club,
+              member: member,
+              month: m,
+              width: monthColWidth,
+              ledgerMap: ledgerMap,
+              policy: policy,
+              isReadOnly: isReadOnly,
+            ),
+
+          // [연간 납부 합계 & 1년 일괄 완납 간편 액션]
+          SizedBox(
+            width: totalColWidth,
+            child: Column(
+              children: [
+                Text(
+                  FeeLedgerCalculator.formatWon(annualTotal),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.primaryDark,
+                  ),
+                ),
+                Text(
+                  '$paidMonths개월 완납',
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                if (!isReadOnly && paidMonths < 12) ...[
+                  const SizedBox(height: 3),
+                  InkWell(
+                    key: Key('annual_all_paid_btn_${member.id}'),
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () async {
+                      await ref
+                          .read(feeLedgerProvider.notifier)
+                          .markMemberPeriodAllPaid(
+                            clubId: club.id,
+                            year: _selectedYear,
+                            member: member,
+                            policy: policy,
+                          );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: AppTheme.primaryDark,
+                            content: Text(
+                              '✅ ${member.name} 회원의 $_selectedYear년 1~12월 회비가 [1년 일괄 완납] 처리되었습니다.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.pastelMint,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppTheme.pastelMintDark.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: const Text(
+                        '1년 일괄 완납',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.pastelMintDark,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 회원 그룹화(Grouping) 아코디언 행 목록 빌더
+  List<Widget> _buildGroupedMatrixRows({
+    required BuildContext context,
+    required Club club,
+    required List<Member> members,
+    required ClubFeePolicy policy,
+    required Map<String, MonthlyFeeRecord> ledgerMap,
+    required bool isReadOnly,
+    required double memberColWidth,
+    required double baseFeeColWidth,
+    required double monthColWidth,
+    required double totalColWidth,
+    required double totalTableWidth,
+  }) {
+    // 5개 그룹 분리: '운영진 그룹', '가족회원 그룹', '일반 정회원', '준회원', '휴면·면제'
+    final execMembers = <Member>[];
+    final familyMembers = <Member>[];
+    final regularMembers = <Member>[];
+    final associateMembers = <Member>[];
+    final restingExemptMembers = <Member>[];
+
+    for (final m in members) {
+      if (m.isExecutive || m.role.isExecutive) {
+        execMembers.add(m);
+      } else if (m.status == MemberStatus.resting ||
+          m.feePolicy == FeePolicyType.exempt) {
+        restingExemptMembers.add(m);
+      } else if (FeeLedgerCalculator.isFamilyDiscountMember(m, policy)) {
+        familyMembers.add(m);
+      } else if (m.role == MemberRole.associate) {
+        associateMembers.add(m);
+      } else {
+        regularMembers.add(m);
+      }
+    }
+
+    final groups = [
+      (
+        key: 'exec',
+        title: '운영진 그룹',
+        icon: Icons.military_tech_rounded,
+        color: AppTheme.pastelPeriwinkleDark,
+        list: execMembers,
+      ),
+      (
+        key: 'family',
+        title: '가족회원 그룹',
+        icon: Icons.diversity_3_rounded,
+        color: AppTheme.pastelCoralDark,
+        list: familyMembers,
+      ),
+      (
+        key: 'regular',
+        title: '일반 정회원',
+        icon: Icons.person_rounded,
+        color: AppTheme.primaryDark,
+        list: regularMembers,
+      ),
+      (
+        key: 'associate',
+        title: '준회원',
+        icon: Icons.person_outline_rounded,
+        color: const Color(0xFF5E657E),
+        list: associateMembers,
+      ),
+      (
+        key: 'resting_exempt',
+        title: '휴면·면제',
+        icon: Icons.pause_circle_filled_rounded,
+        color: AppTheme.pastelYellowDark,
+        list: restingExemptMembers,
+      ),
+    ];
+
+    final widgets = <Widget>[];
+
+    for (final g in groups) {
+      if (g.list.isEmpty) continue;
+
+      final isCollapsed = _collapsedGroups.contains(g.key);
+      final groupPaidCount = g.list.where((m) {
+        final rec = FeeLedgerCalculator.resolveCellRecord(
+          ledgerMap: ledgerMap,
+          clubId: club.id,
+          year: _selectedYear,
+          month: _selectedMonth,
+          member: m,
+          policy: policy,
+        );
+        return rec.status == FeeStatus.paid;
+      }).length;
+
+      final groupAnnualTotal = g.list.fold<int>(
+        0,
+        (sum, m) =>
+            sum +
+            FeeLedgerCalculator.calculateMemberAnnualTotal(
+              ledgerMap: ledgerMap,
+              clubId: club.id,
+              year: _selectedYear,
+              member: m,
+              policy: policy,
+            ),
+      );
+
+      // 그룹 아코디언 헤더 행
+      widgets.add(
+        InkWell(
+          key: Key('group_header_${g.key}'),
+          onTap: () {
+            setState(() {
+              if (isCollapsed) {
+                _collapsedGroups.remove(g.key);
+              } else {
+                _collapsedGroups.add(g.key);
+              }
+            });
+          },
+          child: Container(
+            width: totalTableWidth,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F3F9),
+              border: Border(
+                top: const BorderSide(color: Color(0xFFD6DBED), width: 1),
+                bottom: BorderSide(
+                  color: isCollapsed
+                      ? const Color(0xFFD6DBED)
+                      : const Color(0xFFE2E6F2),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(g.icon, size: 15, color: g.color),
+                const SizedBox(width: 6),
+                Text(
+                  '${g.title} (${g.list.length}명)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: g.color,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: const Color(0xFFDCE0F0)),
+                  ),
+                  child: Text(
+                    '$_selectedMonth월 완납 $groupPaidCount명 · 연간 합계 ${FeeLedgerCalculator.formatWon(groupAnnualTotal)}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  isCollapsed
+                      ? Icons.expand_more_rounded
+                      : Icons.expand_less_rounded,
+                  size: 18,
+                  color: AppTheme.textMuted,
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      // 그룹 회원 목록 (접힌 상태가 아닐 때만 렌더링)
+      if (!isCollapsed) {
+        for (int i = 0; i < g.list.length; i++) {
+          widgets.add(
+            _buildMemberRow(
+              context: context,
+              club: club,
+              member: g.list[i],
+              index: i,
+              policy: policy,
+              ledgerMap: ledgerMap,
+              isReadOnly: isReadOnly,
+              memberColWidth: memberColWidth,
+              baseFeeColWidth: baseFeeColWidth,
+              monthColWidth: monthColWidth,
+              totalColWidth: totalColWidth,
+            ),
+          );
+        }
+      }
+    }
+
+    return widgets;
+  }
+
+  /// 1. 회원 카드 상세 정보 팝업 (전화 걸기 / 문자 발송 액션 포함)
+  void _showMemberDetailPopup(
+    BuildContext context,
+    WidgetRef ref,
+    Member member,
+  ) {
+    final hasPhone =
+        member.phoneNumber != null && member.phoneNumber!.trim().isNotEmpty;
+    final restingBadge = member.restingBadgeText;
+    final feePolicyBadge = member.feePolicyBadgeText;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: const EdgeInsets.fromLTRB(22, 20, 16, 8),
+        contentPadding: const EdgeInsets.fromLTRB(22, 8, 22, 16),
+        title: Row(
+          children: [
+            Container(
+              width: 10,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppTheme.getGenderAccentColor(member.gender),
+                borderRadius: BorderRadius.circular(5),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                member.name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textDark,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.getTierBgColor(member.tier),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                member.tier.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.getTierTextColor(member.tier),
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              icon: const Icon(
+                Icons.close_rounded,
+                size: 20,
+                color: AppTheme.textMuted,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.getGenderCardBg(member.gender),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppTheme.getGenderCardBorder(member.gender),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '구분: ${member.gender.label} · ${member.displayRoleLabel}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '연락처: ${hasPhone ? member.phoneNumber! : "연락처 미등록"}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                  if (restingBadge != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '활동 상태: $restingBadge${member.restingReason != null ? " (${member.restingReason})" : ""}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.pastelYellowDark,
+                      ),
+                    ),
+                  ],
+                  if (feePolicyBadge != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '회비 정책: $feePolicyBadge',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.pastelPeriwinkleDark,
+                      ),
+                    ),
+                  ],
+                  if (member.memo != null && member.memo!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '메모: ${member.memo!}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryMint,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.call_rounded, size: 17),
+                    label: const Text(
+                      '전화 걸기',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      _callMember(context, member);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryDark,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.sms_rounded, size: 17),
+                    label: const Text(
+                      '문자 보내기',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      _sendMemberSms(context, member);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 개별 회원 전화 걸기 (tel:)
+  Future<void> _callMember(BuildContext context, Member member) async {
+    final rawPhone = (member.phoneNumber ?? '').trim();
+    if (rawPhone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.pastelRoseDark,
+          content: Text('${member.name} 님의 등록된 전화번호가 없습니다.'),
+        ),
+      );
+      return;
+    }
+    final cleanPhone = rawPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final telUri = Uri.parse('tel:$cleanPhone');
+    try {
+      final launched =
+          await launchUrl(telUri, mode: LaunchMode.externalApplication);
+      if (!launched && context.mounted) {
+        await Clipboard.setData(ClipboardData(text: rawPhone));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${member.name} 님 번호($rawPhone)로 전화 연결을 시도했습니다.'),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: rawPhone));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${member.name} 님의 번호($rawPhone)를 복사했습니다.'),
+          ),
+        );
+      }
+    }
+  }
+
+  /// 개별 회원 문자 보내기 (sms:)
+  Future<void> _sendMemberSms(BuildContext context, Member member) async {
+    final rawPhone = (member.phoneNumber ?? '').trim();
+    if (rawPhone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.pastelRoseDark,
+          content: Text('${member.name} 님의 등록된 전화번호가 없습니다.'),
+        ),
+      );
+      return;
+    }
+    final cleanPhone = rawPhone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final smsUri = Uri.parse('sms:$cleanPhone');
+    try {
+      final launched =
+          await launchUrl(smsUri, mode: LaunchMode.externalApplication);
+      if (!launched && context.mounted) {
+        await Clipboard.setData(ClipboardData(text: rawPhone));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${member.name} 님 번호($rawPhone)로 문자 앱 연결을 요청했습니다.'),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: rawPhone));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${member.name} 님의 번호($rawPhone)를 복사했습니다.'),
+          ),
+        );
+      }
+    }
+  }
+
+  /// 상단 서브 탭 선택 바 ([📊 연간 월회비 장부] vs [🧾 행사비/모임비 출납부])
+  Widget _buildSubTabSelector() {
+    final palette = AppTheme.getPagePalette(4);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+      child: Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F2FA),
+          borderRadius: BorderRadius.circular(11),
+        ),
+        padding: const EdgeInsets.all(3),
+        child: Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                key: const Key('subtab_annual_fee_ledger'),
+                onTap: () => setState(() => _activeSubTab = 0),
+                borderRadius: BorderRadius.circular(9),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: _activeSubTab == 0 ? Colors.white : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9),
+                    boxShadow: _activeSubTab == 0
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.table_chart_rounded,
+                        size: 14,
+                        color: _activeSubTab == 0
+                            ? palette.primary
+                            : AppTheme.textMuted,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        '연간 월회비 장부',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: _activeSubTab == 0
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                          color: _activeSubTab == 0
+                              ? palette.primary
+                              : AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: InkWell(
+                key: const Key('subtab_event_expense_ledger'),
+                onTap: () => setState(() => _activeSubTab = 1),
+                borderRadius: BorderRadius.circular(9),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: _activeSubTab == 1 ? Colors.white : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9),
+                    boxShadow: _activeSubTab == 1
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.receipt_long_rounded,
+                        size: 14,
+                        color: _activeSubTab == 1
+                            ? palette.primary
+                            : AppTheme.textMuted,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        '행사비/모임비 출납부',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: _activeSubTab == 1
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                          color: _activeSubTab == 1
+                              ? palette.primary
+                              : AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 2. [PRO 장부] 행사비/모임비 금전출납부 탭 뷰
+  Widget _buildEventExpenseLedgerView({
+    required BuildContext context,
+    required Club club,
+    required List<Member> members,
+  }) {
+    final pagePalette = AppTheme.getPagePalette(4);
+    final events = ref.watch(currentClubEventsProvider);
+
+    if (_selectedEventId == null ||
+        !events.any((e) => e.id == _selectedEventId)) {
+      _selectedEventId = events.isNotEmpty ? events.first.id : null;
+    }
+    final currentEvent =
+        events.where((e) => e.id == _selectedEventId).firstOrNull;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1) 행사 선택 및 상단 등록/연동 바
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE4E7F4)),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.event_note_rounded,
+                    size: 17,
+                    color: pagePalette.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      '행사비 / 모임비 정산 선택',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                  ),
+                  // [+ 새 행사 등록] 버튼
+                  InkWell(
+                    key: const Key('create_club_event_button'),
+                    onTap: () => _showCreateEventDialog(context, club),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryDark,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_rounded, size: 13, color: Colors.white),
+                          SizedBox(width: 2),
+                          Text(
+                            '새 행사 등록',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  // [📥 출석부 모임 불러오기] 버튼
+                  InkWell(
+                    key: const Key('import_session_event_button'),
+                    onTap: () =>
+                        _showImportFromSessionDialog(context, club, members),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: pagePalette.softTint,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: pagePalette.borderTint),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.download_rounded,
+                            size: 13,
+                            color: pagePalette.primary,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '출석부 불러오기',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              color: pagePalette.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (events.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: events.map((ev) {
+                      final isSel = ev.id == _selectedEventId;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          key: Key('event_chip_${ev.id}'),
+                          selected: isSel,
+                          label: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (ev.linkedSessionId != null) ...[
+                                const Icon(Icons.link_rounded, size: 12),
+                                const SizedBox(width: 3),
+                              ],
+                              Text(ev.title),
+                              const SizedBox(width: 4),
+                              Text(
+                                ev.eventDate,
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  color: isSel
+                                      ? Colors.white70
+                                      : AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          selectedColor: pagePalette.primary,
+                          backgroundColor: const Color(0xFFF0F2FA),
+                          labelStyle: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight:
+                                isSel ? FontWeight.w900 : FontWeight.w700,
+                            color: isSel ? Colors.white : AppTheme.textDark,
+                          ),
+                          side: BorderSide(
+                            color: isSel
+                                ? pagePalette.primary
+                                : const Color(0xFFE2E6F2),
+                          ),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() => _selectedEventId = ev.id);
+                            }
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        if (currentEvent == null)
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE4E7F4)),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.receipt_long_outlined,
+                  size: 40,
+                  color: AppTheme.textMuted,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  '등록된 행사비/모임비 출납부가 없습니다.',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.textDark,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '새 행사를 직접 등록하거나, 일반 모드 [출석부]에서 진행한 모임 데이터를\n원클릭으로 불러와 수입/지출 및 영수증을 스마트하게 정산해 보세요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppTheme.textMuted,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryDark,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text(
+                        '새 행사 직접 등록',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
+                      ),
+                      onPressed: () => _showCreateEventDialog(context, club),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: pagePalette.primary,
+                        side: BorderSide(color: pagePalette.borderTint),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                      ),
+                      icon: const Icon(Icons.download_rounded, size: 16),
+                      label: const Text(
+                        '출석부 모임 불러오기',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
+                      ),
+                      onPressed: () =>
+                          _showImportFromSessionDialog(context, club, members),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          )
+        else ...[
+          // 2) 행사 정산 요약 카드 (총 수입, 총 지출, 최종 잔액)
+          _buildEventSummaryCard(context, club, currentEvent),
+          const SizedBox(height: 10),
+
+          // 3) 수입/지출 상세 명세 목록 카드
+          _buildEventTransactionListCard(context, club, currentEvent),
+        ],
+      ],
+    );
+  }
+
+  /// 행사 정산 재정 요약 카드
+  Widget _buildEventSummaryCard(
+    BuildContext context,
+    Club club,
+    ClubEvent event,
+  ) {
+    final pagePalette = AppTheme.getPagePalette(4);
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE4E7F4)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            event.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.textDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (event.linkedSessionId != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.pastelMint,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: AppTheme.pastelMintDark
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.link_rounded,
+                                  size: 10,
+                                  color: AppTheme.pastelMintDark,
+                                ),
+                                SizedBox(width: 2),
+                                Text(
+                                  '출석부 연동',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.pastelMintDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '일자: ${event.eventDate}${event.memo != null && event.memo!.isNotEmpty ? " · ${event.memo}" : ""}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  size: 18,
+                  color: Colors.red,
+                ),
+                tooltip: '행사 삭제',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _confirmDeleteEvent(context, event),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 3-Metric Boxes
+          Row(
+            children: [
+              // 총 수입
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.pastelMint.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color:
+                          AppTheme.pastelMintDark.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        '총 수입',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.pastelMintDark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '+${FeeLedgerCalculator.formatWon(event.totalIncome)}',
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.pastelMintDark,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${event.incomeCount}건',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: AppTheme.textMuted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // 총 지출
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.pastelRose.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color:
+                          AppTheme.pastelRoseDark.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        '총 지출',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.pastelRoseDark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '-${FeeLedgerCalculator.formatWon(event.totalExpense)}',
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.pastelRoseDark,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${event.expenseCount}건',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: AppTheme.textMuted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // 최종 잔액
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: event.balance >= 0
+                        ? AppTheme.pastelPeriwinkle.withValues(alpha: 0.5)
+                        : AppTheme.pastelCoral.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: event.balance >= 0
+                          ? AppTheme.primaryDark.withValues(alpha: 0.3)
+                          : Colors.red.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '최종 잔액',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: event.balance >= 0
+                              ? AppTheme.primaryDark
+                              : Colors.red.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '${event.balance >= 0 ? "+" : ""}${FeeLedgerCalculator.formatWon(event.balance)}',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w900,
+                            color: event.balance >= 0
+                                ? AppTheme.primaryDark
+                                : Colors.red.shade700,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        event.balance >= 0 ? '정산 흑자' : '정산 적자',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: event.balance >= 0
+                              ? AppTheme.primaryDark
+                              : Colors.red.shade700,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Action Buttons: [+ 내역 추가] and [📊 엑셀 다운로드 (CSV)]
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  key: const Key('add_event_expense_item_btn'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryDark,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_circle_outline_rounded, size: 15),
+                  label: const Text(
+                    '수입/지출 내역 추가',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                  ),
+                  onPressed: () =>
+                      _showAddEditExpenseItemDialog(context, event),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                key: const Key('export_event_expense_csv_btn'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: pagePalette.primary,
+                  side: BorderSide(color: pagePalette.borderTint),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: const Icon(Icons.file_download_outlined, size: 15),
+                label: const Text(
+                  '엑셀 다운로드 (CSV)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                ),
+                onPressed: () => _exportEventCsv(context, club, event),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 행사 수입/지출 내역 목록 카드
+  Widget _buildEventTransactionListCard(
+    BuildContext context,
+    Club club,
+    ClubEvent event,
+  ) {
+    final filteredItems = event.items.where((i) {
+      if (_eventFilterType == 'income') return i.isIncome;
+      if (_eventFilterType == 'expense') return !i.isIncome;
+      return true;
+    }).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE4E7F4)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Filter bar
+          Row(
+            children: [
+              const Text(
+                '입출금 상세 내역',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textDark,
+                ),
+              ),
+              const Spacer(),
+              // Filter chips: 전체, 수입, 지출
+              Wrap(
+                spacing: 4,
+                children: [
+                  _buildSmallFilterChip('전체', 'all', event.items.length),
+                  _buildSmallFilterChip('수입', 'income', event.incomeCount),
+                  _buildSmallFilterChip('지출', 'expense', event.expenseCount),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 16, color: Color(0xFFECEFF8)),
+          if (filteredItems.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  '기록된 수입/지출 내역이 없습니다.\n[+ 수입/지출 내역 추가]를 눌러 첫 내역을 기록해 보세요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textMuted,
+                    fontWeight: FontWeight.w700,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filteredItems.length,
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, color: Color(0xFFF1F3F8)),
+              itemBuilder: (ctx, idx) {
+                final item = filteredItems[idx];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      // Type Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: item.isIncome
+                              ? AppTheme.pastelMint
+                              : AppTheme.pastelRose,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          item.isIncome ? '수입' : '지출',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: item.isIncome
+                                ? AppTheme.pastelMintDark
+                                : AppTheme.pastelRoseDark,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Title, Date, Memo
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.title,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.textDark,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Text(
+                                  item.date,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                ),
+                                if (item.memo != null &&
+                                    item.memo!.isNotEmpty) ...[
+                                  const Text(
+                                    ' · ',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      item.memo!,
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        color: AppTheme.textMuted,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Amount
+                      Text(
+                        '${item.isIncome ? "+" : "-"}${FeeLedgerCalculator.formatWon(item.amount)}',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w900,
+                          color: item.isIncome
+                              ? AppTheme.pastelMintDark
+                              : AppTheme.pastelRoseDark,
+                        ),
+                      ),
+                      // Receipt icon button (if has receipt)
+                      if (item.hasReceipt) ...[
+                        const SizedBox(width: 4),
+                        IconButton(
+                          key: Key('receipt_btn_${item.id}'),
+                          tooltip: '영수증 증빙 보기',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(
+                            Icons.receipt_long_rounded,
+                            size: 18,
+                            color: AppTheme.pastelPeriwinkleDark,
+                          ),
+                          onPressed: () =>
+                              _showReceiptPreviewDialog(context, item),
+                        ),
+                      ],
+                      // Edit / Delete popup
+                      PopupMenuButton<String>(
+                        icon: const Icon(
+                          Icons.more_vert,
+                          size: 16,
+                          color: AppTheme.textMuted,
+                        ),
+                        padding: EdgeInsets.zero,
+                        onSelected: (val) {
+                          if (val == 'edit') {
+                            _showAddEditExpenseItemDialog(
+                              context,
+                              event,
+                              existingItem: item,
+                            );
+                          } else if (val == 'delete') {
+                            ref
+                                .read(clubEventsProvider.notifier)
+                                .deleteItem(event.id, item.id);
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text(
+                              '수정',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Text(
+                              '삭제',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmallFilterChip(String label, String type, int count) {
+    final isSel = _eventFilterType == type;
+    return InkWell(
+      key: Key('event_filter_$type'),
+      onTap: () => setState(() => _eventFilterType = type),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSel ? AppTheme.primaryDark : const Color(0xFFF1F3F9),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          '$label $count',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            color: isSel ? Colors.white : AppTheme.textDark,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// [+ 새 행사 직접 등록] 다이얼로그
+  void _showCreateEventDialog(BuildContext context, Club club) {
+    final titleCtrl = TextEditingController();
+    final now = DateTime.now();
+    final todayStr =
+        '${now.year}.${now.month.toString().padLeft(2, '0')}.${now.day.toString().padLeft(2, '0')}';
+    final dateCtrl = TextEditingController(text: todayStr);
+    final memoCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.event_available_rounded, color: AppTheme.primaryDark),
+            SizedBox(width: 8),
+            Text(
+              '새 행사/모임 출납부 생성',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: titleCtrl,
+              decoration: const InputDecoration(
+                labelText: '행사/모임 명칭 *',
+                hintText: '예: 10월 정기모임 정산, 가을 교류전',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: dateCtrl,
+              decoration: const InputDecoration(
+                labelText: '행사 일자 (YYYY.MM.DD) *',
+                hintText: '2026.09.28',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: memoCtrl,
+              decoration: const InputDecoration(
+                labelText: '행사 메모 (선택)',
+                hintText: '장소, 참석 대상 등',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('취소', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final title = titleCtrl.text.trim();
+              final date = dateCtrl.text.trim();
+              if (title.isEmpty || date.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('행사명과 일자를 모두 입력해 주세요.')),
+                );
+                return;
+              }
+              final newEvent = ref
+                  .read(clubEventsProvider.notifier)
+                  .createEvent(
+                    clubId: club.id,
+                    title: title,
+                    eventDate: date,
+                    memo: memoCtrl.text.trim(),
+                  );
+              Navigator.pop(dialogCtx);
+              setState(() => _selectedEventId = newEvent.id);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: AppTheme.primaryDark,
+                  content: Text('✅ "$title" 출납부가 생성되었습니다.'),
+                ),
+              );
+            },
+            child: const Text('생성 완료'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// [📥 출석부 모임 불러오기] 다이얼로그 (일반 모드 출석부 데이터 원클릭 연동)
+  void _showImportFromSessionDialog(
+    BuildContext context,
+    Club club,
+    List<Member> members,
+  ) {
+    final ongoing = ref.read(currentClubOngoingSessionsProvider);
+    final archived = ref.read(currentClubArchivedSessionsProvider);
+    final allSessions = [...ongoing, ...archived];
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.download_rounded, color: AppTheme.primaryDark),
+            SizedBox(width: 8),
+            Text(
+              '출석부 모임 데이터 불러오기',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: allSessions.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      '불러올 수 있는 출석부 모임 기록이 없습니다.\n[출석부]에서 모임을 먼저 생성해 보세요.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.textMuted),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: allSessions.length,
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, color: Color(0xFFF1F3F8)),
+                  itemBuilder: (ctx, idx) {
+                    final session = allSessions[idx];
+                    final collected = session.calculatePaidFee(members);
+                    final count = session.attendees.length;
+
+                    return ListTile(
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      title: Text(
+                        session.displayTitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${session.sessionDate} · 참석자 $count명 · 수납액 ${FeeLedgerCalculator.formatWon(collected)}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      trailing: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryMint,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          minimumSize: Size.zero,
+                        ),
+                        onPressed: () {
+                          final imported = ref
+                              .read(clubEventsProvider.notifier)
+                              .importFromSession(
+                                session: session,
+                                members: members,
+                              );
+                          Navigator.pop(dialogCtx);
+                          setState(() => _selectedEventId = imported.id);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: AppTheme.primaryDark,
+                              content: Text(
+                                '✅ "${imported.title}" 모임 데이터가 출납부로 연동 생성되었습니다.',
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          '가져오기',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 수입/지출 내역 추가 및 수정 다이얼로그 (영수증 증빙 사진 첨부 포함)
+  void _showAddEditExpenseItemDialog(
+    BuildContext context,
+    ClubEvent event, {
+    EventExpenseItem? existingItem,
+  }) {
+    bool isIncome = existingItem?.isIncome ?? false;
+    final titleCtrl = TextEditingController(text: existingItem?.title ?? '');
+    final amountCtrl = TextEditingController(
+      text: existingItem != null ? existingItem.amount.toString() : '',
+    );
+    final dateCtrl =
+        TextEditingController(text: existingItem?.date ?? event.eventDate);
+    final memoCtrl = TextEditingController(text: existingItem?.memo ?? '');
+    String? receiptBase64 = existingItem?.receiptBase64;
+    String? receiptFileName = existingItem?.receiptFileName;
+
+    final incomePresets = ['참가비 수납', '클럽 찬조금', '기부금', '기타 수입'];
+    final expensePresets = [
+      '코트 대관료',
+      '셔틀콕 구매',
+      '음료/간식비',
+      '뒤풀이 식대',
+      '시상 상품',
+      '기타 지출',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final presets = isIncome ? incomePresets : expensePresets;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  isIncome
+                      ? Icons.arrow_circle_up_rounded
+                      : Icons.arrow_circle_down_rounded,
+                  color: isIncome ? AppTheme.pastelMintDark : AppTheme.pastelRoseDark,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  existingItem == null ? '수입/지출 내역 등록' : '내역 수정',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 수입 vs 지출 선택 토글
+                  Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F3F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.all(3),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setDialogState(() => isIncome = true),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isIncome
+                                    ? AppTheme.primaryMint
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '수입 (+)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: isIncome
+                                      ? Colors.white
+                                      : AppTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setDialogState(() => isIncome = false),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: !isIncome
+                                    ? AppTheme.pastelRoseDark
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '지출 (-)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: !isIncome
+                                      ? Colors.white
+                                      : AppTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 빠른 항목명 프리셋
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: presets.map((p) {
+                      return InkWell(
+                        onTap: () => setDialogState(() => titleCtrl.text = p),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F4FA),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFDCE0F0)),
+                          ),
+                          child: Text(
+                            p,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textDark,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '항목명 *',
+                      hintText: '예: 코트 대관료, 셔틀콕 구매',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: '금액 (원) *',
+                      hintText: '숫자만 입력 (예: 50000)',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // 빠른 금액 버튼 (+1만, +3만, +5만, +10만)
+                  Row(
+                    children: [10000, 30000, 50000, 100000].map((amt) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: InkWell(
+                          onTap: () {
+                            final cur = int.tryParse(amountCtrl.text) ?? 0;
+                            amountCtrl.text = (cur + amt).toString();
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDF2FB),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '+${amt ~/ 10000}만',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.primaryDark,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: dateCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '일자 *',
+                      hintText: 'YYYY.MM.DD',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: memoCtrl,
+                    decoration: const InputDecoration(
+                      labelText: '메모 (선택)',
+                      hintText: '상세 내역',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 영수증 증빙 사진 첨부
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFAFBFD),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E6F2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.receipt_long_rounded,
+                              size: 16,
+                              color: AppTheme.primaryDark,
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              '영수증 증빙 사진 첨부',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (receiptBase64 != null)
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                ),
+                                onPressed: () {
+                                  setDialogState(() {
+                                    receiptBase64 = null;
+                                    receiptFileName = null;
+                                  });
+                                },
+                                child: const Text(
+                                  '삭제',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        if (receiptBase64 != null) ...[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(
+                              base64Decode(receiptBase64!),
+                              height: 90,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            receiptFileName ?? '영수증 첨부됨',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ] else
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.primaryDark,
+                              side: const BorderSide(color: Color(0xFFD6DBED)),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 10,
+                              ),
+                            ),
+                            icon: const Icon(Icons.add_a_photo_outlined, size: 15),
+                            label: const Text(
+                              '영수증 사진 / 파일 선택',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                            ),
+                            onPressed: () async {
+                              final res = await FilePicker.pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: [
+                                  'jpg',
+                                  'jpeg',
+                                  'png',
+                                  'webp',
+                                  'gif',
+                                ],
+                              );
+                              if (res.isNotEmpty) {
+                                final f = res.first;
+                                final bytes = await f.xFile.readAsBytes();
+                                setDialogState(() {
+                                  receiptFileName = f.name;
+                                  receiptBase64 = base64Encode(bytes);
+                                });
+                              }
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('취소', style: TextStyle(color: AppTheme.textMuted)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryDark,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  final title = titleCtrl.text.trim();
+                  final amount = int.tryParse(amountCtrl.text.trim()) ?? 0;
+                  final date = dateCtrl.text.trim();
+                  if (title.isEmpty || amount <= 0 || date.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('항목명, 0원 이상의 금액, 일자를 올바르게 입력해 주세요.'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (existingItem == null) {
+                    final newItem = EventExpenseItem(
+                      id: 'item_${DateTime.now().millisecondsSinceEpoch}',
+                      eventId: event.id,
+                      title: title,
+                      amount: amount,
+                      isIncome: isIncome,
+                      date: date,
+                      memo: memoCtrl.text.trim(),
+                      receiptBase64: receiptBase64,
+                      receiptFileName: receiptFileName,
+                      createdAt: DateTime.now(),
+                    );
+                    ref
+                        .read(clubEventsProvider.notifier)
+                        .addItem(event.id, newItem);
+                  } else {
+                    final updatedItem = existingItem.copyWith(
+                      title: title,
+                      amount: amount,
+                      isIncome: isIncome,
+                      date: date,
+                      memo: memoCtrl.text.trim(),
+                      receiptBase64: receiptBase64,
+                      receiptFileName: receiptFileName,
+                    );
+                    ref
+                        .read(clubEventsProvider.notifier)
+                        .updateItem(event.id, updatedItem);
+                  }
+
+                  Navigator.pop(dialogCtx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppTheme.primaryDark,
+                      content: Text('✅ "$title" 내역이 저장되었습니다.'),
+                    ),
+                  );
+                },
+                child: const Text('저장'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// 영수증 증빙 원본 미리보기 팝업
+  void _showReceiptPreviewDialog(BuildContext context, EventExpenseItem item) {
+    if (item.receiptBase64 == null) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryDark),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '영수증 증빙: ${item.title}',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${item.date} · ${item.isIncome ? "수입" : "지출"} ${FeeLedgerCalculator.formatWon(item.amount)}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textMuted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(
+                base64Decode(item.receiptBase64!),
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 행사비 출납부 정산 내역 CSV/Excel(UTF-8 BOM) 다운로드
+  Future<void> _exportEventCsv(
+    BuildContext context,
+    Club club,
+    ClubEvent event,
+  ) async {
+    final fileName =
+        '${club.clubName}_${event.title.replaceAll(" ", "_")}_정산_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
+    final csvString = EventExpenseCalculator.buildEventCsvString(event);
+    final csvBytes =
+        Uint8List.fromList(EventExpenseCalculator.buildEventCsvBytes(event));
+    final previewLines = csvString.split('\n').take(6).join('\n');
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.table_view_rounded, color: AppTheme.primaryDark, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '${event.title} 정산 내역 다운로드',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '행사 수입/지출 명세서 및 최종 정산 내역이 엑셀(CSV, UTF-8 BOM)로 다운로드됩니다.',
+              style: TextStyle(fontSize: 12, color: AppTheme.textDark, height: 1.4),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F8FC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E6F2)),
+              ),
+              child: Text(
+                previewLines,
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  fontFamily: 'monospace',
+                  color: Color(0xFF4A5568),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('닫기', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('클립보드 복사'),
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              await Clipboard.setData(ClipboardData(text: csvString));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('정산 내역이 클립보드에 복사되었습니다.')),
+                );
+              }
+            },
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(Icons.download_rounded, size: 16),
+            label: const Text('CSV 다운로드 / 공유'),
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              try {
+                final savedPath = await FilePicker.saveFile(
+                  dialogTitle: fileName,
+                  fileName: fileName,
+                  type: FileType.custom,
+                  allowedExtensions: ['csv'],
+                  bytes: csvBytes,
+                );
+                if (savedPath != null && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppTheme.primaryDark,
+                      content: Text('✅ $fileName 저장 완료'),
+                    ),
+                  );
+                  return;
+                }
+              } catch (_) {}
+
+              try {
+                final xFile = XFile.fromData(
+                  csvBytes,
+                  name: fileName,
+                  mimeType: 'text/csv;charset=utf-8',
+                );
+                await SharePlus.instance.share(
+                  ShareParams(
+                    files: [xFile],
+                    fileNameOverrides: [fileName],
+                    subject: '$fileName 정산 내역',
+                  ),
+                );
+              } catch (_) {
+                await Clipboard.setData(ClipboardData(text: csvString));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('클립보드에 정산 내역 CSV가 복사되었습니다.'),
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 행사 삭제 확인 다이얼로그
+  void _confirmDeleteEvent(BuildContext context, ClubEvent event) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('행사 출납부 삭제'),
+        content: Text('정말 "${event.title}" 행사 정산 출납부를 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              ref.read(clubEventsProvider.notifier).deleteEvent(event.id);
+              Navigator.pop(dialogCtx);
+              setState(() => _selectedEventId = null);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('"${event.title}" 행사가 삭제되었습니다.')),
+              );
+            },
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
     );
   }
 

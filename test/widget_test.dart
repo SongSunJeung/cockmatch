@@ -831,4 +831,68 @@ void main() {
     expect(title2TopLeft, equals(title1TopLeft));
     expect(dot2TopLeft, equals(dot1TopLeft));
   });
+
+  testWidgets('[월회비 관리 PRO] 상단 고정 월별 수납 요약 행, 회원 상세 팝업 연동, 그룹화 보기 토글, 행사비/모임비 출납부 탭 검증', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: CockMatchApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 드로어를 열어 [월회비 관리 🔒] 클릭 -> PRO 활성화 후 진입
+    await tester.tap(find.byTooltip('메뉴 열기').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('월회비 관리 🔒'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('activate_pro_and_open_fee_ledger_button')));
+    await tester.pumpAndSettle();
+
+    // 1. 상단 서브탭([연간 월회비 장부] / [행사비/모임비 출납부]) 및 상단 고정된 '월별 수납 요약' 행 확인
+    expect(find.byKey(const Key('subtab_annual_fee_ledger')), findsOneWidget);
+    expect(find.byKey(const Key('subtab_event_expense_ledger')), findsOneWidget);
+    final pinnedSummaryFinder = find.byKey(const Key('pinned_monthly_summary_row'));
+    expect(pinnedSummaryFinder, findsOneWidget);
+    expect(find.text('월별 수납 요약'), findsOneWidget);
+
+    // 2. 좌측 회원명 터치 시 '회원 상세 카드' 팝업 및 전화/문자 버튼 노출 확인
+    final memberTrigger = find.byKey(const Key('member_detail_trigger_m06')); // 강호동
+    await tester.ensureVisible(memberTrigger);
+    await tester.pumpAndSettle();
+    // 상단 고정 행이 첫 번째 회원 행보다 위(작은 y좌표)에 위치하는지 확인
+    expect(
+      tester.getTopLeft(pinnedSummaryFinder).dy,
+      lessThan(tester.getTopLeft(memberTrigger).dy),
+    );
+
+    await tester.tap(memberTrigger);
+    await tester.pumpAndSettle();
+    expect(find.text('전화 걸기'), findsOneWidget);
+    expect(find.text('문자 보내기'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded).first);
+    await tester.pumpAndSettle();
+
+    // 3. [그룹화 보기 ⌵] 토글 클릭 시 그룹별 섹션 헤더(운영진/가족회원/일반 정회원/휴면·면제) 노출 확인
+    final groupToggleBtn = find.byKey(const Key('toggle_fee_matrix_grouping_button'));
+    expect(groupToggleBtn, findsOneWidget);
+    await tester.ensureVisible(groupToggleBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(groupToggleBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('group_header_exec')), findsOneWidget);
+    expect(find.byKey(const Key('group_header_family')), findsOneWidget);
+    expect(find.byKey(const Key('group_header_regular')), findsOneWidget);
+    expect(find.byKey(const Key('group_header_resting_exempt')), findsOneWidget);
+
+    // 4. [행사비/모임비 출납부] 탭 전환 시 행사 목록, 출석부 불러오기, 수입/지출 내역 및 엑셀 다운로드 버튼 노출 확인
+    await tester.tap(find.byKey(const Key('subtab_event_expense_ledger')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('create_club_event_button')), findsOneWidget);
+    expect(find.byKey(const Key('import_session_event_button')), findsOneWidget);
+    expect(find.byKey(const Key('export_event_expense_csv_btn')), findsOneWidget);
+    expect(find.byKey(const Key('add_event_expense_item_btn')), findsOneWidget);
+    expect(find.textContaining('2026년 가을 친선 교류전 및 정산'), findsWidgets);
+  });
 }

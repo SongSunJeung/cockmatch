@@ -8,4 +8,5 @@ export 'match.dart';
 export 'player_standing.dart';
 export 'session_preferences.dart';
 export 'fee_ledger.dart';
+export 'event_expense.dart';
 
