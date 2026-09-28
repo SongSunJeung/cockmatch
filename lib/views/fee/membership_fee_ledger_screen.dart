@@ -41,8 +41,10 @@ class _MembershipFeeLedgerScreenState
   int _selectedYear = 2026;
   int _selectedMonth = 9; // 기준 월 (기본 9월)
   FeeLedgerFilter _selectedFilter = FeeLedgerFilter.all;
-  bool _isRulesAccordionExpanded = false;
+  bool _isPolicyExpanded = false; // 기본 접힌 상태(Collapsed)
+  bool _isRulesAccordionExpanded = false; // 기본 접힌 상태(Collapsed)
   bool _isEditingRules = false;
+  bool _sortByNameAsc = true; // 기본: 이름 가나다순 오름차순 (false면 등록순)
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _rulesController = TextEditingController();
@@ -63,7 +65,7 @@ class _MembershipFeeLedgerScreenState
   }) {
     final regularMembers = clubMembers.where((m) => !m.isGuest).toList();
 
-    return regularMembers.where((member) {
+    final filtered = regularMembers.where((member) {
       // 1. 검색어 필터
       if (_searchQuery.trim().isNotEmpty) {
         final matchedName = KoreanSearchUtil.matches(member.name, _searchQuery);
@@ -91,8 +93,15 @@ class _MembershipFeeLedgerScreenState
           return currentMonthRec.status == FeeStatus.exempt ||
               member.status == MemberStatus.resting ||
               member.feePolicy == FeePolicyType.exempt;
+        case FeeLedgerFilter.familyDiscount:
+          return FeeLedgerCalculator.isFamilyDiscountMember(member, policy);
       }
     }).toList();
+
+    if (_sortByNameAsc) {
+      filtered.sort((a, b) => a.name.compareTo(b.name));
+    }
+    return filtered;
   }
 
   @override
@@ -115,6 +124,14 @@ class _MembershipFeeLedgerScreenState
       policy: policy,
     );
 
+    final familyDiscountCount = clubMembers
+        .where(
+          (m) =>
+              !m.isGuest &&
+              FeeLedgerCalculator.isFamilyDiscountMember(m, policy),
+        )
+        .length;
+
     final filteredMembers = _filterMembers(
       clubMembers: clubMembers,
       ledgerMap: ledgerMap,
@@ -128,31 +145,34 @@ class _MembershipFeeLedgerScreenState
         bottom: true,
         child: CustomScrollView(
           slivers: [
-            // 0. 상단 앱바 영역
+            // 0. 상단 슬림 앱바 영역 ([내보내기 📤] & [실시간 웹뷰어] 포함)
             SliverToBoxAdapter(
-              child: _buildTopHeaderBar(context, currentClub, policy),
-            ),
-
-            // 1. 클럽 기본 회비 정책 및 계좌 정보 헤더 (총무 수정 가능)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
-                child: _buildFeePolicyHeaderCard(context, currentClub, policy),
+              child: _buildTopHeaderBar(
+                context: context,
+                currentClub: currentClub,
+                members: clubMembers,
+                ledgerMap: ledgerMap,
+                policy: policy,
+                summary: monthlySummary,
               ),
             ),
 
-            // 2. [📜 클럽 회비 회칙 & 메모란] (접이식 아코디언 카드)
+            // 1 & 2. 슬림 아코디언 바: [⚙️ 정책 및 계좌 설정 열기 ⌵] + [📜 클럽 회비 회칙 & 메모란 ⌵]
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 2, 14, 6),
-                child: _buildRulesAccordionCard(context, currentClub, policy),
+                padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
+                child: _buildCompactPolicyAndRulesSection(
+                  context,
+                  currentClub,
+                  policy,
+                ),
               ),
             ),
 
-            // 3. 상단 대시보드 통계 & 액션 툴바
+            // 3 & 4. 통합 슬림 대시보드 ([통계 요약 칩] + 조회 필터 칩 + 검색창)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 2, 14, 6),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
                 child: _buildDashboardAndToolbarCard(
                   context: context,
                   club: currentClub,
@@ -160,26 +180,15 @@ class _MembershipFeeLedgerScreenState
                   ledgerMap: ledgerMap,
                   policy: policy,
                   summary: monthlySummary,
+                  familyDiscountCount: familyDiscountCount,
                 ),
               ),
             ),
 
-            // 4. 조회 필터 칩 ([전체 보기], [당월 미납자만 보기], [휴면/면제 회원만 보기]) & 검색 바
+            // 5. 연간 월별 회비 매트릭스 테이블 (페이지 진입 시 통계 요약 칩 바로 아래에 즉시 노출)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 2, 14, 8),
-                child: _buildFilterAndSearchBar(
-                  totalCount: clubMembers.where((m) => !m.isGuest).length,
-                  unpaidCount: monthlySummary.unpaidCount,
-                  exemptCount: monthlySummary.exemptCount,
-                ),
-              ),
-            ),
-
-            // 5. 연간 월별 회비 매트릭스 테이블 (Table View)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                 child: _buildAnnualMatrixTableCard(
                   context: context,
                   club: currentClub,
@@ -197,14 +206,17 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// 0. 상단 타이틀 및 실시간 웹뷰어 미리보기 헤더
-  Widget _buildTopHeaderBar(
-    BuildContext context,
-    Club currentClub,
-    ClubFeePolicy policy,
-  ) {
+  /// 0. 상단 타이틀 및 [내보내기 📤] / [실시간 웹뷰어] 헤더
+  Widget _buildTopHeaderBar({
+    required BuildContext context,
+    required Club currentClub,
+    required List<Member> members,
+    required Map<String, MonthlyFeeRecord> ledgerMap,
+    required ClubFeePolicy policy,
+    required MonthlyFeeSummary summary,
+  }) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
       child: Row(
         children: [
           IconButton(
@@ -214,70 +226,86 @@ class _MembershipFeeLedgerScreenState
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
             icon: const Icon(
               Icons.menu_rounded,
               color: AppTheme.textDark,
-              size: 22,
+              size: 20,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        '연간/월별 회비 납부 현황표',
-                        style: const TextStyle(
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.textDark,
-                          letterSpacing: -0.3,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                Flexible(
+                  child: Text(
+                    '연간/월별 회비 납부 현황표',
+                    style: const TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textDark,
+                      letterSpacing: -0.3,
                     ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppTheme.primaryDark, AppTheme.primaryMint],
-                        ),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Text(
-                        'PRO 장부',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  '${currentClub.clubName} · 회원 프로필(할인/면제/휴면) 자동 연동',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textMuted,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 5),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1.5,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.primaryDark, AppTheme.primaryMint],
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'PRO 장부',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
+          // 상단 우측 [내보내기 📤] 액션 메뉴 버튼 (바텀시트 오픈)
+          OutlinedButton(
+            key: const Key('fee_export_menu_button'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.primaryDark,
+              backgroundColor: AppTheme.pastelPeriwinkle.withValues(alpha: 0.7),
+              side: BorderSide(
+                color: AppTheme.primaryDark.withValues(alpha: 0.28),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(9),
+              ),
+            ),
+            onPressed: () => _showExportActionsBottomSheet(
+              context: context,
+              club: currentClub,
+              members: members,
+              ledgerMap: ledgerMap,
+              policy: policy,
+              summary: summary,
+            ),
+            child: const Text(
+              '내보내기 📤',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+            ),
+          ),
+          const SizedBox(width: 5),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
               foregroundColor: AppTheme.primaryDark,
@@ -285,17 +313,17 @@ class _MembershipFeeLedgerScreenState
               side: BorderSide(
                 color: AppTheme.primaryDark.withValues(alpha: 0.35),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(9),
               ),
             ),
-            icon: const Icon(Icons.visibility_outlined, size: 15),
+            icon: const Icon(Icons.visibility_outlined, size: 13.5),
             label: const Text(
               '실시간 웹뷰어',
-              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
             ),
             onPressed: () {
               Navigator.of(context).push(
@@ -314,51 +342,301 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// 1. 클럽 기본 회비 정책 및 계좌 정보 헤더 (총무 수정 가능)
+  /// 상단 우측 [내보내기 📤] 클릭 시 열리는 공유 & 내보내기 바텀시트 메뉴
+  void _showExportActionsBottomSheet({
+    required BuildContext context,
+    required Club club,
+    required List<Member> members,
+    required Map<String, MonthlyFeeRecord> ledgerMap,
+    required ClubFeePolicy policy,
+    required MonthlyFeeSummary summary,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          bottom: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD9DDF0),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Text('📤', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text(
+                        '공유 & 내보내기 툴바',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.textDark,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.pop(sheetCtx),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildActionToolbarButton(
+                      label: '📢 당월 미납자 알림 문구 복사',
+                      bgColor: AppTheme.pastelCoral,
+                      fgColor: AppTheme.pastelCoralDark,
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _showKakaoUnpaidMessageDialog(
+                          context: context,
+                          club: club,
+                          summary: summary,
+                          policy: policy,
+                        );
+                      },
+                    ),
+                    _buildActionToolbarButton(
+                      label: '📸 장부 이미지 내보내기',
+                      bgColor: AppTheme.primaryDark,
+                      fgColor: Colors.white,
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _showBandImageExportModal(
+                          context: context,
+                          club: club,
+                          members: members,
+                          ledgerMap: ledgerMap,
+                          policy: policy,
+                          summary: summary,
+                        );
+                      },
+                    ),
+                    _buildActionToolbarButton(
+                      label: '🔗 실시간 회비 웹뷰어 링크 복사',
+                      bgColor: AppTheme.pastelBlue,
+                      fgColor: AppTheme.pastelBlueDark,
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _copyWebViewerLinkAndShowPreview(
+                          context: context,
+                          club: club,
+                        );
+                      },
+                    ),
+                    _buildActionToolbarButton(
+                      label: '📊 엑셀 다운로드',
+                      bgColor: AppTheme.pastelMint,
+                      fgColor: AppTheme.pastelMintDark,
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _showExcelExportDialog(
+                          context: context,
+                          club: club,
+                          members: members,
+                          ledgerMap: ledgerMap,
+                          policy: policy,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 1 & 2. 슬림 아코디언 바: [⚙️ 정책 및 계좌 설정 열기 ⌵] + [📜 클럽 회비 회칙 & 메모란]
+  Widget _buildCompactPolicyAndRulesSection(
+    BuildContext context,
+    Club currentClub,
+    ClubFeePolicy policy,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            // [⚙️ 정책 및 계좌 설정 열기 ⌵] 토글 버튼 (기본 Collapsed)
+            Expanded(
+              flex: 6,
+              child: InkWell(
+                key: const Key('toggle_fee_policy_button'),
+                onTap: () {
+                  setState(() => _isPolicyExpanded = !_isPolicyExpanded);
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _isPolicyExpanded
+                        ? AppTheme.pastelPeriwinkle
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _isPolicyExpanded
+                          ? AppTheme.primaryDark.withValues(alpha: 0.4)
+                          : const Color(0xFFE4E7F4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _isPolicyExpanded
+                              ? '⚙️ 정책 및 계좌 설정 접기 ⌃'
+                              : '⚙️ 정책 및 계좌 설정 열기 ⌵',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.primaryDark,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${policy.formattedDefaultFee}·${policy.formattedDueDay}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // [📜 클럽 회비 회칙 & 메모란] 토글 버튼 (기본 Collapsed)
+            Expanded(
+              flex: 5,
+              child: InkWell(
+                key: const Key('toggle_fee_rules_button'),
+                onTap: () {
+                  setState(
+                    () =>
+                        _isRulesAccordionExpanded = !_isRulesAccordionExpanded,
+                  );
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _isRulesAccordionExpanded
+                        ? AppTheme.pastelPeriwinkle
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _isRulesAccordionExpanded
+                          ? AppTheme.primaryDark.withValues(alpha: 0.4)
+                          : const Color(0xFFE4E7F4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text('📜', style: TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
+                      const Expanded(
+                        child: Text(
+                          '클럽 회비 회칙 & 메모란',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.textDark,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        _isRulesAccordionExpanded ? '접기 ⌃' : '⌵',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.primaryDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_isPolicyExpanded) ...[
+          const SizedBox(height: 4),
+          _buildFeePolicyHeaderCard(context, currentClub, policy),
+        ],
+        if (_isRulesAccordionExpanded) ...[
+          const SizedBox(height: 4),
+          _buildRulesAccordionCard(context, currentClub, policy),
+        ],
+      ],
+    );
+  }
+
+  /// 1. 클럽 기본 회비 정책 및 계좌 정보 상세 패널 (펼쳤을 때 노출)
   Widget _buildFeePolicyHeaderCard(
     BuildContext context,
     Club currentClub,
     ClubFeePolicy policy,
   ) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppTheme.primaryDark.withValues(alpha: 0.16),
+          color: AppTheme.primaryDark.withValues(alpha: 0.2),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryDark.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppTheme.pastelPeriwinkle,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  size: 16,
-                  color: AppTheme.primaryDark,
-                ),
+              const Icon(
+                Icons.account_balance_wallet_rounded,
+                size: 15,
+                color: AppTheme.primaryDark,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               const Expanded(
                 child: Text(
                   '클럽 기본 회비 정책 & 입금 계좌 설정',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w900,
                     color: AppTheme.textDark,
                   ),
@@ -367,28 +645,32 @@ class _MembershipFeeLedgerScreenState
               TextButton.icon(
                 style: TextButton.styleFrom(
                   foregroundColor: AppTheme.primaryDark,
-                  backgroundColor: AppTheme.pastelPeriwinkle.withValues(alpha: 0.65),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  backgroundColor:
+                      AppTheme.pastelPeriwinkle.withValues(alpha: 0.65),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                icon: const Icon(Icons.edit_rounded, size: 13.5),
+                icon: const Icon(Icons.edit_rounded, size: 13),
                 label: const Text(
                   '정책/계좌 수정',
-                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
                 ),
                 onPressed: () =>
                     _showEditFeePolicyDialog(context, currentClub, policy),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
-            runSpacing: 8,
+            runSpacing: 6,
             children: [
               _buildPolicyMetricChip(
                 icon: Icons.payments_outlined,
@@ -408,44 +690,31 @@ class _MembershipFeeLedgerScreenState
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: AppTheme.background,
-              borderRadius: BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0xFFE4E7F4)),
             ),
             child: Row(
               children: [
                 const Icon(
                   Icons.account_balance_rounded,
-                  size: 15,
+                  size: 14,
                   color: AppTheme.pastelBlueDark,
                 ),
-                const SizedBox(width: 7),
+                const SizedBox(width: 6),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '회비 입금 계좌 (독려 문구 및 공유 카드 자동 포함)',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        '${policy.bankName} ${policy.accountNumber} · 예금주: ${policy.accountHolder}',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.textDark,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    '${policy.bankName} ${policy.accountNumber} · 예금주: ${policy.accountHolder}',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textDark,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 InkWell(
@@ -462,35 +731,24 @@ class _MembershipFeeLedgerScreenState
                       );
                     }
                   },
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
+                      horizontal: 7,
+                      vertical: 4,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: const Color(0xFFD9DDF0)),
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.copy_rounded,
-                          size: 12.5,
-                          color: AppTheme.primaryDark,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          '계좌 복사',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.primaryDark,
-                          ),
-                        ),
-                      ],
+                    child: const Text(
+                      '계좌 복사',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.primaryDark,
+                      ),
                     ),
                   ),
                 ),
@@ -511,49 +769,140 @@ class _MembershipFeeLedgerScreenState
     required Color accentColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: accentColor),
-          const SizedBox(width: 7),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textMuted,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    '($subNote)',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w700,
-                      color: accentColor,
-                    ),
-                  ),
-                ],
+          Icon(icon, size: 14, color: accentColor),
+          const SizedBox(width: 5),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textMuted,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: accentColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 2. [📜 클럽 회비 회칙 & 메모란] 상세 패널 (펼쳤을 때 노출)
+  Widget _buildRulesAccordionCard(
+    BuildContext context,
+    Club currentClub,
+    ClubFeePolicy policy,
+  ) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.primaryDark.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _rulesController,
+            maxLines: 4,
+            onChanged: (_) {
+              if (!_isEditingRules) {
+                setState(() => _isEditingRules = true);
+              }
+            },
+            style: const TextStyle(
+              fontSize: 11.5,
+              color: AppTheme.textDark,
+              height: 1.4,
+            ),
+            decoration: InputDecoration(
+              hintText:
+                  '가족 할인 기준, 휴면(휴회) 규정, 임원 면제 기준, 미납 제재 등 클럽 회칙과 총무 메모를 입력하세요.',
+              filled: true,
+              fillColor: AppTheme.background,
+              contentPadding: const EdgeInsets.all(10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFDCE0F0)),
               ),
-              const SizedBox(height: 1),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w900,
-                  color: accentColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _rulesController.text = ClubFeePolicy.defaultRulesText;
+                    _isEditingRules = true;
+                  });
+                },
+                child: const Text(
+                  '표준 회칙 예시 불러오기',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textMuted,
+                  ),
                 ),
+              ),
+              const SizedBox(width: 6),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryDark,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                icon: const Icon(Icons.save_rounded, size: 14),
+                label: const Text(
+                  '회칙/메모 영구 저장',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                onPressed: () async {
+                  final text = _rulesController.text.trim();
+                  await ref
+                      .read(clubFeePoliciesProvider.notifier)
+                      .updateRulesAndMemo(currentClub.id, text);
+                  setState(() => _isEditingRules = false);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        backgroundColor: AppTheme.primaryDark,
+                        content: Text(
+                          '클럽 회비 회칙 및 메모가 영구 저장되었습니다.',
+                        ),
+                      ),
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -562,202 +911,7 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// 2. [📜 클럽 회비 회칙 & 메모란] (접이식 아코디언 카드)
-  Widget _buildRulesAccordionCard(
-    BuildContext context,
-    Club currentClub,
-    ClubFeePolicy policy,
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _isRulesAccordionExpanded
-              ? AppTheme.primaryDark.withValues(alpha: 0.35)
-              : const Color(0xFFE4E7F4),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isRulesAccordionExpanded = !_isRulesAccordionExpanded;
-              });
-            },
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              child: Row(
-                children: [
-                  const Text('📜', style: TextStyle(fontSize: 15)),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '클럽 회비 회칙 & 메모란',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.textDark,
-                          ),
-                        ),
-                        Text(
-                          '가족 할인 기준, 휴면 규정, 미납 제재 등 클럽 규칙 작성 및 영구 보관',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3.5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.pastelPeriwinkle,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _isRulesAccordionExpanded ? '접기' : '펼치기',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.primaryDark,
-                          ),
-                        ),
-                        const SizedBox(width: 2),
-                        Icon(
-                          _isRulesAccordionExpanded
-                              ? Icons.keyboard_arrow_up_rounded
-                              : Icons.keyboard_arrow_down_rounded,
-                          size: 16,
-                          color: AppTheme.primaryDark,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_isRulesAccordionExpanded) ...[
-            const Divider(height: 1, color: Color(0xFFECEFF8)),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _rulesController,
-                    maxLines: 5,
-                    onChanged: (_) {
-                      if (!_isEditingRules) {
-                        setState(() => _isEditingRules = true);
-                      }
-                    },
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textDark,
-                      height: 1.45,
-                    ),
-                    decoration: InputDecoration(
-                      hintText:
-                          '가족 할인 기준, 휴면(휴회) 규정, 임원 면제 기준, 미납 제재 등 클럽 회칙과 총무 메모를 입력하세요.',
-                      filled: true,
-                      fillColor: AppTheme.background,
-                      contentPadding: const EdgeInsets.all(12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFDCE0F0)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _rulesController.text =
-                                ClubFeePolicy.defaultRulesText;
-                            _isEditingRules = true;
-                          });
-                        },
-                        child: const Text(
-                          '표준 회칙 예시 불러오기',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textMuted,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryDark,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        icon: const Icon(Icons.save_rounded, size: 15),
-                        label: const Text(
-                          '회칙/메모 영구 저장',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        onPressed: () async {
-                          final text = _rulesController.text.trim();
-                          await ref
-                              .read(clubFeePoliciesProvider.notifier)
-                              .updateRulesAndMemo(currentClub.id, text);
-                          setState(() => _isEditingRules = false);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                backgroundColor: AppTheme.primaryDark,
-                                content: Text(
-                                  '클럽 회비 회칙 및 메모가 영구 저장되었습니다.',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// 3. 상단 대시보드 통계 & 공유/내보내기 액션 툴바
+  /// 3 & 4. 통합 슬림 대시보드 ([통계 요약 칩] + 회원 상태 필터 칩 + 검색창)
   Widget _buildDashboardAndToolbarCard({
     required BuildContext context,
     required Club club,
@@ -765,41 +919,39 @@ class _MembershipFeeLedgerScreenState
     required Map<String, MonthlyFeeRecord> ledgerMap,
     required ClubFeePolicy policy,
     required MonthlyFeeSummary summary,
+    required int familyDiscountCount,
   }) {
     final ratePercent = summary.collectionRate.toStringAsFixed(1);
+    final totalRegularCount = members.where((m) => !m.isGuest).length;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE4E7F4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // [연도 선택] 드롭다운 + [기준 월 선택] 드롭다운 + 일괄 완납 버튼
+          // 1행: [연도 선택] + [기준 월 선택] + [당월 수납률 및 수납액/미납액 요약] + [일괄 완납]
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 6,
+            runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             alignment: WrapAlignment.spaceBetween,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 연도 선택 드롭다운
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 2,
+                      horizontal: 8,
+                      vertical: 1,
                     ),
                     decoration: BoxDecoration(
                       color: AppTheme.pastelPeriwinkle,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppTheme.primaryDark.withValues(alpha: 0.25),
-                      ),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<int>(
@@ -807,10 +959,11 @@ class _MembershipFeeLedgerScreenState
                         isDense: true,
                         icon: const Icon(
                           Icons.arrow_drop_down_rounded,
+                          size: 16,
                           color: AppTheme.primaryDark,
                         ),
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w900,
                           color: AppTheme.primaryDark,
                         ),
@@ -828,19 +981,15 @@ class _MembershipFeeLedgerScreenState
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // 당월(기준월) 선택 드롭다운
+                  const SizedBox(width: 5),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 2,
+                      horizontal: 8,
+                      vertical: 1,
                     ),
                     decoration: BoxDecoration(
                       color: AppTheme.pastelBlue,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppTheme.pastelBlueDark.withValues(alpha: 0.25),
-                      ),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<int>(
@@ -848,10 +997,11 @@ class _MembershipFeeLedgerScreenState
                         isDense: true,
                         icon: const Icon(
                           Icons.arrow_drop_down_rounded,
+                          size: 16,
                           color: AppTheme.pastelBlueDark,
                         ),
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w900,
                           color: AppTheme.pastelBlueDark,
                         ),
@@ -869,62 +1019,86 @@ class _MembershipFeeLedgerScreenState
                       ),
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '총 납부율 $ratePercent%',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.primaryDark,
+                    ),
+                  ),
                 ],
               ),
-              if (summary.unpaidCount > 0)
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppTheme.pastelMintDark,
-                    backgroundColor: AppTheme.pastelMint,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  icon: const Icon(Icons.done_all_rounded, size: 14),
-                  label: Text(
-                    '$_selectedMonth월 미납 ${summary.unpaidCount}명 일괄 완납',
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '당월 수납액 ${summary.formattedCollectedAmount} · 당월 미납액 ${summary.formattedUnpaidAmount}',
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w800,
+                      color: AppTheme.textDark,
                     ),
                   ),
-                  onPressed: () async {
-                    final todayStr = DateFormat('yyyy.MM.dd').format(
-                      DateTime.now(),
-                    );
-                    final count = await ref
-                        .read(feeLedgerProvider.notifier)
-                        .markMonthAllPaid(
-                          clubId: club.id,
-                          year: _selectedYear,
-                          month: _selectedMonth,
-                          members: members,
-                          policy: policy,
-                          paidDate: todayStr,
-                        );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: AppTheme.pastelMintDark,
-                          content: Text(
-                            '$_selectedYear년 $_selectedMonth월 미납 회원 $count명이 일괄 완납 처리되었습니다.',
-                          ),
+                  if (summary.unpaidCount > 0) ...[
+                    const SizedBox(width: 6),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.pastelMintDark,
+                        backgroundColor: AppTheme.pastelMint,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
                         ),
-                      );
-                    }
-                  },
-                ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      icon: const Icon(Icons.done_all_rounded, size: 12),
+                      label: Text(
+                        '$_selectedMonth월 미납 ${summary.unpaidCount}명 일괄 완납',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      onPressed: () async {
+                        final todayStr = DateFormat('yyyy.MM.dd').format(
+                          DateTime.now(),
+                        );
+                        final count = await ref
+                            .read(feeLedgerProvider.notifier)
+                            .markMonthAllPaid(
+                              clubId: club.id,
+                              year: _selectedYear,
+                              month: _selectedMonth,
+                              members: members,
+                              policy: policy,
+                              paidDate: todayStr,
+                            );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: AppTheme.pastelMintDark,
+                              content: Text(
+                                '$_selectedYear년 $_selectedMonth월 미납 회원 $count명이 일괄 완납 처리되었습니다.',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
 
-          // 이번 달 수납 요약 카드 ([완납 N명], [미납 N명], [면제/휴면 N명], [당월 수납률 및 총 수납액])
+          // 2행: [통계 요약 칩] (1줄 슬림 배치)
           Row(
             children: [
               Expanded(
@@ -939,7 +1113,7 @@ class _MembershipFeeLedgerScreenState
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               Expanded(
                 child: _buildSummaryStatBox(
                   title: '미납',
@@ -952,7 +1126,7 @@ class _MembershipFeeLedgerScreenState
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               Expanded(
                 child: _buildSummaryStatBox(
                   title: '면제/휴면',
@@ -967,138 +1141,14 @@ class _MembershipFeeLedgerScreenState
               ),
             ],
           ),
-          const SizedBox(height: 8),
-
-          // [당월 수납률 및 총 수납액] 바
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.primaryDark.withValues(alpha: 0.08),
-                  AppTheme.pastelBlue.withValues(alpha: 0.45),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppTheme.primaryDark.withValues(alpha: 0.18),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.pie_chart_rounded,
-                          size: 15,
-                          color: AppTheme.primaryDark,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          '총 납부율 $ratePercent% ($_selectedMonth월)',
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.primaryDark,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      '당월 수납액 ${summary.formattedCollectedAmount} · 당월 미납액 ${summary.formattedUnpaidAmount}',
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.textDark,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: (summary.collectionRate / 100.0).clamp(0.0, 1.0),
-                    minHeight: 7,
-                    backgroundColor: Colors.white,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppTheme.primaryDark,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // 상단 공유 & 내보내기 버튼 바 (핵심 액션)
-          const Text(
-            '공유 & 내보내기 툴바',
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textMuted,
-            ),
-          ),
           const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildActionToolbarButton(
-                label: '📢 당월 미납자 알림 문구 복사',
-                bgColor: AppTheme.pastelCoral,
-                fgColor: AppTheme.pastelCoralDark,
-                onTap: () => _showKakaoUnpaidMessageDialog(
-                  context: context,
-                  club: club,
-                  summary: summary,
-                  policy: policy,
-                ),
-              ),
-              _buildActionToolbarButton(
-                label: '📸 장부 이미지 내보내기',
-                bgColor: AppTheme.primaryDark,
-                fgColor: Colors.white,
-                onTap: () => _showBandImageExportModal(
-                  context: context,
-                  club: club,
-                  members: members,
-                  ledgerMap: ledgerMap,
-                  policy: policy,
-                  summary: summary,
-                ),
-              ),
-              _buildActionToolbarButton(
-                label: '🔗 실시간 회비 웹뷰어 링크 복사',
-                bgColor: AppTheme.pastelBlue,
-                fgColor: AppTheme.pastelBlueDark,
-                onTap: () => _copyWebViewerLinkAndShowPreview(
-                  context: context,
-                  club: club,
-                ),
-              ),
-              _buildActionToolbarButton(
-                label: '📊 엑셀 다운로드',
-                bgColor: AppTheme.pastelMint,
-                fgColor: AppTheme.pastelMintDark,
-                onTap: () => _showExcelExportDialog(
-                  context: context,
-                  club: club,
-                  members: members,
-                  ledgerMap: ledgerMap,
-                  policy: policy,
-                ),
-              ),
-            ],
+
+          // 3행: 회원 상태 필터 탭 ([전체], [당월 미납자], [휴면·면제], [👨‍👩‍👧 가족할인 회원]) & 초성 검색
+          _buildFilterAndSearchBar(
+            totalCount: totalRegularCount,
+            unpaidCount: summary.unpaidCount,
+            exemptCount: summary.exemptCount,
+            familyDiscountCount: familyDiscountCount,
           ),
         ],
       ),
@@ -1115,36 +1165,25 @@ class _MembershipFeeLedgerScreenState
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(9),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 6),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(9),
         ),
-        child: Column(
-          children: [
-            Text(
-              '$emoji $title',
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '$emoji $countText',
               style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-                color: textColor.withValues(alpha: 0.85),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w900,
+                color: textColor,
               ),
             ),
-            const SizedBox(height: 2),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                countText,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: textColor,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1177,11 +1216,12 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// 4. 조회 필터 칩 ([전체 보기], [당월 미납자만 보기], [휴면/면제 회원만 보기]) & 검색창
+  /// 4. 조회 필터 칩 ([전체], [당월 미납자], [휴면·면제], [👨‍👩‍👧 가족할인 회원]) & 검색창
   Widget _buildFilterAndSearchBar({
     required int totalCount,
     required int unpaidCount,
     required int exemptCount,
+    required int familyDiscountCount,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1192,46 +1232,55 @@ class _MembershipFeeLedgerScreenState
             children: [
               _buildFilterChipItem(
                 filter: FeeLedgerFilter.all,
-                label: '전체 보기 ($totalCount명)',
+                label: '전체 ($totalCount명)',
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               _buildFilterChipItem(
                 filter: FeeLedgerFilter.currentMonthUnpaid,
-                label: '당월 미납자만 보기 ($unpaidCount명)',
+                label: '당월 미납자 ($unpaidCount명)',
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               _buildFilterChipItem(
                 filter: FeeLedgerFilter.exemptOrResting,
-                label: '휴면/면제 회원만 보기 ($exemptCount명)',
+                label: '휴면·면제 ($exemptCount명)',
+              ),
+              const SizedBox(width: 5),
+              _buildFilterChipItem(
+                filter: FeeLedgerFilter.familyDiscount,
+                label: '👨‍👩‍👧 가족할인 회원 ($familyDiscountCount명)',
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _searchController,
-          onChanged: (val) => setState(() => _searchQuery = val),
-          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-          decoration: InputDecoration(
-            hintText: '회원 이름 또는 직책(회장/총무 등) 초성 검색...',
-            prefixIcon: const Icon(
-              Icons.search_rounded,
-              size: 18,
-              color: AppTheme.textMuted,
-            ),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear_rounded, size: 16),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = '');
-                    },
-                  )
-                : null,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 9,
+        const SizedBox(height: 5),
+        SizedBox(
+          height: 34,
+          child: TextField(
+            controller: _searchController,
+            onChanged: (val) => setState(() => _searchQuery = val),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            decoration: InputDecoration(
+              hintText: '회원 이름 또는 직책(회장/총무 등) 초성 검색...',
+              prefixIcon: const Icon(
+                Icons.search_rounded,
+                size: 16,
+                color: AppTheme.textMuted,
+              ),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.clear_rounded, size: 15),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
             ),
           ),
         ),
@@ -1248,14 +1297,17 @@ class _MembershipFeeLedgerScreenState
       label: Text(label),
       selected: isSelected,
       selectedColor: AppTheme.primaryDark,
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.background,
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
       labelStyle: TextStyle(
-        fontSize: 11.5,
+        fontSize: 11,
         fontWeight: FontWeight.w800,
         color: isSelected ? Colors.white : AppTheme.textDark,
       ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         side: BorderSide(
           color: isSelected ? AppTheme.primaryDark : const Color(0xFFDCE0F0),
         ),
@@ -1279,39 +1331,81 @@ class _MembershipFeeLedgerScreenState
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE4E7F4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 테이블 안내 헤더
+          // 테이블 안내 헤더 + [가나다순 / 등록순 정렬] 토글 옵션
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+            padding: const EdgeInsets.fromLTRB(12, 9, 12, 7),
             child: Row(
               children: [
                 const Icon(
                   Icons.table_chart_rounded,
-                  size: 17,
+                  size: 16,
                   color: AppTheme.primaryDark,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 5),
                 Expanded(
                   child: Text(
                     '$_selectedYear년 월별 회비 매트릭스 (${members.length}명)',
                     style: const TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.w900,
                       color: AppTheme.textDark,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(
-                  isReadOnly ? '셀 터치 시 납부 상세 조회' : '셀 터치 시 상태/입금일/메모 변경',
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.primaryDark,
+                const SizedBox(width: 6),
+                // [가나다순 / 등록순 정렬] 토글 버튼 (기본: 이름 가나다순 오름차순)
+                InkWell(
+                  key: const Key('toggle_fee_matrix_sort_button'),
+                  onTap: () {
+                    setState(() => _sortByNameAsc = !_sortByNameAsc);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.pastelPeriwinkle,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppTheme.primaryDark.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.swap_vert_rounded,
+                          size: 13,
+                          color: AppTheme.primaryDark,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          _sortByNameAsc ? '가나다순 정렬' : '등록순 정렬',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.primaryDark,
+                          ),
+                        ),
+                        Text(
+                          _sortByNameAsc ? ' (등록순 전환)' : ' (가나다순 전환)',
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -3373,8 +3467,11 @@ class _FeeStatusWebViewerScreenState
           return rec.status == FeeStatus.exempt ||
               member.status == MemberStatus.resting ||
               member.feePolicy == FeePolicyType.exempt;
+        case FeeLedgerFilter.familyDiscount:
+          return FeeLedgerCalculator.isFamilyDiscountMember(member, policy);
       }
-    }).toList();
+    }).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
 
     return Scaffold(
       backgroundColor: AppTheme.background,

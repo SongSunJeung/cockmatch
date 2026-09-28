@@ -607,27 +607,54 @@ void main() {
     await tester.tap(find.byKey(const Key('activate_pro_and_open_fee_ledger_button')));
     await tester.pumpAndSettle();
 
-    // [Part 2] 연간/월별 회비 납부 현황표 핵심 UI 검증
+    // [Part 2] 연간/월별 회비 납부 현황표 핵심 UI 검증 (상단 아코디언 기본 접힘 & 슬림화)
     expect(find.text('연간/월별 회비 납부 현황표'), findsOneWidget);
+    expect(find.text('⚙️ 정책 및 계좌 설정 열기 ⌵'), findsOneWidget);
+    expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsNothing);
+
+    // [⚙️ 정책 및 계좌 설정 열기 ⌵] 클릭 시 정책 및 계좌 카드 펼침 확인
+    await tester.tap(find.byKey(const Key('toggle_fee_policy_button')));
+    await tester.pumpAndSettle();
     expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsOneWidget);
     expect(find.text('30,000원'), findsWidgets);
     expect(find.text('매월 25일'), findsOneWidget);
+    // 다시 접기
+    await tester.tap(find.byKey(const Key('toggle_fee_policy_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsNothing);
 
     // [📜 클럽 회비 회칙 & 메모란] 아코디언 펼치기 및 접기 확인
     expect(find.text('클럽 회비 회칙 & 메모란'), findsOneWidget);
-    await tester.tap(find.text('클럽 회비 회칙 & 메모란'));
+    await tester.tap(find.byKey(const Key('toggle_fee_rules_button')));
     await tester.pumpAndSettle();
     expect(find.text('회칙/메모 영구 저장'), findsOneWidget);
-    await tester.tap(find.text('클럽 회비 회칙 & 메모란'));
+    await tester.tap(find.byKey(const Key('toggle_fee_rules_button')));
     await tester.pumpAndSettle();
 
-    // 상단 대시보드 통계(당월 수납액 · 당월 미납액) 및 액션 툴바 버튼 확인
+    // 상단 대시보드 통계(당월 수납액 · 당월 미납액), [👨‍👩‍👧 가족할인 회원] 필터, [가나다순 / 등록순 정렬] 토글 확인
     expect(find.textContaining('당월 수납액'), findsOneWidget);
     expect(find.textContaining('당월 미납액'), findsOneWidget);
+    expect(find.textContaining('👨‍👩‍👧 가족할인 회원'), findsOneWidget);
+    expect(find.byKey(const Key('toggle_fee_matrix_sort_button')), findsOneWidget);
+    expect(find.text('가나다순 정렬'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('toggle_fee_matrix_sort_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('등록순 정렬'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('toggle_fee_matrix_sort_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('가나다순 정렬'), findsOneWidget);
+
+    // 상단 우측 [내보내기 📤] 액션 메뉴 클릭 시 4대 내보내기 바텀시트 노출 확인
+    expect(find.byKey(const Key('fee_export_menu_button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('fee_export_menu_button')));
+    await tester.pumpAndSettle();
     expect(find.text('📢 당월 미납자 알림 문구 복사'), findsOneWidget);
     expect(find.text('📸 장부 이미지 내보내기'), findsOneWidget);
     expect(find.text('🔗 실시간 회비 웹뷰어 링크 복사'), findsOneWidget);
     expect(find.text('📊 엑셀 다운로드'), findsOneWidget);
+    // 바텀시트 닫기
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
 
     // [실시간 웹뷰어] 진입 시 읽기 전용 뷰어 및 하단 배너 광고 슬롯 노출 확인
     await tester.tap(find.text('실시간 웹뷰어'));

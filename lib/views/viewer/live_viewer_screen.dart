@@ -708,7 +708,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
         .toList();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -890,10 +890,10 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
         (match.isFinished || !isLiveScoreboard) && (match.scoreB > match.scoreA);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isHighlighted
               ? AppTheme.primaryMint
@@ -911,23 +911,23 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryDark,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(9),
                     ),
                     child: Text(
                       '코트 ${match.courtNumber}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
-                        fontSize: 13,
+                        fontSize: 12.5,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
                     decoration: BoxDecoration(
                       color: AppTheme.surfaceGrey,
                       borderRadius: BorderRadius.circular(8),
@@ -936,7 +936,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                       '${match.round}R',
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
-                        fontSize: 12,
+                        fontSize: 11.5,
                         color: AppTheme.textDark,
                       ),
                     ),
@@ -946,20 +946,20 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
               _buildStatusBadge(match.status),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 11),
 
-          // 중단: TEAM A vs 대형 점수판 vs TEAM B
+          // 중단: TEAM A vs 대형 점수판 vs TEAM B (3~4글자 이상 한국인 이름 온전 노출)
           Row(
             children: [
               // TEAM A 영역
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
                   decoration: BoxDecoration(
                     color: isTeamAWinner
                         ? AppTheme.pastelMint.withValues(alpha: 0.55)
                         : AppTheme.surfaceGrey,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isTeamAWinner ? AppTheme.primaryMint : Colors.transparent,
                       width: 1.5,
@@ -973,18 +973,18 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                           const Text(
                             'TEAM A',
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: 10,
                               fontWeight: FontWeight.w800,
                               color: AppTheme.textMuted,
                             ),
                           ),
                           if (isTeamAWinner) ...[
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                             _buildWinBadge(),
                           ],
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       ...List.generate(match.teamA.length, (idx) {
                         final id = match.teamA[idx];
                         final member = teamAMembers[idx];
@@ -996,20 +996,25 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Row(
                             children: [
-                              Flexible(
-                                child: Text(
-                                  name,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    color: isPlayerSearched
-                                        ? AppTheme.primaryMint
-                                        : AppTheme.textDark,
+                              Expanded(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    name,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.3,
+                                      color: isPlayerSearched
+                                          ? AppTheme.primaryMint
+                                          : AppTheme.textDark,
+                                    ),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 5),
+                              const SizedBox(width: 4),
                               _buildTierMiniBadge(tier),
                             ],
                           ),
@@ -1020,34 +1025,37 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                 ),
               ),
 
-              // 중앙 대형 점수판 (큰 폰트 직관적 스코어)
+              // 중앙 대형 점수판 (컴팩트 여백 + 큰 폰트 스코어)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryDark,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
                     children: [
-                      Text(
-                        '${match.scoreA} : ${match.scoreB}',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '${match.scoreA} : ${match.scoreB}',
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         isLiveScoreboard ? 'LIVE SCORE' : 'FINAL',
                         style: TextStyle(
-                          fontSize: 9,
+                          fontSize: 8.5,
                           fontWeight: FontWeight.w800,
                           color: Colors.white.withValues(alpha: 0.7),
-                          letterSpacing: 0.8,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],
@@ -1058,12 +1066,12 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
               // TEAM B 영역
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
                   decoration: BoxDecoration(
                     color: isTeamBWinner
                         ? AppTheme.pastelMint.withValues(alpha: 0.55)
                         : AppTheme.surfaceGrey,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isTeamBWinner ? AppTheme.primaryMint : Colors.transparent,
                       width: 1.5,
@@ -1077,19 +1085,19 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                         children: [
                           if (isTeamBWinner) ...[
                             _buildWinBadge(),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                           ],
                           const Text(
                             'TEAM B',
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: 10,
                               fontWeight: FontWeight.w800,
                               color: AppTheme.textMuted,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       ...List.generate(match.teamB.length, (idx) {
                         final id = match.teamB[idx];
                         final member = teamBMembers[idx];
@@ -1103,18 +1111,23 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               _buildTierMiniBadge(tier),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  name,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    color: isPlayerSearched
-                                        ? AppTheme.primaryMint
-                                        : AppTheme.textDark,
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    name,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.3,
+                                      color: isPlayerSearched
+                                          ? AppTheme.primaryMint
+                                          : AppTheme.textDark,
+                                    ),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -1135,18 +1148,18 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
   /// 승리팀 WIN 강조 뱃지
   Widget _buildWinBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
       decoration: BoxDecoration(
         color: AppTheme.primaryMint,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(5),
       ),
       child: const Text(
         'WIN',
         style: TextStyle(
-          fontSize: 10,
+          fontSize: 9.5,
           fontWeight: FontWeight.w900,
           color: Colors.white,
-          letterSpacing: 0.4,
+          letterSpacing: 0.3,
         ),
       ),
     );
@@ -1155,17 +1168,18 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
   /// 급수 뱃지 (A조, B조, C조, D조, 초심)
   Widget _buildTierMiniBadge(Tier tier) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(5),
         border: Border.all(color: Colors.grey.shade300),
       ),
       child: Text(
         tier.label,
         style: const TextStyle(
-          fontSize: 10.5,
+          fontSize: 10,
           fontWeight: FontWeight.w800,
+          letterSpacing: -0.2,
           color: AppTheme.textDark,
         ),
       ),

@@ -149,7 +149,8 @@ class MonthlyFeeRecord {
 enum FeeLedgerFilter {
   all('전체 보기'),
   currentMonthUnpaid('당월 미납자만 보기'),
-  exemptOrResting('휴면/면제 회원만 보기');
+  exemptOrResting('휴면/면제 회원만 보기'),
+  familyDiscount('👨‍👩‍👧 가족할인 회원');
 
   final String label;
   const FeeLedgerFilter(this.label);
@@ -249,6 +250,21 @@ class FeeLedgerCalculator {
           : '차등/할인';
     }
     return '기본 회비';
+  }
+
+  /// 가족할인 / 차등할인 회원 여부 판별
+  static bool isFamilyDiscountMember(Member member, ClubFeePolicy policy) {
+    if (member.feePolicy == FeePolicyType.discounted) return true;
+    if (member.customFeeLabel != null &&
+        member.customFeeLabel!.contains('가족')) {
+      return true;
+    }
+    if (member.customFeeAmount != null &&
+        member.customFeeAmount! > 0 &&
+        member.customFeeAmount! < policy.defaultMonthlyFee) {
+      return true;
+    }
+    return false;
   }
 
   /// 날짜 문자열('2026.09.01' 또는 '2026-09-01')에서 (year * 100 + month) 정수 추출
