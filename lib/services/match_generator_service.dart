@@ -108,7 +108,7 @@ class MatchGeneratorService {
           .where((m) => !pairedMemberIds.contains(m.id))
           .toList();
 
-      return _generateMatchesWithFixedPairs(
+      final fixedMatches = _generateMatchesWithFixedPairs(
         session: session,
         fixedTeams: activeFixedPairs,
         soloMembers: soloMembers,
@@ -121,6 +121,9 @@ class MatchGeneratorService {
         partnerHistory: partnerHistory,
         opponentHistory: opponentHistory,
       );
+      return session.matchFormat == MatchFormat.tournament
+          ? _tagTournamentBracketMetadata(fixedMatches)
+          : fixedMatches;
     }
 
     // 4. 성별 매칭 규칙에 따른 정밀 인원 선출 (개인별 로테이션 기본 경로)
@@ -228,7 +231,21 @@ class MatchGeneratorService {
       courtNumber++;
     }
 
-    return generatedMatches;
+    return session.matchFormat == MatchFormat.tournament
+        ? _tagTournamentBracketMetadata(generatedMatches)
+        : generatedMatches;
+  }
+
+  /// 토너먼트 라운드 경기 목록에 강수(4강/8강/16강) 및 경기 순번 메타데이터 부여
+  List<GameMatch> _tagTournamentBracketMetadata(List<GameMatch> matches) {
+    if (matches.isEmpty) return matches;
+    final bracketSize = GameMatch.inferBracketSize(matches.length);
+    return List.generate(matches.length, (i) {
+      return matches[i].copyWith(
+        bracketRoundSize: bracketSize,
+        bracketMatchIndex: i + 1,
+      );
+    });
   }
 
   /// [급수별 자동 짝짓기] 출전 인원 전체를 2명씩 복식 페어로 자동 편성
@@ -706,7 +723,114 @@ class MatchGeneratorService {
       pairIdx += 2;
     }
 
-    return generatedMatches;
+    return _tagTournamentBracketMetadata(generatedMatches);
+  }
+
+  /// [토너먼트 승자 자동 승급 로직]
+  /// 특정 매치(updatedMatchId)가 경기 완료(finished) 처리되면, 승리한 2인 복식 팀을
+  /// 상위 라운드(round + 1)의 매칭 슬롯(홀수 경기 -> teamA, 짝수 경기 -> teamB)으로 즉시 자동 배정합니다.
+  List<GameMatch> syncTournamentAdvancement({
+    required List<GameMatch> allMatches,
+    required String updatedMatchId,
+    required GameSession session,
+  }) {
+    if (session.matchFormat != MatchFormat.tournament) return allMatches;
+    final targetIdx = allMatches.indexWhere((m) => m.id == updatedMatchId);
+    if (targetIdx < 0) return allMatches;
+
+    final updatedMatch = allMatches[targetIdx];
+    final roundMatches = allMatches
+        .where((m) => m.round == updatedMatch.round)
+        .toList()
+      ..sort((a, b) => (a.bracketMatchIndex ?? a.courtNumber)
+          .compareTo(b.bracketMatchIndex ?? b.courtNumber));
+
+    final matchIdxInRound = updatedMatch.bracketMatchIndex ??
+        (roundMatches.indexWhere((m) => m.id == updatedMatch.id) + 1);
+    if (matchIdxInRound <= 0) return allMatches;
+
+    final roundBracketSize = updatedMatch.bracketRoundSize ??
+        GameMatch.inferBracketSize(roundMatches.length);
+
+    // 이미 결승전(2강 이하)이면 상위 라운드 슬롯이 없으므로 그대로 반환
+    if (roundBracketSize <= 2) return allMatches;
+
+    final nextRound = updatedMatch.round + 1;
+    final nextBracketSize = roundBracketSize ~/ 2;
+    final nextMatchIdx = (matchIdxInRound + 1) ~/ 2;
+    final isSlotA = matchIdxInRound.isOdd;
+    final startCourt = session.startCourtNumber;
+    final targetCourt = startCourt + nextMatchIdx - 1;
+
+    final working = List<GameMatch>.from(allMatches);
+    final existingUpperIdx = working.indexWhere(
+      (m) =>
+          m.round == nextRound &&
+          (m.bracketMatchIndex == nextMatchIdx ||
+              (m.bracketMatchIndex == null && m.courtNumber == targetCourt)),
+    );
+
+    if (updatedMatch.isFinished) {
+      final winningTeam = updatedMatch.scoreA >= updatedMatch.scoreB
+          ? List<String>.from(updatedMatch.teamA)
+          : List<String>.from(updatedMatch.teamB);
+      if (winningTeam.isEmpty) return working;
+
+      if (existingUpperIdx >= 0) {
+        final existingUpper = working[existingUpperIdx];
+        if (!existingUpper.isFinished) {
+          final updatedTeamA = isSlotA ? winningTeam : existingUpper.teamA;
+          final updatedTeamB = isSlotA ? existingUpper.teamB : winningTeam;
+          working[existingUpperIdx] = existingUpper.copyWith(
+            teamA: updatedTeamA,
+            teamB: updatedTeamB,
+            status: (updatedTeamA.length == 2 &&
+                    updatedTeamB.length == 2 &&
+                    existingUpper.status == MatchStatus.pending)
+                ? MatchStatus.playing
+                : existingUpper.status,
+            bracketRoundSize: existingUpper.bracketRoundSize ?? nextBracketSize,
+            bracketMatchIndex: existingUpper.bracketMatchIndex ?? nextMatchIdx,
+          );
+        }
+      } else {
+        working.add(
+          GameMatch(
+            id: 'tournament_r${nextRound}_m${nextMatchIdx}_${updatedMatch.sessionId}',
+            sessionId: updatedMatch.sessionId,
+            round: nextRound,
+            courtNumber: targetCourt,
+            teamA: isSlotA ? winningTeam : const [],
+            teamB: isSlotA ? const [] : winningTeam,
+            status: MatchStatus.pending,
+            bracketRoundSize: nextBracketSize,
+            bracketMatchIndex: nextMatchIdx,
+          ),
+        );
+      }
+    } else {
+      // 경기 완료 해제(playing/pending 복귀) 시 아직 시작 전인 상위 라운드 슬롯에서 승자 배정 회수
+      if (existingUpperIdx >= 0) {
+        final existingUpper = working[existingUpperIdx];
+        if (!existingUpper.isFinished &&
+            existingUpper.scoreA == 0 &&
+            existingUpper.scoreB == 0) {
+          final clearedA = isSlotA ? const <String>[] : existingUpper.teamA;
+          final clearedB = isSlotA ? existingUpper.teamB : const <String>[];
+          if (clearedA.isEmpty && clearedB.isEmpty) {
+            working.removeAt(existingUpperIdx);
+          } else {
+            working[existingUpperIdx] = existingUpper.copyWith(
+              teamA: clearedA,
+              teamB: clearedB,
+              status: MatchStatus.pending,
+            );
+          }
+        }
+      }
+    }
+
+    return working;
   }
 
   /// 종목 유형별 후보 선수 필터링
@@ -1580,22 +1704,27 @@ class MatchGeneratorService {
     }
 
     for (final m in matches) {
+      if (m.teamA.isEmpty && m.teamB.isEmpty) continue;
       final aWon = m.isTeamAWon || (m.scoreA > m.scoreB);
       final bWon = m.isTeamBWon || (m.scoreB > m.scoreA);
-      getOrUpdateNode(
-        m.teamA,
-        addWins: aWon ? 1 : 0,
-        addLosses: bWon ? 1 : 0,
-        addPointsFor: m.scoreA,
-        addPointsAgainst: m.scoreB,
-      );
-      getOrUpdateNode(
-        m.teamB,
-        addWins: bWon ? 1 : 0,
-        addLosses: aWon ? 1 : 0,
-        addPointsFor: m.scoreB,
-        addPointsAgainst: m.scoreA,
-      );
+      if (m.teamA.isNotEmpty) {
+        getOrUpdateNode(
+          m.teamA,
+          addWins: aWon ? 1 : 0,
+          addLosses: bWon ? 1 : 0,
+          addPointsFor: m.scoreA,
+          addPointsAgainst: m.scoreB,
+        );
+      }
+      if (m.teamB.isNotEmpty) {
+        getOrUpdateNode(
+          m.teamB,
+          addWins: bWon ? 1 : 0,
+          addLosses: aWon ? 1 : 0,
+          addPointsFor: m.scoreB,
+          addPointsAgainst: m.scoreA,
+        );
+      }
     }
 
     final rounds = matchesByRound.keys.toList()..sort();
@@ -1613,27 +1742,34 @@ class MatchGeneratorService {
     final finalLosers = <TournamentTeamNode>[];
 
     for (final m in finalRoundMatches) {
-      final keyA = makeTeamKey(m.teamA);
-      final keyB = makeTeamKey(m.teamB);
+      final keyA = m.teamA.isNotEmpty ? makeTeamKey(m.teamA) : null;
+      final keyB = m.teamB.isNotEmpty ? makeTeamKey(m.teamB) : null;
       final aWon = m.isTeamAWon || (m.scoreA > m.scoreB);
       final bWon = m.isTeamBWon || (m.scoreB > m.scoreA);
 
-      if (aWon) {
+      if (aWon && keyA != null && teamNodes.containsKey(keyA)) {
         finalWinners.add(teamNodes[keyA]!);
-        finalLosers.add(teamNodes[keyB]!);
         placedTeamKeys.add(keyA);
-        placedTeamKeys.add(keyB);
-      } else if (bWon) {
+        if (keyB != null && teamNodes.containsKey(keyB)) {
+          finalLosers.add(teamNodes[keyB]!);
+          placedTeamKeys.add(keyB);
+        }
+      } else if (bWon && keyB != null && teamNodes.containsKey(keyB)) {
         finalWinners.add(teamNodes[keyB]!);
-        finalLosers.add(teamNodes[keyA]!);
         placedTeamKeys.add(keyB);
-        placedTeamKeys.add(keyA);
-      } else {
-        // 무승부 또는 미완료 시 둘 다 결승 진출로 등록
-        finalWinners.add(teamNodes[keyA]!);
-        finalWinners.add(teamNodes[keyB]!);
-        placedTeamKeys.add(keyA);
-        placedTeamKeys.add(keyB);
+        if (keyA != null && teamNodes.containsKey(keyA)) {
+          finalLosers.add(teamNodes[keyA]!);
+          placedTeamKeys.add(keyA);
+        }
+      } else if (m.isFinished) {
+        if (keyA != null && teamNodes.containsKey(keyA)) {
+          finalWinners.add(teamNodes[keyA]!);
+          placedTeamKeys.add(keyA);
+        }
+        if (keyB != null && teamNodes.containsKey(keyB)) {
+          finalWinners.add(teamNodes[keyB]!);
+          placedTeamKeys.add(keyB);
+        }
       }
     }
 
@@ -1668,15 +1804,19 @@ class MatchGeneratorService {
       final stageTeams = <TournamentTeamNode>[];
 
       for (final m in rMatches) {
-        final keyA = makeTeamKey(m.teamA);
-        final keyB = makeTeamKey(m.teamB);
-        if (!placedTeamKeys.contains(keyA)) {
-          stageTeams.add(teamNodes[keyA]!);
-          placedTeamKeys.add(keyA);
+        if (m.teamA.isNotEmpty) {
+          final keyA = makeTeamKey(m.teamA);
+          if (!placedTeamKeys.contains(keyA) && teamNodes.containsKey(keyA)) {
+            stageTeams.add(teamNodes[keyA]!);
+            placedTeamKeys.add(keyA);
+          }
         }
-        if (!placedTeamKeys.contains(keyB)) {
-          stageTeams.add(teamNodes[keyB]!);
-          placedTeamKeys.add(keyB);
+        if (m.teamB.isNotEmpty) {
+          final keyB = makeTeamKey(m.teamB);
+          if (!placedTeamKeys.contains(keyB) && teamNodes.containsKey(keyB)) {
+            stageTeams.add(teamNodes[keyB]!);
+            placedTeamKeys.add(keyB);
+          }
         }
       }
 

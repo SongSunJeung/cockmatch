@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cockmatch/main.dart';
 import 'package:cockmatch/core/theme/app_theme.dart';
+import 'package:cockmatch/views/widgets/tournament_bracket_tree_widget.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -1073,5 +1074,89 @@ void main() {
     expect(find.byKey(const Key('edit_club_event_date_field')), findsOneWidget);
     await tester.tap(find.text('취소'));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('토너먼트 대회/행사 대진 운영 및 웹뷰어 브래킷 트리 연동 통합 검증', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: CockMatchApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. [+ 새 모임 시작하기] -> 모임 생성 및 일정/모임 진입
+    await tester.tap(find.text('+ 새 모임 시작하기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('다음: 모임 정보 설정'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('다음: 참석자 등록'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('모임 시작 & 일정/모임 열기'));
+    await tester.pumpAndSettle();
+
+    // 2. 대진 설정 바텀시트 오픈하여 경기 방식을 [토너먼트]로 선택 후 대진 생성
+    final startSessionBtn = find.text('대진표 설정수정');
+    expect(startSessionBtn, findsOneWidget);
+    await tester.tap(startSessionBtn);
+    await tester.pumpAndSettle();
+
+    final tournamentOption = find.text('토너먼트');
+    await tester.ensureVisible(tournamentOption);
+    await tester.pumpAndSettle();
+    await tester.tap(tournamentOption);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('start_session_and_generate_button')));
+    await tester.pumpAndSettle();
+
+    if (find.byKey(const Key('confirm_regenerate_bracket_button')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const Key('confirm_regenerate_bracket_button')));
+      await tester.pumpAndSettle();
+    }
+
+    // 3. 대진표 화면: 토너먼트 모드일 때만 상단 미니 툴바에 [ 🏆 전체 트리 보기 ] 버튼 노출 확인
+    final openTreeBtn = find.byKey(const Key('open_tournament_tree_dialog_button'));
+    expect(openTreeBtn, findsOneWidget);
+    expect(find.textContaining('전체 트리 보기'), findsOneWidget);
+
+    // 코트 매치 카드 상단에 토너먼트 라운드/경기 라벨 표시 확인 (예: [8강 1경기], [준결승 1경기], [결승전] 등)
+    expect(find.textContaining('경기'), findsWidgets);
+
+    // 4. [전체 트리 보기] 버튼 클릭 -> 팝업 다이얼로그 오픈 및 TournamentBracketTreeWidget 렌더링 확인
+    await tester.tap(openTreeBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('토너먼트 전체 브래킷 (트리 보기)'), findsOneWidget);
+    expect(find.byType(TournamentBracketTreeWidget), findsOneWidget);
+    expect(find.byTooltip('확대 (+)'), findsOneWidget);
+    expect(find.byTooltip('축소 (-)'), findsOneWidget);
+    expect(find.byTooltip('100% 원래 크기로 초기화'), findsOneWidget);
+
+    // 줌/인/아웃/초기화 버튼 탭 동작 확인
+    await tester.tap(find.byTooltip('확대 (+)'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('축소 (-)'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('100% 원래 크기로 초기화'));
+    await tester.pump();
+
+    // 다이얼로그 닫기 버튼 탭
+    await tester.tap(find.byTooltip('닫기'));
+    await tester.pumpAndSettle();
+    expect(find.text('토너먼트 전체 브래킷 (트리 보기)'), findsNothing);
+
+    // 5. 드로어 메뉴 열어서 [웹뷰어]로 이동 -> 실시간 토너먼트 브래킷 트리(live_tournament_bracket_tree) 자동 렌더링 검증
+    final scaffoldState = tester.state<ScaffoldState>(find.byType(Scaffold).first);
+    scaffoldState.openDrawer();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('웹뷰어'));
+    await tester.pumpAndSettle();
+
+    // 웹뷰어 화면에서 토너먼트 브래킷 트리가 메인 뷰로 자동 렌더링되는지 확인
+    expect(find.byKey(const Key('live_tournament_bracket_tree')), findsOneWidget);
+    expect(find.byType(TournamentBracketTreeWidget), findsOneWidget);
+    expect(find.text('핀치 줌 & 자유 이동'), findsOneWidget);
+    expect(find.text('두 손가락 확대/축소 및 상하좌우 드래그 지원'), findsOneWidget);
   });
 }

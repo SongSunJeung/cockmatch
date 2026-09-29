@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
+import '../widgets/tournament_bracket_tree_widget.dart';
 
 /// [화면 3] 대진표 및 실시간 코트 운영 화면
 /// - 메인 화면 인라인 직접 점수 입력 (숫자 키패드 TextField, 실시간 자동 저장)
@@ -410,6 +411,45 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                               ),
                             ),
                           ),
+                          if (isTournament) ...[
+                            const SizedBox(width: 6),
+                            InkWell(
+                              key: const Key('open_tournament_tree_dialog_button'),
+                              onTap: () => _showTournamentBracketTreeDialog(
+                                context,
+                                allMatches,
+                                memberMap,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.pastelYellow,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppTheme.pastelYellowDark),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.account_tree_rounded,
+                                      size: 13.5,
+                                      color: AppTheme.pastelYellowDark,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '🏆 전체 트리 보기',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppTheme.pastelYellowDark,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1236,6 +1276,82 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// [🏆 전체 트리 보기] 팝업 다이얼로그 (InteractiveViewer 2D 줌/팬 지원)
+  void _showTournamentBracketTreeDialog(
+    BuildContext context,
+    List<GameMatch> matches,
+    Map<String, Member> memberMap,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          width: 960,
+          height: 640,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.pastelYellow,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.emoji_events_rounded,
+                      color: AppTheme.pastelYellowDark,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '토너먼트 전체 브래킷 (트리 보기)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                        Text(
+                          '승자 승급 및 실시간 스코어가 즉시 반영됩니다 (핀치 줌 & 자유 이동 가능)',
+                          style: TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: '닫기',
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const Divider(height: 20),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: TournamentBracketTreeWidget(
+                    matches: matches,
+                    memberMap: memberMap,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2500,42 +2616,67 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Flexible(
-                child: Tooltip(
-                  message: isFinished ? '완료된 경기는 코트가 고정되어 있습니다' : '터치하여 코트 번호 변경',
-                  child: InkWell(
-                    onTap: isFinished ? null : () => _showEditCourtNumberDialog(context, match),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppTheme.pastelYellow,
-                        borderRadius: BorderRadius.circular(10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.isTournament) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryDark,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          match.formatTournamentMatchLabel(totalMatchesInRound: widget.roundMatches.length),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              '${match.courtNumber}번 코트',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.pastelYellowDark,
-                              ),
+                      const SizedBox(width: 6),
+                    ],
+                    Flexible(
+                      child: Tooltip(
+                        message: isFinished ? '완료된 경기는 코트가 고정되어 있습니다' : '터치하여 코트 번호 변경',
+                        child: InkWell(
+                          onTap: isFinished ? null : () => _showEditCourtNumberDialog(context, match),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: AppTheme.pastelYellow,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    '${match.courtNumber}번 코트',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.pastelYellowDark,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  isFinished ? Icons.lock_outline_rounded : Icons.edit_rounded,
+                                  size: 11,
+                                  color: AppTheme.pastelYellowDark,
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            isFinished ? Icons.lock_outline_rounded : Icons.edit_rounded,
-                            size: 11,
-                            color: AppTheme.pastelYellowDark,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
@@ -2552,6 +2693,25 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                             match.scoreB,
                             status: nextStatus,
                           );
+                      if (context.mounted && widget.isTournament && nextStatus == MatchStatus.finished) {
+                        final winTeam = match.scoreA >= match.scoreB ? teamAMembers : teamBMembers;
+                        final winNames = winTeam.map((m) => m.name).join('·');
+                        final label = match.formatTournamentMatchLabel(totalMatchesInRound: widget.roundMatches.length);
+                        final isFinalMatch = match.bracketRoundSize == 2 || (widget.roundMatches.length == 1 && match.round > 1);
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: AppTheme.primaryDark,
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 2),
+                            content: Text(
+                              isFinalMatch
+                                  ? '🎉 결승전 종료! 우승($winNames)이 확정되었습니다!'
+                                  : '🏆 $label 승리 팀($winNames)이 다음 라운드 매칭 슬롯으로 자동 배정되었습니다!',
+                            ),
+                          ),
+                        );
+                      }
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: AnimatedContainer(
@@ -2616,12 +2776,12 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                         ),
                       ),
                     )
-                  else
+                  else if (teamAMembers.isNotEmpty || teamBMembers.isNotEmpty)
                     InkWell(
                       onTap: () => _showPlayerSwapSheet(
                         context: context,
                         match: match,
-                        initialTargetPlayer: teamAMembers.first,
+                        initialTargetPlayer: teamAMembers.isNotEmpty ? teamAMembers.first : teamBMembers.first,
                       ),
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
@@ -3030,7 +3190,21 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
             ],
           ),
           const SizedBox(height: 6),
-          ...members.map(
+          if (members.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                '⏳ 이전 라운드 승자 대기 (TBD)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textMuted,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            )
+          else
+            ...members.map(
             (m) => InkWell(
               onTap: isFinished ? null : () => onPlayerTap(m),
               borderRadius: BorderRadius.circular(6),

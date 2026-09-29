@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/korean_search_util.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
+import '../widgets/tournament_bracket_tree_widget.dart';
 
 /// [화면 4] 웹뷰어 (라이브 전광판 & 모임 완료 종합 리포트)
 /// 1. 모임 진행 중: [실시간 코트 전광판]
@@ -825,6 +826,33 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
           ),
           const SizedBox(height: 12),
 
+          // 토너먼트 모드일 때 메인 기본 화면으로 InteractiveViewer 기반 토너먼트 브래킷(트리) 자동 전환 노출
+          if (session.matchFormat == MatchFormat.tournament) ...[
+            Container(
+              width: double.infinity,
+              height: 480,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: AppTheme.pastelYellowDark.withValues(alpha: 0.35),
+                  width: 1.5,
+                ),
+                boxShadow: AppTheme.softShadow,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: TournamentBracketTreeWidget(
+                  key: const Key('live_tournament_bracket_tree'),
+                  matches: matches,
+                  memberMap: memberMap,
+                  searchQuery: _searchQuery,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
           // 실시간 코트 전광판 섹션 타이틀 & 라운드 칩 (4라운드 이상 가로 스크롤 지원)
           Row(
             children: [
@@ -1641,6 +1669,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
               matches: effectiveMatches,
               members: members,
             ),
+            matches: effectiveMatches,
             memberMap: {for (final m in members) m.id: m},
           )
         else if (activeFormat == MatchFormat.league)
@@ -1711,9 +1740,10 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
   /// [토너먼트] 전용 화면: 개인별 순위표 대신 '최종 트리(우승, 준우승, 4강 등 진출 단계 기준)' 표시
   Widget _buildTournamentFinalTreeView({
     required TournamentResultTree tree,
+    required List<GameMatch> matches,
     required Map<String, Member> memberMap,
   }) {
-    if (tree.stagePlacements.isEmpty) {
+    if (tree.stagePlacements.isEmpty && matches.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
@@ -1735,6 +1765,32 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 0) 인터랙티브 토너먼트 브래킷 시각화 (InteractiveViewer 2D 줌/팬)
+        if (matches.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            height: 480,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: AppTheme.pastelYellowDark.withValues(alpha: 0.35),
+                width: 1.5,
+              ),
+              boxShadow: AppTheme.softShadow,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: TournamentBracketTreeWidget(
+                key: const Key('completed_tournament_bracket_tree'),
+                matches: matches,
+                memberMap: memberMap,
+                searchQuery: _searchQuery,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
         // 1) 진출 단계별 입상 카드 트리 (우승, 준우승, 4강 등)
         Container(
           width: double.infinity,

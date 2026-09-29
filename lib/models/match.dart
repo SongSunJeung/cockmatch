@@ -16,6 +16,8 @@ class GameMatch {
   final MatchStatus status; // pending, playing, finished
   final DateTime? startedAt;
   final DateTime? finishedAt;
+  final int? bracketRoundSize; // 토너먼트 강수 (예: 16=16강, 8=8강, 4=준결승/4강, 2=결승)
+  final int? bracketMatchIndex; // 해당 라운드 내 매치 순번 (1부터 시작, 예: 1경기, 2경기)
 
   const GameMatch({
     required this.id,
@@ -29,6 +31,8 @@ class GameMatch {
     this.status = MatchStatus.pending,
     this.startedAt,
     this.finishedAt,
+    this.bracketRoundSize,
+    this.bracketMatchIndex,
   });
 
   /// 경기 참가자 4명의 ID 전체 목록
@@ -67,6 +71,50 @@ class GameMatch {
   /// 점수 차이
   int get scoreDiff => (scoreA - scoreB).abs();
 
+  /// 매치 수(또는 참가 팀 수) 기준 토너먼트 강수(2, 4, 8, 16) 산출
+  static int inferBracketSize(int matchCountInRound) {
+    final teams = matchCountInRound * 2;
+    if (teams <= 2) return 2;
+    if (teams <= 4) return 4;
+    if (teams <= 8) return 8;
+    return 16;
+  }
+
+  /// 강수(bracketRoundSize)별 단계 명칭 반환
+  static String stageTitleForSize(int size) {
+    if (size <= 2) return '결승';
+    if (size <= 4) return '준결승';
+    if (size <= 8) return '8강';
+    if (size <= 16) return '16강';
+    return '$size강';
+  }
+
+  /// 토너먼트 라운드/경기 라벨 반환 (예: '[8강 1경기]', '[준결승 2경기]', '[결승전]')
+  String formatTournamentMatchLabel({int? totalMatchesInRound, int? indexInRound}) {
+    final size = bracketRoundSize ??
+        (totalMatchesInRound != null ? inferBracketSize(totalMatchesInRound) : null);
+    final idx = bracketMatchIndex ?? indexInRound ?? courtNumber;
+
+    if (size != null) {
+      if (size <= 2) {
+        return (totalMatchesInRound != null && totalMatchesInRound > 1)
+            ? '[결승 $idx경기]'
+            : '[결승전]';
+      }
+      if (size <= 4) {
+        return '[준결승 $idx경기]';
+      }
+      if (size <= 8) {
+        return '[8강 $idx경기]';
+      }
+      if (size <= 16) {
+        return '[16강 $idx경기]';
+      }
+      return '[$size강 $idx경기]';
+    }
+    return '[${round}R $idx경기]';
+  }
+
   /// Firestore 저장용 Map 변환
   Map<String, dynamic> toMap() {
     return {
@@ -80,6 +128,8 @@ class GameMatch {
       'status': status.code,
       if (startedAt != null) 'startedAt': startedAt!.toIso8601String(),
       if (finishedAt != null) 'finishedAt': finishedAt!.toIso8601String(),
+      if (bracketRoundSize != null) 'bracketRoundSize': bracketRoundSize,
+      if (bracketMatchIndex != null) 'bracketMatchIndex': bracketMatchIndex,
     };
   }
 
@@ -107,6 +157,8 @@ class GameMatch {
       finishedAt: map['finishedAt'] != null
           ? DateTime.tryParse(map['finishedAt'] as String)
           : null,
+      bracketRoundSize: (map['bracketRoundSize'] as num?)?.toInt(),
+      bracketMatchIndex: (map['bracketMatchIndex'] as num?)?.toInt(),
     );
   }
 
@@ -122,6 +174,8 @@ class GameMatch {
     MatchStatus? status,
     DateTime? startedAt,
     DateTime? finishedAt,
+    int? bracketRoundSize,
+    int? bracketMatchIndex,
   }) {
     return GameMatch(
       id: id ?? this.id,
@@ -135,6 +189,8 @@ class GameMatch {
       status: status ?? this.status,
       startedAt: startedAt ?? this.startedAt,
       finishedAt: finishedAt ?? this.finishedAt,
+      bracketRoundSize: bracketRoundSize ?? this.bracketRoundSize,
+      bracketMatchIndex: bracketMatchIndex ?? this.bracketMatchIndex,
     );
   }
 

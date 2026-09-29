@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cockmatch/models/models.dart';
 import 'package:cockmatch/providers/providers.dart';
 import 'package:cockmatch/services/club_service.dart';
+import 'package:cockmatch/services/match_generator_service.dart';
 import 'package:cockmatch/core/utils/korean_search_util.dart';
 
 void main() {
@@ -1231,6 +1232,190 @@ void main() {
       // 4) 엑셀/CSV (UTF-8 BOM) 바이트 생성 검증
       final csvBytes = EventExpenseCalculator.buildEventCsvBytes(updatedEvent);
       expect(csvBytes.sublist(0, 3), equals([0xEF, 0xBB, 0xBF]));
+    });
+  });
+
+  group('Tournament Bracket Model & Automatic Advancement Logic Test', () {
+    test('토너먼트 라운드/경기 라벨 생성 및 stageTitleForSize 검증', () {
+      expect(GameMatch.stageTitleForSize(2), equals('결승'));
+      expect(GameMatch.stageTitleForSize(4), equals('준결승'));
+      expect(GameMatch.stageTitleForSize(8), equals('8강'));
+      expect(GameMatch.stageTitleForSize(16), equals('16강'));
+      expect(GameMatch.stageTitleForSize(32), equals('32강'));
+
+      final match8 = GameMatch(
+        id: 'm_8_1',
+        sessionId: 's1',
+        round: 1,
+        courtNumber: 1,
+        teamA: ['p1', 'p2'],
+        teamB: ['p3', 'p4'],
+        bracketRoundSize: 8,
+        bracketMatchIndex: 1,
+      );
+      expect(match8.formatTournamentMatchLabel(), equals('[8강 1경기]'));
+
+      final matchSemi = GameMatch(
+        id: 'm_4_2',
+        sessionId: 's1',
+        round: 2,
+        courtNumber: 2,
+        teamA: ['p1', 'p2'],
+        teamB: ['p5', 'p6'],
+        bracketRoundSize: 4,
+        bracketMatchIndex: 2,
+      );
+      expect(matchSemi.formatTournamentMatchLabel(), equals('[준결승 2경기]'));
+
+      final matchFinal = GameMatch(
+        id: 'm_2_1',
+        sessionId: 's1',
+        round: 3,
+        courtNumber: 1,
+        teamA: ['p1', 'p2'],
+        teamB: ['p7', 'p8'],
+        bracketRoundSize: 2,
+        bracketMatchIndex: 1,
+      );
+      expect(matchFinal.formatTournamentMatchLabel(), equals('[결승전]'));
+
+      // Map 직렬화/역직렬화 검증
+      final map = match8.toMap();
+      expect(map['bracketRoundSize'], equals(8));
+      expect(map['bracketMatchIndex'], equals(1));
+      final restored = GameMatch.fromMap(map, id: 'm_8_1');
+      expect(restored.bracketRoundSize, equals(8));
+      expect(restored.bracketMatchIndex, equals(1));
+    });
+
+    test('승자 승급(syncTournamentAdvancement): 1R 승리 팀 자동 2R 배정 및 취소 시 롤백 검증', () {
+      final generator = MatchGeneratorService();
+      final session = GameSession(
+        id: 's_tour',
+        clubId: 'c1',
+        sessionDate: '2026-10-01',
+        matchFormat: MatchFormat.tournament,
+      );
+
+      // 8강 모드: Round 1에 4경기, Round 2(준결승)에 2경기 빈 슬롯
+      final r1m1 = GameMatch(
+        id: 'r1_1',
+        sessionId: 's_tour',
+        round: 1,
+        courtNumber: 1,
+        teamA: ['p1', 'p2'],
+        teamB: ['p3', 'p4'],
+        bracketRoundSize: 8,
+        bracketMatchIndex: 1,
+      );
+      final r1m2 = GameMatch(
+        id: 'r1_2',
+        sessionId: 's_tour',
+        round: 1,
+        courtNumber: 2,
+        teamA: ['p5', 'p6'],
+        teamB: ['p7', 'p8'],
+        bracketRoundSize: 8,
+        bracketMatchIndex: 2,
+      );
+      final r1m3 = GameMatch(
+        id: 'r1_3',
+        sessionId: 's_tour',
+        round: 1,
+        courtNumber: 3,
+        teamA: ['p9', 'p10'],
+        teamB: ['p11', 'p12'],
+        bracketRoundSize: 8,
+        bracketMatchIndex: 3,
+      );
+      final r1m4 = GameMatch(
+        id: 'r1_4',
+        sessionId: 's_tour',
+        round: 1,
+        courtNumber: 4,
+        teamA: ['p13', 'p14'],
+        teamB: ['p15', 'p16'],
+        bracketRoundSize: 8,
+        bracketMatchIndex: 4,
+      );
+
+      final r2m1 = GameMatch(
+        id: 'r2_1',
+        sessionId: 's_tour',
+        round: 2,
+        courtNumber: 1,
+        teamA: [],
+        teamB: [],
+        bracketRoundSize: 4,
+        bracketMatchIndex: 1,
+      );
+      final r2m2 = GameMatch(
+        id: 'r2_2',
+        sessionId: 's_tour',
+        round: 2,
+        courtNumber: 2,
+        teamA: [],
+        teamB: [],
+        bracketRoundSize: 4,
+        bracketMatchIndex: 2,
+      );
+
+      var allMatches = [r1m1, r1m2, r1m3, r1m4, r2m1, r2m2];
+
+      // 1) 1R 1경기 종료 (teamA ['p1', 'p2'] 승리 21:15)
+      final finishedR1m1 = r1m1.copyWith(
+        status: MatchStatus.finished,
+        scoreA: 21,
+        scoreB: 15,
+      );
+      allMatches[0] = finishedR1m1;
+
+      // syncTournamentAdvancement 실행
+      var synced = generator.syncTournamentAdvancement(
+        allMatches: allMatches,
+        updatedMatchId: 'r1_1',
+        session: session,
+      );
+      var semi1 = synced.firstWhere((m) => m.id == 'r2_1');
+      // 1R 1경기(홀수 인덱스 1)의 승자는 준결승 1경기의 teamA로 배정
+      expect(semi1.teamA, equals(['p1', 'p2']));
+      expect(semi1.teamB, isEmpty);
+
+      // 2) 1R 2경기 종료 (teamB ['p7', 'p8'] 승리 18:21)
+      final finishedR1m2 = r1m2.copyWith(
+        status: MatchStatus.finished,
+        scoreA: 18,
+        scoreB: 21,
+      );
+      synced[1] = finishedR1m2;
+
+      synced = generator.syncTournamentAdvancement(
+        allMatches: synced,
+        updatedMatchId: 'r1_2',
+        session: session,
+      );
+      semi1 = synced.firstWhere((m) => m.id == 'r2_1');
+      // 1R 2경기(짝수 인덱스 2)의 승자는 준결승 1경기의 teamB로 배정되어 대진 완성
+      expect(semi1.teamA, equals(['p1', 'p2']));
+      expect(semi1.teamB, equals(['p7', 'p8']));
+
+      // 3) 1R 1경기 취소 (finished -> playing 롤백)
+      final revertedR1m1 = r1m1.copyWith(
+        status: MatchStatus.playing,
+        scoreA: 0,
+        scoreB: 0,
+      );
+      synced[0] = revertedR1m1;
+
+      synced = generator.syncTournamentAdvancement(
+        allMatches: synced,
+        updatedMatchId: 'r1_1',
+        session: session,
+      );
+      semi1 = synced.firstWhere((m) => m.id == 'r2_1');
+      // 준결승 1경기의 teamA가 빈 슬롯으로 안전하게 롤백됨
+      expect(semi1.teamA, isEmpty);
+      expect(semi1.teamB, equals(['p7', 'p8']));
     });
   });
 }

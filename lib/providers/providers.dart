@@ -1247,6 +1247,23 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
         .toList();
 
     if (lockedInTargetRound.isEmpty) {
+      final existingTargetMatches = state.where((m) => m.round == targetRound).toList();
+      final hasCompleteTargetMatches = session.matchFormat == MatchFormat.tournament &&
+          existingTargetMatches.isNotEmpty &&
+          existingTargetMatches.every((m) => m.teamA.length == 2 && m.teamB.length == 2);
+
+      if (hasCompleteTargetMatches) {
+        state = state.map((m) {
+          if (m.round == targetRound && m.status == MatchStatus.pending) {
+            return m.copyWith(status: MatchStatus.playing);
+          }
+          return m;
+        }).toList();
+        _saveCurrentSessionMatches(state);
+        ref.read(selectedRoundProvider.notifier).setRound(targetRound);
+        return;
+      }
+
       final newMatches = generator.generateRoundMatches(
         session: session,
         allMembers: members,
@@ -1367,6 +1384,18 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
       }
       return m;
     }).toList();
+
+    // 토너먼트 모드일 때 승자 자동 승급 동기화
+    final currentSession = ref.read(sessionProvider);
+    if (currentSession != null && currentSession.matchFormat == MatchFormat.tournament) {
+      final generator = ref.read(matchGeneratorServiceProvider);
+      state = generator.syncTournamentAdvancement(
+        allMatches: state,
+        updatedMatchId: matchId,
+        session: currentSession,
+      );
+    }
+
     _saveCurrentSessionMatches(state);
   }
 
@@ -1390,6 +1419,18 @@ class MatchesNotifier extends Notifier<List<GameMatch>> {
       }
       return m;
     }).toList();
+
+    // 토너먼트 모드일 때 승자 자동 승급 동기화
+    final currentSession = ref.read(sessionProvider);
+    if (currentSession != null && currentSession.matchFormat == MatchFormat.tournament) {
+      final generator = ref.read(matchGeneratorServiceProvider);
+      state = generator.syncTournamentAdvancement(
+        allMatches: state,
+        updatedMatchId: matchId,
+        session: currentSession,
+      );
+    }
+
     _saveCurrentSessionMatches(state);
   }
 
