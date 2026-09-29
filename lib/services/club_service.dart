@@ -467,11 +467,13 @@ class ClubService {
         }
       }
 
-      // 4) 급수 검증 (A, B, C, D, 초심 / A조, B조 등, 미입력 시 초심)
+      // 4) 급수 검증 (S, A, B, C, D, 초심 / S조, A조, B조 등, 미입력 시 초심)
       Tier tier = Tier.novice;
       if (rawTier.isNotEmpty) {
         final t = rawTier.trim().toUpperCase().replaceAll('조', '').replaceAll('급', '').trim();
-        if (t == 'A') {
+        if (t == 'S') {
+          tier = Tier.s;
+        } else if (t == 'A') {
           tier = Tier.a;
         } else if (t == 'B') {
           tier = Tier.b;

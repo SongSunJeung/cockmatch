@@ -375,7 +375,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                           const SizedBox(width: 10),
                           const Expanded(
                             child: Text(
-                              '오늘 모임 & 일정/모임',
+                              '오늘 모임 & 모임/행사',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
@@ -3422,7 +3422,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   ],
                 ),
 
-                // 급수 선택 드롭다운
+                // 급수 선택 드롭다운 & 빠른 선택 칩 (초심, D조, C조, B조, A조, S조)
                 Row(
                   children: [
                     const Text('급수: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
@@ -3436,7 +3436,40 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    Tier.novice,
+                    Tier.d,
+                    Tier.c,
+                    Tier.b,
+                    Tier.a,
+                    Tier.s,
+                  ].map((tierOption) {
+                    final isSelected = selectedTier == tierOption;
+                    return ChoiceChip(
+                      key: Key('guest_form_tier_chip_${tierOption.code}'),
+                      label: Text(
+                        tierOption.label,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: isSelected
+                              ? Colors.white
+                              : AppTheme.getTierTextColor(tierOption),
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedColor: AppTheme.primaryDark,
+                      backgroundColor: AppTheme.getTierBgColor(tierOption),
+                      showCheckmark: false,
+                      visualDensity: VisualDensity.compact,
+                      onSelected: (_) => setDialogState(() => selectedTier = tierOption),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 8),
 
                 TextField(
                   controller: clubCtrl,

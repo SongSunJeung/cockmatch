@@ -1704,6 +1704,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<Tier>(
+                      key: ValueKey(selectedTier),
                       initialValue: selectedTier,
                       decoration: const InputDecoration(labelText: '급수'),
                       items: Tier.values
@@ -1712,6 +1713,40 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                       onChanged: (val) {
                         if (val != null) setModalState(() => selectedTier = val);
                       },
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        Tier.novice,
+                        Tier.d,
+                        Tier.c,
+                        Tier.b,
+                        Tier.a,
+                        Tier.s,
+                      ].map((tierOption) {
+                        final isSelected = selectedTier == tierOption;
+                        return ChoiceChip(
+                          key: Key('member_form_tier_chip_${tierOption.code}'),
+                          label: Text(
+                            tierOption.label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppTheme.getTierTextColor(tierOption),
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedColor: AppTheme.primaryDark,
+                          backgroundColor: AppTheme.getTierBgColor(tierOption),
+                          showCheckmark: false,
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (_) => setModalState(() => selectedTier = tierOption),
+                        );
+                      }).toList(),
                     ),
                     const SizedBox(height: 14),
 
@@ -2681,7 +2716,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                         const SizedBox(height: 8),
                         const Text(
                           '• 성별: 남 / 여 (또는 남성 / 여성)\n'
-                          '• 급수: A, B, C, D, 초심 (또는 A조, B조 등)\n'
+                          '• 급수: S, A, B, C, D, 초심 (또는 S조, A조, B조 등)\n'
                           '• 회원구분: 운영진(회장/총무 등 직책 포함), 정회원, 준회원 (기본값: 정회원)\n'
                           '• 전화번호: 010-XXXX-XXXX 형식 (하이픈 유무 무관하게 정규화)',
                           style: TextStyle(

@@ -608,43 +608,105 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   ],
                 ),
 
-                // 클럽 내 모임 선택 칩 (진행 모임 & 지난 완료 모임 빠른 전환)
-                if (allAvailableSessions.length > 1) ...[
+                // 클럽 내 모임 선택 드롭다운 (클릭 시 최근 모임 목록이 펼쳐지는 선택형 방식)
+                if (allAvailableSessions.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: allAvailableSessions.map((s) {
-                        final isSelected = s.id == targetSession.id;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            label: Text(
-                              '${s.isCompleted ? "[완료]" : "[LIVE]"} ${s.title} (${s.matchFormat.label})',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: isSelected ? Colors.white : AppTheme.textDark,
-                              ),
+                  Builder(
+                    builder: (context) {
+                      final seenIds = <String>{};
+                      final uniqueSessions = allAvailableSessions
+                          .where((s) => seenIds.add(s.id))
+                          .toList();
+                      final activeDropdownId = uniqueSessions.any((s) => s.id == targetSession.id)
+                          ? targetSession.id
+                          : uniqueSessions.first.id;
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceGrey,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: pagePalette.borderTint),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            key: const Key('viewer_session_selector_dropdown'),
+                            value: activeDropdownId,
+                            isExpanded: true,
+                            isDense: true,
+                            icon: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: pagePalette.primary,
+                              size: 20,
                             ),
-                            selected: isSelected,
-                            selectedColor: pagePalette.primary,
-                            backgroundColor: AppTheme.surfaceGrey,
-                            showCheckmark: false,
-                            visualDensity: VisualDensity.compact,
-                            onSelected: (_) {
+                            borderRadius: BorderRadius.circular(14),
+                            dropdownColor: Colors.white,
+                            items: uniqueSessions.map((s) {
+                              final isSelected = s.id == targetSession.id;
+                              return DropdownMenuItem<String>(
+                                value: s.id,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: s.isCompleted
+                                            ? pagePalette.softTint
+                                            : AppTheme.pastelMint,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        s.isCompleted ? '완료' : 'LIVE',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: s.isCompleted
+                                              ? pagePalette.primary
+                                              : AppTheme.pastelMintDark,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '${s.title} (${s.matchFormat.label})',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight:
+                                              isSelected ? FontWeight.w900 : FontWeight.w700,
+                                          color: isSelected
+                                              ? pagePalette.primary
+                                              : AppTheme.textDark,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (selectedId) {
+                              if (selectedId == null) return;
+                              final picked = uniqueSessions.firstWhere(
+                                (s) => s.id == selectedId,
+                                orElse: () => targetSession,
+                              );
                               setState(() {
-                                _selectedSessionId = s.id;
-                                _isCompletedViewOverride = s.isCompleted;
+                                _selectedSessionId = picked.id;
+                                _isCompletedViewOverride = picked.isCompleted;
                                 _formatPreviewOverride = null;
                                 _scoreFilterRound = null;
                                 _liveSelectedRound = null;
                               });
                             },
                           ),
-                        );
-                      }).toList(),
-                    ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ],

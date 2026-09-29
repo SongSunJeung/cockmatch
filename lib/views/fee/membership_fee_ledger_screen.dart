@@ -502,38 +502,25 @@ class _MembershipFeeLedgerScreenState
     final carryoverCtrl = TextEditingController(
       text: policy.carryoverBalance.toString(),
     );
-    final generalOpCtrl = TextEditingController(
-      text: policy.generalOperationBalance.toString(),
-    );
 
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text(
-          '기초 이월금 및 운영비 기초잔액 설정',
+          '기초 이월금 설정',
           style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w900),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
+              key: const Key('base_carryover_balance_field'),
               controller: carryoverCtrl,
               keyboardType: const TextInputType.numberWithOptions(signed: true),
               decoration: const InputDecoration(
                 labelText: '기초 이월금 (원)',
                 hintText: '예: 1500000',
-                isDense: true,
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: generalOpCtrl,
-              keyboardType: const TextInputType.numberWithOptions(signed: true),
-              decoration: const InputDecoration(
-                labelText: '일반운영비 보정액 (원, 선택)',
-                hintText: '예: 0',
                 isDense: true,
                 border: OutlineInputBorder(),
               ),
@@ -555,14 +542,9 @@ class _MembershipFeeLedgerScreenState
                     carryoverCtrl.text.replaceAll(',', '').trim(),
                   ) ??
                   policy.carryoverBalance;
-              final nextGeneralOp = int.tryParse(
-                    generalOpCtrl.text.replaceAll(',', '').trim(),
-                  ) ??
-                  policy.generalOperationBalance;
               ref.read(clubFeePoliciesProvider.notifier).updatePolicy(
                     policy.copyWith(
                       carryoverBalance: nextCarryover,
-                      generalOperationBalance: nextGeneralOp,
                     ),
                   );
               Navigator.pop(dialogCtx);
@@ -574,7 +556,7 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// 0. 상단 타이틀('클럽 통합 금전출납부') 및 우측 심플 아이콘 버튼(내보내기/웹뷰어) 헤더
+  /// 0. 상단 타이틀('금전출납부') 및 우측 심플 아이콘 버튼(내보내기/웹뷰어) 헤더
   Widget _buildTopHeaderBar({
     required BuildContext context,
     required Club currentClub,
@@ -611,7 +593,7 @@ class _MembershipFeeLedgerScreenState
               children: [
                 const Flexible(
                   child: Text(
-                    '클럽 통합 금전출납부',
+                    '금전출납부',
                     style: TextStyle(
                       fontSize: 16.5,
                       fontWeight: FontWeight.w900,

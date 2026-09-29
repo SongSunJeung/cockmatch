@@ -55,6 +55,8 @@ class AppTheme {
   // 급수별 톤앤매너 통일 컬러 (무지개색 충돌을 없애고 바이올렛 -> 페리윙클 -> 스카이 -> 아쿠아 -> 슬레이트 그라데이션 적용)
   static Color getTierBgColor(Tier tier) {
     switch (tier) {
+      case Tier.s:
+        return const Color(0xFFDAD3FF); // 시그니처 로얄 바이올렛
       case Tier.a:
         return const Color(0xFFE5E0FF); // 딥 라벤더
       case Tier.b:
@@ -70,6 +72,8 @@ class AppTheme {
 
   static Color getTierTextColor(Tier tier) {
     switch (tier) {
+      case Tier.s:
+        return const Color(0xFF3927B3);
       case Tier.a:
         return const Color(0xFF4B3BC2);
       case Tier.b:
@@ -166,7 +170,7 @@ class AppTheme {
     ),
     PageAccentPalette(
       pageIndex: 1,
-      pageName: '일정/모임',
+      pageName: '모임/행사',
       toneLabel: 'SAGE 그린 활동 톤',
       primary: Color(0xFF527F5B),
       secondary: Color(0xFFA3C9A8),
@@ -219,13 +223,13 @@ class AppTheme {
     return pagePalettes[safeIndex];
   }
 
-  /// 스와이프 3대 메인 페이지(0: 회원 명부, 1: 일정/모임, 2: 대진표)의 AppBar 좌측 페이지명 반환
+  /// 스와이프 3대 메인 페이지(0: 회원 명부, 1: 모임/행사, 2: 대진표)의 AppBar 좌측 페이지명 반환
   static String getMainPageTitle(int currentIndex) {
     switch (currentIndex.clamp(0, 2)) {
       case 0:
         return '회원 명부';
       case 1:
-        return '일정/모임';
+        return '모임/행사';
       case 2:
       default:
         return '대진표';

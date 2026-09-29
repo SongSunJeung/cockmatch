@@ -38,7 +38,13 @@ void main() {
       expect(minimalMember.joinedAt, isNotNull);
     });
 
-    test('회원 모델 생성 및 급수 가중치 검증', () {
+    test('회원 모델 생성 및 급수 가중치 검증 (S조 포함)', () {
+      final memberS = Member(
+        id: 'ms',
+        name: '강에스',
+        gender: Gender.male,
+        tier: Tier.s,
+      );
       final memberA = Member(
         id: 'm1',
         name: '홍길동',
@@ -51,6 +57,11 @@ void main() {
         gender: Gender.female,
         tier: Tier.novice,
       );
+
+      expect(memberS.tier.label, equals('S조'));
+      expect(memberS.tierWeight, equals(6));
+      expect(memberS.isHighTier, isTrue);
+      expect(memberS.isLowTier, isFalse);
 
       expect(memberA.tierWeight, equals(5));
       expect(memberA.isHighTier, isTrue);
@@ -333,8 +344,9 @@ void main() {
 안세영,01011112222,여성,A조,운영진(회장),기존번호중복테스트
 박신규,010-3333-4444,남,B,총무,신규총무
 이초심,01055556666,여,초심,,회원구분기본값정회원
+김에스,010-2222-3333,남,S조,정회원,S조검증
 ,010-7777-8888,남,C조,정회원,이름누락오류
-최오류,010-8888-9999,남,S급,정회원,잘못된급수오류''';
+최오류,010-8888-9999,남,Z급,정회원,잘못된급수오류''';
 
       final result = clubService.analyzeCsvContent(
         rawCsv,
@@ -342,8 +354,8 @@ void main() {
         existingClubMembers: existing,
       );
 
-      expect(result.totalDetectedCount, equals(5));
-      expect(result.validRows.length, equals(3));
+      expect(result.totalDetectedCount, equals(6));
+      expect(result.validRows.length, equals(4));
       expect(result.errorRows.length, equals(2));
       expect(result.duplicateRows.length, equals(1));
 
@@ -364,6 +376,10 @@ void main() {
       final row3 = result.validRows[2];
       expect(row3.member!.role, equals(MemberRole.member));
       expect(row3.member!.tier, equals(Tier.novice));
+
+      // 4행: S조 파싱 확인
+      final row4 = result.validRows[3];
+      expect(row4.member!.tier, equals(Tier.s));
 
       // 오류 행 검증 (이름 누락, 잘못된 급수)
       expect(result.errorRows[0].errorSummary, contains('이름'));

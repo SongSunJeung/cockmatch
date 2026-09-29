@@ -25,8 +25,9 @@ enum Gender {
 }
 
 /// 배드민턴 급수 체계 및 가중치
-/// A(5점), B(4점), C(3점), D(2점), 초심/novice(1점)
+/// S(6점), A(5점), B(4점), C(3점), D(2점), 초심/novice(1점)
 enum Tier {
+  s('S', 'S조', 6),
   a('A', 'A조', 5),
   b('B', 'B조', 4),
   c('C', 'C조', 3),
@@ -42,8 +43,8 @@ enum Tier {
   /// 하위 호환성을 위한 alias
   static const Tier beginner = Tier.novice;
 
-  /// 상위부 여부 (A, B)
-  bool get isHighTier => this == Tier.a || this == Tier.b;
+  /// 상위부 여부 (S, A, B)
+  bool get isHighTier => this == Tier.s || this == Tier.a || this == Tier.b;
 
   /// 하위부 여부 (C, D, 초심)
   bool get isLowTier => !isHighTier;
@@ -54,10 +55,12 @@ enum Tier {
     if (clean.toLowerCase() == 'beginner' || clean == '초심' || clean == 'novice') {
       return Tier.novice;
     }
+    final stripped = clean.replaceAll('조', '').replaceAll('급', '').trim();
     for (final tier in Tier.values) {
       if (tier.code.toLowerCase() == clean.toLowerCase() ||
           tier.label.toLowerCase() == clean.toLowerCase() ||
-          tier.name.toLowerCase() == clean.toLowerCase()) {
+          tier.name.toLowerCase() == clean.toLowerCase() ||
+          tier.code.toLowerCase() == stripped.toLowerCase()) {
         return tier;
       }
     }
