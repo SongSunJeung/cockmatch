@@ -340,10 +340,20 @@ void main() {
     await tester.tap(find.text('웹뷰어'));
     await tester.pumpAndSettle();
 
-    // 상단 공유 버튼 및 모임 선택 드롭다운 확인: [웹 링크 복사] & [결과 요약 텍스트 복사] & 드롭다운
+    // 상단 공유 버튼 및 모임 선택 드롭다운 확인: 대형 버튼 제거 및 상단바 공유 팝업 버튼 통합
+    expect(find.byKey(const Key('web_viewer_share_popup_button')), findsOneWidget);
+    expect(find.text('웹 링크 복사'), findsNothing);
+    expect(find.text('결과 요약 텍스트 복사'), findsNothing);
+    expect(find.byKey(const Key('viewer_session_selector_dropdown')), findsOneWidget);
+
+    // 공유 아이콘 터치 시 팝업 메뉴([웹 링크 복사] & [결과 요약 텍스트 복사]) 노출 확인
+    await tester.tap(find.byKey(const Key('web_viewer_share_popup_button')));
+    await tester.pumpAndSettle();
     expect(find.text('웹 링크 복사'), findsOneWidget);
     expect(find.text('결과 요약 텍스트 복사'), findsOneWidget);
-    expect(find.byKey(const Key('viewer_session_selector_dropdown')), findsOneWidget);
+    await tester.tap(find.text('웹 링크 복사'));
+    await tester.pumpAndSettle();
+
 
     // 진행 중 [실시간 코트 전광판] & 하단 대기자/휴식자 명단 확인
     expect(find.text('실시간 코트 전광판'), findsWidgets);
@@ -376,6 +386,13 @@ void main() {
     expect(find.text('완료'), findsWidgets);
     expect(find.text('대기'), findsNothing);
     expect(find.text('WIN'), findsWidgets);
+
+    // 최하단으로 스크롤하여 [앱 다운로드 유도 배너] 플레이스홀더 노출 확인
+    await tester.drag(find.byType(CustomScrollView).first, const Offset(0, -600));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('web_viewer_app_download_banner')), findsOneWidget);
+    expect(find.textContaining('공식 앱'), findsOneWidget);
+    expect(find.textContaining('홈 화면에 추가하여 앱처럼 빠르게 실행하세요'), findsOneWidget);
   });
 
   testWidgets('오늘 모임 세션 & 대진 설정 바텀시트: 직전 설정값 자동 기억(Persistence) 및 [설정 초기화] 검증', (WidgetTester tester) async {

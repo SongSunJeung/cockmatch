@@ -342,7 +342,12 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                 ),
               ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            // 3. 최하단 앱 다운로드 유도 배너 (플레이스홀더)
+            SliverToBoxAdapter(
+              child: _buildAppDownloadBanner(),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
           ],
         ),
       ),
@@ -361,11 +366,11 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
   }) {
     final pagePalette = AppTheme.getPagePalette(3);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 20, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 클럽명 & 라이브/완료 상태 헤더
+          // 클럽명 & 라이브/완료 상태 헤더 + 우측 상단 공유 팝업 버튼
           Row(
             children: [
               IconButton(
@@ -448,64 +453,102 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // 3. 공유 및 편의 기능 버튼 바: [웹 링크 복사] & [결과 요약 텍스트 복사]
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _copyWebViewerLink(targetSession),
-                  icon: Icon(Icons.link_rounded, size: 17, color: pagePalette.primary),
-                  label: Text(
-                    '웹 링크 복사',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: pagePalette.primary,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    side: BorderSide(color: pagePalette.borderTint),
-                    padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-              ),
               const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _copyResultSummaryText(
-                    session: targetSession,
-                    matches: sessionMatches,
-                    members: clubMembers,
-                    activeFormat: activeFormat,
-                    isCompletedView: isCompletedView,
+              PopupMenuButton<String>(
+                key: const Key('web_viewer_share_popup_button'),
+                tooltip: '공유 및 복사',
+                position: PopupMenuPosition.under,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: Colors.grey.shade200),
+                ),
+                color: Colors.white,
+                elevation: 4,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: pagePalette.borderTint),
+                    boxShadow: AppTheme.softShadow,
                   ),
-                  icon: const Icon(Icons.content_copy_rounded, size: 16, color: Colors.white),
-                  label: const Text(
-                    '결과 요약 텍스트 복사',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                  child: Center(
+                    child: Icon(
+                      Icons.share_rounded,
+                      color: pagePalette.primary,
+                      size: 19,
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: pagePalette.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
                 ),
+                onSelected: (value) {
+                  if (value == 'copy_link') {
+                    _copyWebViewerLink(targetSession);
+                  } else if (value == 'copy_summary') {
+                    _copyResultSummaryText(
+                      session: targetSession,
+                      matches: sessionMatches,
+                      members: clubMembers,
+                      activeFormat: activeFormat,
+                      isCompletedView: isCompletedView,
+                    );
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  PopupMenuItem<String>(
+                    value: 'copy_link',
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: pagePalette.softTint,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.link_rounded, size: 16, color: pagePalette.primary),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          '웹 링크 복사',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(height: 1),
+                  PopupMenuItem<String>(
+                    value: 'copy_summary',
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.pastelMint,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.content_copy_rounded, size: 16, color: AppTheme.pastelMintDark),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          '결과 요약 텍스트 복사',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
           // 진행 중 [실시간 코트 전광판] ↔ 모임 완료 [종합 순위 & 리포트 / 라운드별 스코어] 전환 및 모임 선택 바
           Container(
@@ -714,6 +757,122 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 4. 웹뷰어 최하단 [앱 다운로드 유도 배너] (플레이스홀더)
+  Widget _buildAppDownloadBanner() {
+    final pagePalette = AppTheme.getPagePalette(3);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Container(
+        key: const Key('web_viewer_app_download_banner'),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: pagePalette.borderTint),
+          boxShadow: AppTheme.softShadow,
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: pagePalette.softTint,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.sports_tennis_rounded,
+                      color: pagePalette.primary,
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            AppConstants.appName,
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.textDark,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: AppTheme.pastelMint,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              '공식 앱',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.pastelMintDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        '스마트 대진표 자동 편성 · 출석 및 참가비 · 금전출납부',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: AppTheme.textMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              decoration: BoxDecoration(
+                color: pagePalette.softTint,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.install_mobile_rounded, size: 16, color: pagePalette.primary),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      '홈 화면에 추가하여 앱처럼 빠르게 실행하세요 (출시 준비중)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: pagePalette.primary,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
