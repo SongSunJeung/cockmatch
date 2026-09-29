@@ -338,23 +338,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                       AppTheme.buildMainAppBarRow(
                         context: context,
                         currentIndex: 1,
-                        actions: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppTheme.pastelPeriwinkle,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              currentClub.clubName,
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryDark,
-                              ),
-                            ),
-                          ),
-                        ],
+                        actions: const [],
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -562,23 +546,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                         AppTheme.buildMainAppBarRow(
                           context: context,
                           currentIndex: 1,
-                          actions: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppTheme.pastelPeriwinkle,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                currentClub.clubName,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.primaryDark,
-                                ),
-                              ),
-                            ),
-                          ],
+                          actions: const [],
                         ),
                         const SizedBox(height: 6),
                         _buildSessionHeader(context, session, currentClub),
@@ -1466,51 +1434,60 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             ],
           ),
           const SizedBox(height: 7),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
+            key: const Key('fee_status_chips_3col_row'),
             children: [
-              _buildSummaryStatusChip(
-                key: const Key('attendance_summary_fee_chip_unpaid'),
-                label: unpaidCount > 0 ? '미납 $unpaidCount명' : '전원 수납완료!',
-                bg: unpaidCount > 0 ? AppTheme.pastelRose : pagePalette.softTint,
-                fg: unpaidCount > 0 ? AppTheme.pastelRoseDark : pagePalette.primary,
-                isSelected: _selectedFeeStatus == FeeStatus.unpaid,
-                onTap: () {
-                  setState(() {
-                    _selectedFeeStatus = _selectedFeeStatus == FeeStatus.unpaid
-                        ? null
-                        : FeeStatus.unpaid;
-                  });
-                },
+              Expanded(
+                child: _buildSummaryStatusChip(
+                  key: const Key('attendance_summary_fee_chip_unpaid'),
+                  label: unpaidCount > 0 ? '미납 $unpaidCount명' : '전원 수납완료!',
+                  bg: unpaidCount > 0 ? AppTheme.pastelRose : pagePalette.softTint,
+                  fg: unpaidCount > 0 ? AppTheme.pastelRoseDark : pagePalette.primary,
+                  isSelected: _selectedFeeStatus == FeeStatus.unpaid,
+                  centerText: true,
+                  onTap: () {
+                    setState(() {
+                      _selectedFeeStatus = _selectedFeeStatus == FeeStatus.unpaid
+                          ? null
+                          : FeeStatus.unpaid;
+                    });
+                  },
+                ),
               ),
-              _buildSummaryStatusChip(
-                key: const Key('attendance_summary_fee_chip_paid'),
-                label: '완납 $paidCount명',
-                bg: pagePalette.softTint,
-                fg: pagePalette.primary,
-                isSelected: _selectedFeeStatus == FeeStatus.paid,
-                onTap: () {
-                  setState(() {
-                    _selectedFeeStatus =
-                        _selectedFeeStatus == FeeStatus.paid ? null : FeeStatus.paid;
-                  });
-                },
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildSummaryStatusChip(
+                  key: const Key('attendance_summary_fee_chip_paid'),
+                  label: '완납 $paidCount명',
+                  bg: pagePalette.softTint,
+                  fg: pagePalette.primary,
+                  isSelected: _selectedFeeStatus == FeeStatus.paid,
+                  centerText: true,
+                  onTap: () {
+                    setState(() {
+                      _selectedFeeStatus =
+                          _selectedFeeStatus == FeeStatus.paid ? null : FeeStatus.paid;
+                    });
+                  },
+                ),
               ),
-              _buildSummaryStatusChip(
-                key: const Key('attendance_summary_fee_chip_exempt'),
-                label: '면제 $exemptCount명',
-                bg: AppTheme.pastelPeriwinkle.withValues(alpha: 0.65),
-                fg: AppTheme.pastelPeriwinkleDark,
-                isSelected: _selectedFeeStatus == FeeStatus.exempt,
-                onTap: () {
-                  setState(() {
-                    _selectedFeeStatus = _selectedFeeStatus == FeeStatus.exempt
-                        ? null
-                        : FeeStatus.exempt;
-                  });
-                },
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildSummaryStatusChip(
+                  key: const Key('attendance_summary_fee_chip_exempt'),
+                  label: '면제 $exemptCount명',
+                  bg: AppTheme.pastelPeriwinkle.withValues(alpha: 0.65),
+                  fg: AppTheme.pastelPeriwinkleDark,
+                  isSelected: _selectedFeeStatus == FeeStatus.exempt,
+                  centerText: true,
+                  onTap: () {
+                    setState(() {
+                      _selectedFeeStatus = _selectedFeeStatus == FeeStatus.exempt
+                          ? null
+                          : FeeStatus.exempt;
+                    });
+                  },
+                ),
               ),
             ],
           ),

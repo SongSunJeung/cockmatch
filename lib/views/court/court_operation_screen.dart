@@ -331,8 +331,14 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  Icon(
+                                    Icons.settings_outlined,
+                                    size: 13.5,
+                                    color: pagePalette.primary,
+                                  ),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    '🏟️ ${session.courtCount}코트 변경 ⚙️',
+                                    '${session.courtCount}코트 변경',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,

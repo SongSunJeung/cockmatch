@@ -825,11 +825,11 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
           ),
           const SizedBox(height: 12),
 
-          // 실시간 코트 전광판 섹션 타이틀 & 라운드 칩
+          // 실시간 코트 전광판 섹션 타이틀 & 라운드 칩 (4라운드 이상 가로 스크롤 지원)
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -857,37 +857,49 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   ),
                 ],
               ),
-              if (rounds.length > 1)
-                Row(
-                  children: rounds.map((r) {
-                    final selected = r == activeRound;
-                    return Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: InkWell(
-                        onTap: () => setState(() => _liveSelectedRound = r),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: selected ? pagePalette.primary : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: selected ? pagePalette.secondary : Colors.grey.shade300,
+              if (rounds.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: SingleChildScrollView(
+                      key: const Key('live_scoreboard_round_chips_scroll'),
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: rounds.map((r) {
+                          final selected = r == activeRound;
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: InkWell(
+                              onTap: () => setState(() => _liveSelectedRound = r),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: selected ? pagePalette.primary : Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: selected ? pagePalette.secondary : Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Text(
+                                  '${r}R',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: selected ? Colors.white : AppTheme.textDark,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            '${r}R',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                              color: selected ? Colors.white : AppTheme.textDark,
-                            ),
-                          ),
-                        ),
+                          );
+                        }).toList(),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -2660,19 +2672,11 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
   }
 
   Widget _buildStatusBadge(MatchStatus status) {
-    Color color;
-    switch (status) {
-      case MatchStatus.pending:
-        color = AppTheme.statusPending;
-        break;
-      case MatchStatus.playing:
-        color = AppTheme.statusPlaying;
-        break;
-      case MatchStatus.finished:
-        color = AppTheme.statusFinished;
-        break;
+    if (status != MatchStatus.finished) {
+      return const SizedBox.shrink();
     }
 
+    const color = AppTheme.statusFinished;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
@@ -2681,7 +2685,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
       ),
       child: Text(
         status.label,
-        style: TextStyle(
+        style: const TextStyle(
           color: color,
           fontSize: 11.5,
           fontWeight: FontWeight.w800,

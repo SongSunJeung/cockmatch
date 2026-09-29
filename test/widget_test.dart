@@ -346,6 +346,8 @@ void main() {
 
     // 진행 중 [실시간 코트 전광판] & 하단 대기자/휴식자 명단 확인
     expect(find.text('실시간 코트 전광판'), findsWidgets);
+    expect(find.byKey(const Key('live_scoreboard_round_chips_scroll')), findsOneWidget);
+    expect(find.text('대기'), findsNothing);
     expect(find.text('다음 라운드 대기자 / 휴식자 명단'), findsOneWidget);
 
     // [모임 완료 결과 리포트] 전환 시 2개 서브 탭([종합 순위 & 리포트] / [라운드별 스코어]) 및 [순위 결정 기준 안내] 확인
@@ -365,11 +367,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('토너먼트 최종 트리 (진출 단계 기준)'), findsOneWidget);
 
-    // [라운드별 스코어] 서브 탭 전환 -> 라운드 필터 칩(전체, 1R, 2R) 및 WIN 뱃지 확인
+    // [라운드별 스코어] 서브 탭 전환 -> 라운드 필터 칩(전체, 1R, 2R), 완료된 경기 '완료' 뱃지 및 WIN 뱃지 확인
     await tester.tap(find.text('라운드별 스코어'));
     await tester.pumpAndSettle();
     expect(find.text('전체'), findsOneWidget);
     expect(find.text('1R'), findsWidgets);
+    expect(find.text('완료'), findsWidgets);
+    expect(find.text('대기'), findsNothing);
     expect(find.text('WIN'), findsWidgets);
   });
 
@@ -486,8 +490,9 @@ void main() {
     expect(find.text('운영 요약 및 설정 ⌵'), findsOneWidget);
     expect(find.text('출전 인원'), findsNothing);
 
-    // 3) 1줄 미니 툴바(칩 형태): [🏟️ 5코트 변경 ⚙️] 및 [모임 경기 전적] 확인
-    expect(find.text('🏟️ 5코트 변경 ⚙️'), findsOneWidget);
+    // 3) 1줄 미니 툴바(칩 형태): [⚙️ 5코트 변경] 2D 플랫 아웃라인 버튼 및 [모임 경기 전적] 확인
+    expect(find.text('5코트 변경'), findsOneWidget);
+    expect(find.textContaining('🏟️'), findsNothing);
     expect(find.textContaining('모임 경기 전적'), findsOneWidget);
     expect(find.textContaining('(1~5번)'), findsNothing);
     expect(find.textContaining('급수합'), findsNothing);
@@ -510,7 +515,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('운영 요약 및 설정 ⌵'), findsOneWidget);
 
-    // 4) [🏟️ 5코트 변경 ⚙️] 칩 버튼 클릭 -> 코트 변경 다이얼로그 오픈 및 [+ 코트 추가] / [- 코트 축소] 확인
+    // 4) [5코트 변경] 칩 버튼 클릭 -> 코트 변경 다이얼로그 오픈 및 [+ 코트 추가] / [- 코트 축소] 확인
     await tester.tap(find.byKey(const Key('open_court_change_dialog_button')));
     await tester.pumpAndSettle();
     expect(find.text('실시간 운영 코트 변경'), findsOneWidget);
@@ -530,7 +535,7 @@ void main() {
     // 다이얼로그 닫고 아래로 스크롤하여 새로 생성된 '빈 코트 슬롯' 카드 노출 확인
     await tester.tap(find.text('닫기'));
     await tester.pumpAndSettle();
-    expect(find.text('🏟️ 6코트 변경 ⚙️'), findsOneWidget);
+    expect(find.text('6코트 변경'), findsOneWidget);
 
     final courtScrollable = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
@@ -542,7 +547,7 @@ void main() {
     expect(find.text('빈 코트 슬롯'), findsOneWidget);
     expect(find.text('배정된 경기가 없는 빈 코트 슬롯입니다'), findsOneWidget);
 
-    // 다시 상단으로 스크롤하여 [🏟️ 6코트 변경 ⚙️] 다이얼로그에서 [- 코트 축소] 클릭 -> 빈 코트 우선 제거 확인
+    // 다시 상단으로 스크롤하여 [6코트 변경] 다이얼로그에서 [- 코트 축소] 클릭 -> 빈 코트 우선 제거 확인
     await tester.scrollUntilVisible(
       find.byKey(const Key('open_court_change_dialog_button')),
       -350.0,
@@ -571,7 +576,7 @@ void main() {
     await tester.tap(find.byKey(const Key('reduce_court_to_waiting_button')));
     await tester.pumpAndSettle();
     expect(find.text('진행/배정 중인 코트 축소 확인'), findsNothing);
-    expect(find.text('🏟️ 4코트 변경 ⚙️'), findsOneWidget);
+    expect(find.text('4코트 변경'), findsOneWidget);
     expect(find.text('현재 휴식 중: '), findsOneWidget);
   });
 
@@ -649,13 +654,19 @@ void main() {
     await tester.tap(find.byKey(const Key('activate_pro_and_open_fee_ledger_button')));
     await tester.pumpAndSettle();
 
-    // [Part 2] 금전출납부 핵심 UI 검증 (상단 아코디언 기본 접힘 & 슬림화)
+    // [Part 2] 금전출납부 핵심 UI 검증 (상단 아코디언 기본 접힘 & 슬림화, 2D 아이콘 및 버튼 너비 비율)
     expect(find.text('금전출납부'), findsWidgets);
     expect(find.text('클럽 통합 금전출납부'), findsNothing);
     expect(find.text('회비&계좌설정'), findsOneWidget);
+    expect(find.byIcon(Icons.account_balance_wallet), findsWidgets);
+    expect(find.byIcon(Icons.article), findsWidgets);
+    expect(
+      tester.getSize(find.byKey(const Key('toggle_fee_policy_button'))).width,
+      greaterThan(tester.getSize(find.byKey(const Key('toggle_fee_rules_button'))).width),
+    );
     expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsNothing);
 
-    // [⚙️ 회비&계좌설정] 클릭 시 정책 및 계좌 카드 펼침 및 입금 계좌 우측 '수정' 버튼 확인
+    // [회비&계좌설정] 클릭 시 정책 및 계좌 카드 펼침 및 입금 계좌 우측 '수정' 버튼 확인
     await tester.tap(find.byKey(const Key('toggle_fee_policy_button')));
     await tester.pumpAndSettle();
     expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsOneWidget);
@@ -668,7 +679,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsNothing);
 
-    // [📜 회비회칙] 아코디언 펼치기 및 '회칙 저장' 버튼 확인
+    // [회비회칙] 아코디언 펼치기 및 '회칙 저장' 버튼 확인
     expect(find.text('회비회칙'), findsOneWidget);
     await tester.tap(find.byKey(const Key('toggle_fee_rules_button')));
     await tester.pumpAndSettle();
@@ -719,6 +730,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // 모임/행사 상단 앱바 우측 '메가 배드민턴 클럽' 중복 칩 제거 확인
+    expect(find.text('메가 배드민턴 클럽'), findsNothing);
+
     // 대진 기록이 있는 모임('2026.09.22 화요 정기 모임') 열기
     final archivedCard = find.text('2026.09.22 화요 정기 모임');
     await tester.ensureVisible(archivedCard);
@@ -726,9 +740,10 @@ void main() {
     await tester.tap(archivedCard);
     await tester.pumpAndSettle();
 
-    // 1. [출석부] 상단 회비 수납 현황 카드 내 [연간/월별 회비 현황표 ->] 버튼이 삭제되었는지 및 3등분 가로 배치(Row) 확인
+    // 1. [출석부] 상단 회비 수납 현황 카드 내 [연간/월별 회비 현황표 ->] 버튼이 삭제되었는지 및 출전/회비 3등분 가로 배치(Row) 확인
     expect(find.textContaining('연간/월별 회비 현황표'), findsNothing);
     expect(find.byKey(const Key('attendance_status_chips_3col_row')), findsOneWidget);
+    expect(find.byKey(const Key('fee_status_chips_3col_row')), findsOneWidget);
 
     // 1-2. [출석부] 상단 회비 수납 칩([미납 N명], [완납 N명], [면제 N명]) 터치 시 참석자 리스트 즉시 필터링 및 재터치 시 해제 검증
     final unpaidChip = find.byKey(const Key('attendance_summary_fee_chip_unpaid'));

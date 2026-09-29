@@ -840,9 +840,8 @@ class _MembershipFeeLedgerScreenState
       children: [
         Row(
           children: [
-            // [⚙️ 회비&계좌설정] 토글 버튼 (기본 Collapsed)
+            // [회비&계좌설정] 토글 버튼 (Expanded로 가로 폭 넓게 할당)
             Expanded(
-              flex: 6,
               child: InkWell(
                 key: const Key('toggle_fee_policy_button'),
                 onTap: () {
@@ -867,8 +866,12 @@ class _MembershipFeeLedgerScreenState
                   ),
                   child: Row(
                     children: [
-                      const Text('⚙️', style: TextStyle(fontSize: 12)),
-                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.account_balance_wallet,
+                        size: 14,
+                        color: pagePalette.primary,
+                      ),
+                      const SizedBox(width: 5),
                       Expanded(
                         child: Text(
                           '회비&계좌설정',
@@ -877,6 +880,7 @@ class _MembershipFeeLedgerScreenState
                             fontWeight: FontWeight.w900,
                             color: pagePalette.primary,
                           ),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -904,59 +908,59 @@ class _MembershipFeeLedgerScreenState
               ),
             ),
             const SizedBox(width: 6),
-            // [📜 회비회칙] 토글 버튼 (기본 Collapsed)
-            Expanded(
-              flex: 5,
-              child: InkWell(
-                key: const Key('toggle_fee_rules_button'),
-                onTap: () {
-                  setState(
-                    () =>
-                        _isRulesAccordionExpanded = !_isRulesAccordionExpanded,
-                  );
-                },
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
+            // [회비회칙] 토글 버튼 (짧은 글자 수에 맞게 가로 폭 축소)
+            InkWell(
+              key: const Key('toggle_fee_rules_button'),
+              onTap: () {
+                setState(
+                  () =>
+                      _isRulesAccordionExpanded = !_isRulesAccordionExpanded,
+                );
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: _isRulesAccordionExpanded
+                      ? AppTheme.pastelPeriwinkle
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
                     color: _isRulesAccordionExpanded
-                        ? AppTheme.pastelPeriwinkle
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _isRulesAccordionExpanded
-                          ? AppTheme.primaryDark.withValues(alpha: 0.4)
-                          : const Color(0xFFE4E7F4),
+                        ? AppTheme.primaryDark.withValues(alpha: 0.4)
+                        : const Color(0xFFE4E7F4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.article,
+                      size: 14,
+                      color: AppTheme.primaryDark,
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Text('📜', style: TextStyle(fontSize: 12)),
-                      const SizedBox(width: 4),
-                      const Expanded(
-                        child: Text(
-                          '회비회칙',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.textDark,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      '회비회칙',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.textDark,
                       ),
-                      Text(
-                        _isRulesAccordionExpanded ? '접기 ⌃' : '⌵',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.primaryDark,
-                        ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _isRulesAccordionExpanded ? '접기 ⌃' : '⌵',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.primaryDark,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
