@@ -1,11 +1,11 @@
 {
-    "name": "cockmatch",
-    "short_name": "cockmatch",
+    "name": "쓸만한 민턴총무",
+    "short_name": "쓸만한 민턴총무",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F8FAFC",
+    "theme_color": "#5A4AD1",
+    "description": "배드민턴 클럽 모임·출석·대진표·금전출납부 통합 관리 웹앱 쓸만한 민턴총무",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

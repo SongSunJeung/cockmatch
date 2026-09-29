@@ -612,11 +612,29 @@ void main() {
     // [Part 3-1] 메인 3개 화면(회원명부 0 ↔ 출석부 1 ↔ 대진표 2) PageView 존재 확인
     expect(find.byKey(const Key('main_three_tab_page_view')), findsOneWidget);
 
-    // [Part 3-2] 좌측 드로어 메뉴에서 [월회비 관리 🔒] 클릭 시 비구독자(isProUser == false) 안내 모달 노출 검증
+    // [Part 3-2] 좌측 드로어 메뉴에서 브랜딩('쓸만한 민턴총무'), 클럽 드롭다운(▾), 메뉴 명칭('모임/행사', '금전출납부') 및 비구독자 안내 모달 노출 검증
     await tester.tap(find.byTooltip('메뉴 열기').first);
     await tester.pumpAndSettle();
-    expect(find.text('월회비 관리 🔒'), findsOneWidget);
-    await tester.tap(find.text('월회비 관리 🔒'));
+    expect(find.byKey(const Key('drawer_brand_title')), findsOneWidget);
+    expect(find.text('쓸만한 민턴총무'), findsOneWidget);
+    expect(find.textContaining('진행 모임:'), findsNothing);
+    expect(find.byKey(const Key('drawer_club_selector_button')), findsOneWidget);
+    expect(find.byKey(const Key('drawer_club_dropdown_arrow')), findsOneWidget);
+    expect(find.text('모임/행사'), findsOneWidget);
+    expect(find.text('모임 출석 체크 및 참가비 수납'), findsOneWidget);
+    expect(find.text('금전출납부'), findsOneWidget);
+    expect(find.text('월회비 · 일반운영비 · 행사 정산'), findsOneWidget);
+
+    // 드로어 상단 클럽명('메가 배드민턴 클럽 ▾') 클릭 시 등록된 클럽 목록 및 '+ 새 모임/클럽 만들기' 메뉴 노출 확인
+    await tester.tap(find.byKey(const Key('drawer_club_selector_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('drawer_create_club_menu_item')), findsOneWidget);
+    expect(find.text('+ 새 모임/클럽 만들기'), findsOneWidget);
+    // 팝업 메뉴 닫기 (현재 클럽 재선택)
+    await tester.tap(find.text('메가 배드민턴 클럽').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('금전출납부'));
     await tester.pumpAndSettle();
 
     // 비구독자 진입 차단 및 PRO 기능 안내 모달 확인
@@ -906,10 +924,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 드로어를 열어 [월회비 관리 🔒] 클릭 -> PRO 활성화 후 진입
+    // 드로어를 열어 [금전출납부] 클릭 -> PRO 활성화 후 진입
     await tester.tap(find.byTooltip('메뉴 열기').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('월회비 관리 🔒'));
+    await tester.tap(find.text('금전출납부'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('activate_pro_and_open_fee_ledger_button')));
     await tester.pumpAndSettle();

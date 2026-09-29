@@ -3965,7 +3965,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                 ),
                 icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
                 label: const Text(
-                  '+ 새 클럽/모임 생성',
+                  '+ 새 모임/클럽 만들기',
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                 ),
                 onPressed: () {

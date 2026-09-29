@@ -2,8 +2,8 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = '콕매치';
-  static const String appSubtitle = 'CockMatch - 배드민턴 스마트 대진표';
+  static const String appName = '쓸만한 민턴총무';
+  static const String appSubtitle = '쓸만한 민턴총무 - 배드민턴 클럽 통합 관리';
 
   // 코트 관련 설정
   static const int minCourtCount = 1;

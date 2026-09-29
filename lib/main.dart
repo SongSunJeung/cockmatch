@@ -87,7 +87,6 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
   Widget build(BuildContext context) {
     final currentTab = ref.watch(currentTabProvider);
     final currentClub = ref.watch(currentClubProvider);
-    final activeSession = ref.watch(sessionProvider);
     final isProUser = ref.watch(isProUserProvider);
 
     Widget activeBody;
@@ -118,7 +117,6 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
         ref: ref,
         currentTab: currentTab,
         clubName: currentClub.clubName,
-        sessionTitle: activeSession?.title,
         isProUser: isProUser,
       ),
       body: Center(
@@ -179,7 +177,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(
-                '🔒 [월회비 관리]는 PRO 구독 클럽 전용 프리미엄 재정 관리 기능입니다.',
+                '🔒 [금전출납부]는 PRO 구독 클럽 전용 프리미엄 재정 관리 기능입니다.',
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w800,
@@ -190,9 +188,9 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
             const SizedBox(height: 12),
             const Text(
               '• 1월~12월 연간 납부 매트릭스 장부 & [1년 일괄 완납] 원터치 처리\n'
-              '• 클럽 기본 월 회비·납부 마감일·입금 계좌 및 회칙 메모 영구 보관\n'
-              '• [📢 당월 미납자 알림 문구 복사] 카톡 자동 생성\n'
-              '• [📸 장부 이미지 내보내기] 및 실시간 회비 웹뷰어 링크 공유',
+              '• 일상 지출(대관료·셔틀콕·비품) 및 일반 수입(가입비·찬조금) 통합 기록\n'
+              '• 행사/모임별 참가비·지출 정산 및 영수증 증빙 사진 첨부\n'
+              '• [📢 당월 미납자 알림 문구 복사], [📸 장부 이미지 내보내기], 실시간 웹뷰어 공유',
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.55,
@@ -240,15 +238,109 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
     );
   }
 
+  /// 드로어 상단 클럽 드롭다운에서 '+ 새 모임/클럽 만들기' 선택 시 열리는 생성 다이얼로그
+  void _showDrawerCreateClubDialog(BuildContext context, WidgetRef ref) {
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.add_business_rounded, color: AppTheme.primaryMint),
+            SizedBox(width: 8),
+            Text(
+              '새 모임/클럽 만들기',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '독립된 회원 명부와 대진표, 금전출납부를 관리할 새 모임/클럽을 만듭니다.',
+              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: '클럽 / 모임 이름 (필수)',
+                hintText: '예: 서초 번개콕, 일요 모닝배턴',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descCtrl,
+              decoration: InputDecoration(
+                labelText: '모임 일정 / 설명 (선택)',
+                hintText: '예: 매주 일요일 08시 · 3코트',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryMint,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) return;
+
+              final desc = descCtrl.text.trim();
+              final newClub = ref.read(clubsProvider.notifier).createClub(
+                    name,
+                    description: desc.isNotEmpty ? desc : null,
+                  );
+
+              ref.read(currentClubIdProvider.notifier).switchClub(newClub.id);
+
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: AppTheme.primaryDark,
+                  content: Text(
+                    '[${newClub.clubName}] 새 모임/클럽이 생성되어 활성화되었습니다!',
+                  ),
+                ),
+              );
+            },
+            child: const Text('생성 및 전환'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAppDrawer({
     required BuildContext context,
     required WidgetRef ref,
     required int currentTab,
     required String clubName,
-    required String? sessionTitle,
     required bool isProUser,
   }) {
     final activePalette = AppTheme.getPagePalette(currentTab);
+    final clubs = ref.watch(clubsProvider);
+    final currentClubId = ref.watch(currentClubIdProvider);
 
     return Drawer(
       backgroundColor: Colors.white,
@@ -262,7 +354,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 드로어 상단 클럽 헤더 (현재 페이지 테마 컬러 반영)
+            // 드로어 상단 클럽 헤더 (브랜드명 '쓸만한 민턴총무' + 클럽 드롭다운 선택기 '▾')
             Container(
               margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               padding: const EdgeInsets.all(18),
@@ -281,81 +373,203 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                   ),
                 ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(12),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text('🏸', style: TextStyle(fontSize: 20)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppConstants.appName,
+                          key: const Key('drawer_brand_title'),
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white.withValues(alpha: 0.88),
+                            letterSpacing: -0.2,
+                          ),
                         ),
-                        child: const Center(
-                          child: Text('🏸', style: TextStyle(fontSize: 20)),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '콕매치 (CockMatch)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white.withValues(alpha: 0.85),
+                        const SizedBox(height: 3),
+                        PopupMenuButton<String>(
+                          key: const Key('drawer_club_selector_button'),
+                          tooltip: '클럽/모임 전환 및 생성',
+                          offset: const Offset(0, 36),
+                          color: Colors.white,
+                          elevation: 10,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          onSelected: (value) {
+                            final rootContext =
+                                AppTheme.rootScaffoldKey.currentContext ??
+                                context;
+                            if (value == '__create_new_club__') {
+                              _showDrawerCreateClubDialog(rootContext, ref);
+                            } else {
+                              ref
+                                  .read(currentClubIdProvider.notifier)
+                                  .switchClub(value);
+                              final selectedClub = clubs
+                                  .where((c) => c.id == value)
+                                  .firstOrNull;
+                              if (selectedClub != null) {
+                                ScaffoldMessenger.of(rootContext).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: AppTheme.primaryDark,
+                                    content: Text(
+                                      '[${selectedClub.clubName}] 클럽으로 전환되었습니다.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            ...clubs.map((club) {
+                              final isSelected = club.id == currentClubId;
+                              return PopupMenuItem<String>(
+                                value: club.id,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 28,
+                                      height: 28,
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? AppTheme.primaryMint
+                                            : AppTheme.pastelPeriwinkle,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        club.clubName.isNotEmpty
+                                            ? club.clubName.characters.first
+                                            : '콕',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : AppTheme.pastelPeriwinkleDark,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            club.clubName,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w900
+                                                  : FontWeight.w700,
+                                              color: AppTheme.textDark,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            club.description ??
+                                                '회원 ${club.memberCount}명',
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              color: AppTheme.textMuted,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      const Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 17,
+                                        color: AppTheme.primaryMint,
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            const PopupMenuDivider(),
+                            const PopupMenuItem<String>(
+                              key: Key('drawer_create_club_menu_item'),
+                              value: '__create_new_club__',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.add_circle_outline_rounded,
+                                    size: 18,
+                                    color: AppTheme.primaryDark,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    '+ 새 모임/클럽 만들기',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.primaryDark,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              clubName,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (sessionTitle != null && sessionTitle.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.fiber_manual_record_rounded,
-                            size: 10,
-                            color: Color(0xFF6EF2FC),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              '진행 모임: $sessionTitle',
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    clubName,
+                                    style: const TextStyle(
+                                      fontSize: 15.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                const Text(
+                                  '▾',
+                                  key: Key('drawer_club_dropdown_arrow'),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
@@ -392,8 +606,8 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                     currentTab: currentTab,
                     index: 1,
                     icon: Icons.checklist_rtl_rounded,
-                    label: '일정/모임',
-                    subtitle: '당일 모임 생성·출석 체크 및 회비 수납',
+                    label: '모임/행사',
+                    subtitle: '모임 출석 체크 및 참가비 수납',
                   ),
                   _buildDrawerMenuItem(
                     context: context,
@@ -419,12 +633,12 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                     currentTab: currentTab,
                     index: 4,
                     icon: Icons.account_balance_wallet_rounded,
-                    label: '월회비 관리 🔒',
-                    subtitle: isProUser
-                        ? 'PRO 활성화됨 · 연간/월별 회비 현황표'
-                        : 'PRO 전용 · 연간 회비 장부 및 미납 알림',
+                    label: '금전출납부',
+                    subtitle: '월회비 · 일반운영비 · 행사 정산',
+                    showLockBadge: !isProUser,
                     onCustomTap: () {
-                      final rootContext = AppTheme.rootScaffoldKey.currentContext ?? context;
+                      final rootContext =
+                          AppTheme.rootScaffoldKey.currentContext ?? context;
                       Navigator.of(context).pop();
                       if (!ref.read(isProUserProvider)) {
                         _showProFeeFeatureGuideModal(rootContext, ref);
@@ -443,14 +657,20 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
               child: Row(
                 children: [
                   Icon(
-                    isProUser ? Icons.verified_rounded : Icons.lock_outline_rounded,
+                    isProUser
+                        ? Icons.verified_rounded
+                        : Icons.lock_outline_rounded,
                     size: 16,
-                    color: isProUser ? AppTheme.getPagePalette(4).primary : AppTheme.textMuted,
+                    color: isProUser
+                        ? AppTheme.getPagePalette(4).primary
+                        : AppTheme.textMuted,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      isProUser ? 'PRO 플랜 구독 중 (회비 장부 열림)' : '무료 플랜 (PRO 잠금 테스트)',
+                      isProUser
+                          ? 'PRO 플랜 구독 중 (회비 장부 열림)'
+                          : '무료 플랜 (PRO 잠금 테스트)',
                       style: const TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
@@ -476,11 +696,15 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
               child: Row(
                 children: [
-                  const Icon(Icons.touch_app_rounded, size: 16, color: AppTheme.textMuted),
+                  const Icon(
+                    Icons.touch_app_rounded,
+                    size: 16,
+                    color: AppTheme.textMuted,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '좌우 스와이프: 회원명부 ↔ 일정/모임 ↔ 대진표 전환',
+                      '좌우 스와이프: 회원명부 ↔ 모임/행사 ↔ 대진표 전환',
                       style: TextStyle(
                         fontSize: 11,
                         color: AppTheme.textMuted.withValues(alpha: 0.9),
@@ -504,6 +728,7 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
     required IconData icon,
     required String label,
     required String subtitle,
+    bool showLockBadge = false,
     VoidCallback? onCustomTap,
   }) {
     final isSelected = currentTab == index;
@@ -545,13 +770,28 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
-                        color: isSelected ? itemPalette.primary : AppTheme.textDark,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: isSelected
+                                  ? FontWeight.w800
+                                  : FontWeight.w700,
+                              color: isSelected
+                                  ? itemPalette.primary
+                                  : AppTheme.textDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (showLockBadge) ...[
+                          const SizedBox(width: 4),
+                          const Text('🔒', style: TextStyle(fontSize: 12)),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 1),
                     Text(
