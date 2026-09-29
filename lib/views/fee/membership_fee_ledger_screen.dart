@@ -828,7 +828,7 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// 1 & 2. 슬림 아코디언 바: [⚙️ 정책 및 계좌 설정 열기 ⌵] + [📜 클럽 회비 회칙 & 메모란]
+  /// 1 & 2. 슬림 아코디언 바: [⚙️ 회비&계좌설정] + [📜 회비회칙]
   Widget _buildCompactPolicyAndRulesSection(
     BuildContext context,
     Club currentClub,
@@ -840,7 +840,7 @@ class _MembershipFeeLedgerScreenState
       children: [
         Row(
           children: [
-            // [⚙️ 정책 및 계좌 설정 열기 ⌵] 토글 버튼 (기본 Collapsed)
+            // [⚙️ 회비&계좌설정] 토글 버튼 (기본 Collapsed)
             Expanded(
               flex: 6,
               child: InkWell(
@@ -867,11 +867,11 @@ class _MembershipFeeLedgerScreenState
                   ),
                   child: Row(
                     children: [
+                      const Text('⚙️', style: TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          _isPolicyExpanded
-                              ? '⚙️ 정책 및 계좌 설정 접기 ⌃'
-                              : '⚙️ 정책 및 계좌 설정 열기 ⌵',
+                          '회비&계좌설정',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w900,
@@ -889,13 +889,22 @@ class _MembershipFeeLedgerScreenState
                           color: AppTheme.textMuted,
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _isPolicyExpanded ? '⌃' : '⌵',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: pagePalette.primary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 6),
-            // [📜 클럽 회비 회칙 & 메모란] 토글 버튼 (기본 Collapsed)
+            // [📜 회비회칙] 토글 버튼 (기본 Collapsed)
             Expanded(
               flex: 5,
               child: InkWell(
@@ -929,7 +938,7 @@ class _MembershipFeeLedgerScreenState
                       const SizedBox(width: 4),
                       const Expanded(
                         child: Text(
-                          '클럽 회비 회칙 & 메모란',
+                          '회비회칙',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w900,
@@ -1077,6 +1086,34 @@ class _MembershipFeeLedgerScreenState
                   ),
                 ),
                 InkWell(
+                  key: const Key('edit_bank_account_button'),
+                  onTap: () =>
+                      _showEditFeePolicyDialog(context, currentClub, policy),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.pastelPeriwinkle.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AppTheme.primaryDark.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: const Text(
+                      '수정',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.primaryDark,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                InkWell(
                   onTap: () async {
                     final accountText =
                         '${policy.bankName} ${policy.accountNumber} (예금주: ${policy.accountHolder})';
@@ -1159,7 +1196,7 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// 2. [📜 클럽 회비 회칙 & 메모란] 상세 패널 (펼쳤을 때 노출)
+  /// 2. [📜 회비회칙] 상세 패널 (펼쳤을 때 노출)
   Widget _buildRulesAccordionCard(
     BuildContext context,
     Club currentClub,
@@ -1224,6 +1261,7 @@ class _MembershipFeeLedgerScreenState
               ),
               const SizedBox(width: 6),
               ElevatedButton.icon(
+                key: const Key('save_fee_rules_button'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryDark,
                   foregroundColor: Colors.white,
@@ -1239,7 +1277,7 @@ class _MembershipFeeLedgerScreenState
                 ),
                 icon: const Icon(Icons.save_rounded, size: 14),
                 label: const Text(
-                  '회칙/메모 영구 저장',
+                  '회칙 저장',
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w800,
@@ -1256,7 +1294,7 @@ class _MembershipFeeLedgerScreenState
                       const SnackBar(
                         backgroundColor: AppTheme.primaryDark,
                         content: Text(
-                          '클럽 회비 회칙 및 메모가 영구 저장되었습니다.',
+                          '클럽 회비 회칙 및 메모가 저장되었습니다.',
                         ),
                       ),
                     );
@@ -3485,6 +3523,7 @@ class _MembershipFeeLedgerScreenState
                       children: [
                         Expanded(
                           child: InkWell(
+                            key: const Key('general_op_dialog_tab_income'),
                             onTap: () => setDialogState(() => isIncome = true),
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
@@ -3496,9 +3535,9 @@ class _MembershipFeeLedgerScreenState
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                '➕ 일반 수입 (가입비·찬조)',
+                                '수입',
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.w900,
                                   color: isIncome
                                       ? Colors.white
@@ -3510,6 +3549,7 @@ class _MembershipFeeLedgerScreenState
                         ),
                         Expanded(
                           child: InkWell(
+                            key: const Key('general_op_dialog_tab_expense'),
                             onTap: () => setDialogState(() => isIncome = false),
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
@@ -3521,9 +3561,9 @@ class _MembershipFeeLedgerScreenState
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                '➖ 일상 지출 (대관·콕·비품)',
+                                '지출',
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.w900,
                                   color: !isIncome
                                       ? Colors.white
@@ -3904,7 +3944,7 @@ class _MembershipFeeLedgerScreenState
                     ),
                   ),
                   const SizedBox(width: 6),
-                  // [📥 일정/모임에서 가져오기] 버튼
+                  // [📥 모임/행사에서 가져오기] 버튼
                   InkWell(
                     key: const Key('import_session_event_button'),
                     onTap: () =>
@@ -3930,7 +3970,7 @@ class _MembershipFeeLedgerScreenState
                           ),
                           const SizedBox(width: 2),
                           Text(
-                            '일정/모임에서 가져오기',
+                            '모임/행사에서 가져오기',
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w900,
@@ -4045,7 +4085,7 @@ class _MembershipFeeLedgerScreenState
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  '새 행사를 직접 등록하거나, 일반 모드 [일정/모임]에서 진행한 모임 데이터를\n원클릭으로 불러와 수입/지출 및 영수증을 스마트하게 정산해 보세요.',
+                  '새 행사를 직접 등록하거나, 일반 모드 [모임/행사]에서 진행한 모임 데이터를\n원클릭으로 불러와 수입/지출 및 영수증을 스마트하게 정산해 보세요.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11.5,
@@ -4094,7 +4134,7 @@ class _MembershipFeeLedgerScreenState
                       ),
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: const Text(
-                        '일정/모임에서 가져오기',
+                        '모임/행사에서 가져오기',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 12,
@@ -4181,7 +4221,7 @@ class _MembershipFeeLedgerScreenState
                                 ),
                                 SizedBox(width: 2),
                                 Text(
-                                  '일정/모임 연동',
+                                  '모임/행사 연동',
                                   style: TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w900,
@@ -4207,6 +4247,18 @@ class _MembershipFeeLedgerScreenState
                 ),
               ),
               IconButton(
+                key: const Key('edit_club_event_button'),
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  size: 18,
+                  color: AppTheme.primaryDark,
+                ),
+                tooltip: '행사 수정',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showEditEventDialog(context, event),
+              ),
+              IconButton(
+                key: const Key('delete_club_event_button'),
                 icon: const Icon(
                   Icons.delete_outline_rounded,
                   size: 18,
@@ -4768,7 +4820,106 @@ class _MembershipFeeLedgerScreenState
     );
   }
 
-  /// [📥 일정/모임에서 가져오기] 다이얼로그 (일반 모드 일정/모임 데이터 원클릭 연동)
+  /// [✏️ 행사 수정] 다이얼로그 (행사명, 행사 일자, 메모 수정)
+  void _showEditEventDialog(BuildContext context, ClubEvent event) {
+    final titleCtrl = TextEditingController(text: event.title);
+    final dateCtrl = TextEditingController(text: event.eventDate);
+    final memoCtrl = TextEditingController(text: event.memo ?? '');
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_calendar_rounded, color: AppTheme.primaryDark),
+            SizedBox(width: 8),
+            Text(
+              '행사/모임 정보 수정',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              key: const Key('edit_club_event_title_field'),
+              controller: titleCtrl,
+              decoration: const InputDecoration(
+                labelText: '행사/모임 명칭 *',
+                hintText: '예: 10월 정기모임 정산, 가을 교류전',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('edit_club_event_date_field'),
+              controller: dateCtrl,
+              decoration: const InputDecoration(
+                labelText: '행사 일자 (YYYY.MM.DD) *',
+                hintText: '2026.09.28',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('edit_club_event_memo_field'),
+              controller: memoCtrl,
+              decoration: const InputDecoration(
+                labelText: '행사 메모 (선택)',
+                hintText: '장소, 참석 대상 등',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('취소', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            key: const Key('save_edited_club_event_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final title = titleCtrl.text.trim();
+              final date = dateCtrl.text.trim();
+              if (title.isEmpty || date.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('행사명과 일자를 모두 입력해 주세요.')),
+                );
+                return;
+              }
+              final updated = event.copyWith(
+                title: title,
+                eventDate: date,
+                memo: memoCtrl.text.trim(),
+              );
+              ref.read(clubEventsProvider.notifier).updateEvent(updated);
+              Navigator.pop(dialogCtx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: AppTheme.primaryDark,
+                  content: Text('✅ "$title" 행사 정보가 수정되었습니다.'),
+                ),
+              );
+            },
+            child: const Text('수정 완료'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// [📥 모임/행사에서 가져오기] 다이얼로그 (일반 모드 모임/행사 데이터 원클릭 연동)
   void _showImportFromSessionDialog(
     BuildContext context,
     Club club,
@@ -4787,7 +4938,7 @@ class _MembershipFeeLedgerScreenState
             Icon(Icons.download_rounded, color: AppTheme.primaryDark),
             SizedBox(width: 8),
             Text(
-              '일정/모임 데이터 가져오기',
+              '모임/행사 데이터 가져오기',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
             ),
           ],
@@ -4799,7 +4950,7 @@ class _MembershipFeeLedgerScreenState
                   padding: EdgeInsets.symmetric(vertical: 24),
                   child: Center(
                     child: Text(
-                      '가져올 수 있는 일정/모임 기록이 없습니다.\n[일정/모임]에서 모임을 먼저 생성해 보세요.',
+                      '가져올 수 있는 모임/행사 기록이 없습니다.\n[모임/행사]에서 모임을 먼저 생성해 보세요.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppTheme.textMuted),
                     ),

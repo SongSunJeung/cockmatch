@@ -652,25 +652,29 @@ void main() {
     // [Part 2] 금전출납부 핵심 UI 검증 (상단 아코디언 기본 접힘 & 슬림화)
     expect(find.text('금전출납부'), findsWidgets);
     expect(find.text('클럽 통합 금전출납부'), findsNothing);
-    expect(find.text('⚙️ 정책 및 계좌 설정 열기 ⌵'), findsOneWidget);
+    expect(find.text('회비&계좌설정'), findsOneWidget);
     expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsNothing);
 
-    // [⚙️ 정책 및 계좌 설정 열기 ⌵] 클릭 시 정책 및 계좌 카드 펼침 확인
+    // [⚙️ 회비&계좌설정] 클릭 시 정책 및 계좌 카드 펼침 및 입금 계좌 우측 '수정' 버튼 확인
     await tester.tap(find.byKey(const Key('toggle_fee_policy_button')));
     await tester.pumpAndSettle();
     expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsOneWidget);
     expect(find.text('30,000원'), findsWidgets);
     expect(find.text('매월 25일'), findsOneWidget);
+    expect(find.byKey(const Key('edit_bank_account_button')), findsOneWidget);
+    expect(find.text('수정'), findsWidgets);
     // 다시 접기
     await tester.tap(find.byKey(const Key('toggle_fee_policy_button')));
     await tester.pumpAndSettle();
     expect(find.text('클럽 기본 회비 정책 & 입금 계좌 설정'), findsNothing);
 
-    // [📜 클럽 회비 회칙 & 메모란] 아코디언 펼치기 및 접기 확인
-    expect(find.text('클럽 회비 회칙 & 메모란'), findsOneWidget);
+    // [📜 회비회칙] 아코디언 펼치기 및 '회칙 저장' 버튼 확인
+    expect(find.text('회비회칙'), findsOneWidget);
     await tester.tap(find.byKey(const Key('toggle_fee_rules_button')));
     await tester.pumpAndSettle();
-    expect(find.text('회칙/메모 영구 저장'), findsOneWidget);
+    expect(find.byKey(const Key('save_fee_rules_button')), findsOneWidget);
+    expect(find.text('회칙 저장'), findsOneWidget);
+    expect(find.text('회칙/메모 영구 저장'), findsNothing);
     await tester.tap(find.byKey(const Key('toggle_fee_rules_button')));
     await tester.pumpAndSettle();
 
@@ -722,8 +726,9 @@ void main() {
     await tester.tap(archivedCard);
     await tester.pumpAndSettle();
 
-    // 1. [출석부] 상단 회비 수납 현황 카드 내 [연간/월별 회비 현황표 ->] 버튼이 삭제되었는지 확인
+    // 1. [출석부] 상단 회비 수납 현황 카드 내 [연간/월별 회비 현황표 ->] 버튼이 삭제되었는지 및 3등분 가로 배치(Row) 확인
     expect(find.textContaining('연간/월별 회비 현황표'), findsNothing);
+    expect(find.byKey(const Key('attendance_status_chips_3col_row')), findsOneWidget);
 
     // 1-2. [출석부] 상단 회비 수납 칩([미납 N명], [완납 N명], [면제 N명]) 터치 시 참석자 리스트 즉시 필터링 및 재터치 시 해제 검증
     final unpaidChip = find.byKey(const Key('attendance_summary_fee_chip_unpaid'));
@@ -743,9 +748,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('필터 초기화'), findsNothing);
 
-    // 2. 이미 대진표가 생성된 상태이므로 하단 기본 버튼이 [현재 대진표 확인] 및 [대진표 설정수정]으로 표시되는지 확인
+    // 2. 이미 대진표가 생성된 상태이므로 하단 기본 버튼이 [현재 대진표 확인] 및 [대진표 설정수정]으로 깔끔하게 표시되고 좌측 잘리는 텍스트('진행 대진...')가 제거되었는지 확인
     expect(find.text('현재 대진표 확인'), findsOneWidget);
     expect(find.text('대진표 설정수정'), findsOneWidget);
+    expect(find.textContaining('진행 대진'), findsNothing);
 
     // 3. [대진표 설정수정] 모달 내부에서도 [📋 현재 대진표 이어보기], [남은 라운드 재편성], [대진표 초기화 후 재생성] 분리 확인
     await tester.tap(find.text('대진표 설정수정'));
@@ -1000,7 +1006,7 @@ void main() {
     expect(find.byKey(const Key('group_header_regular')), findsOneWidget);
     expect(find.byKey(const Key('group_header_resting_exempt')), findsOneWidget);
 
-    // 4. [일반운영비] 탭 전환 시 일반운영비 출납 요약 및 일상 지출/일반 수입 내역 노출 확인
+    // 4. [일반운영비] 탭 전환 시 일반운영비 출납 요약, 일상 지출/일반 수입 내역 및 내역등록 팝업 상단 '수입'/'지출' 탭 확인
     await tester.tap(find.byKey(const Key('subtab_general_operation_ledger')));
     await tester.pumpAndSettle();
 
@@ -1011,7 +1017,17 @@ void main() {
     expect(find.text('공용 셔틀콕 5타 구매'), findsOneWidget);
     expect(find.text('신입 회원 가입비 수납 (2명)'), findsOneWidget);
 
-    // 5. [행사/모임비] 탭 전환 시 '행사 리스트', '일정/모임에서 가져오기', 드롭다운 선택형, 중복 엑셀 버튼 삭제, '입출금 상세 내역' 우측 [+ 내역 추가] 버튼 노출 확인
+    await tester.tap(find.byKey(const Key('add_general_operation_item_btn')));
+    await tester.pumpAndSettle();
+    expect(find.text('일반운영비 내역 등록'), findsOneWidget);
+    expect(find.byKey(const Key('general_op_dialog_tab_income')), findsOneWidget);
+    expect(find.byKey(const Key('general_op_dialog_tab_expense')), findsOneWidget);
+    expect(find.text('➕ 일반 수입 (가입비·찬조)'), findsNothing);
+    expect(find.text('➖ 일상 지출 (대관·콕·비품)'), findsNothing);
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
+
+    // 5. [행사/모임비] 탭 전환 시 '행사 리스트', '모임/행사에서 가져오기', 드롭다운 선택형, 행사 수정(연필) 아이콘 및 다이얼로그, '입출금 상세 내역' 우측 [+ 내역 추가] 버튼 노출 확인
     await tester.tap(find.byKey(const Key('subtab_event_expense_ledger')));
     await tester.pumpAndSettle();
 
@@ -1019,8 +1035,11 @@ void main() {
     expect(find.text('행사비 / 모임비 정산 선택'), findsNothing);
     expect(find.byKey(const Key('create_club_event_button')), findsOneWidget);
     expect(find.byKey(const Key('import_session_event_button')), findsOneWidget);
-    expect(find.text('일정/모임에서 가져오기'), findsOneWidget);
+    expect(find.text('모임/행사에서 가져오기'), findsOneWidget);
+    expect(find.text('일정/모임에서 가져오기'), findsNothing);
     expect(find.byKey(const Key('club_event_selector_dropdown')), findsOneWidget);
+    expect(find.byKey(const Key('edit_club_event_button')), findsOneWidget);
+    expect(find.byKey(const Key('delete_club_event_button')), findsOneWidget);
     expect(find.text('엑셀 다운로드 (CSV)'), findsNothing);
     expect(find.byKey(const Key('export_event_expense_csv_btn')), findsNothing);
     expect(find.byKey(const Key('add_event_expense_item_btn')), findsOneWidget);
@@ -1030,5 +1049,14 @@ void main() {
       greaterThan(tester.getTopLeft(find.text('입출금 상세 내역')).dx),
     );
     expect(find.textContaining('2026년 가을 친선 교류전 및 정산'), findsWidgets);
+
+    // 행사 카드 우측 수정(연필) 아이콘 클릭 -> 행사명 및 일자 수정 다이얼로그 연결 확인
+    await tester.tap(find.byKey(const Key('edit_club_event_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('행사/모임 정보 수정'), findsOneWidget);
+    expect(find.byKey(const Key('edit_club_event_title_field')), findsOneWidget);
+    expect(find.byKey(const Key('edit_club_event_date_field')), findsOneWidget);
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
   });
 }

@@ -1353,43 +1353,53 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1단: 당일 출석 인원 요약 (가로 Wrap + 가로 칩으로 세로 줄바꿈 방지)
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          // 1단 상단: 당일 출석 총 인원수 표시
+          Row(
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.how_to_reg_rounded, size: 15, color: pagePalette.primary),
-                  const SizedBox(width: 5),
-                  const Text(
-                    '당일 출석 인원',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppTheme.textMuted),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '$attendeeCount',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppTheme.textDark),
-                  ),
-                  const Text('명', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
-                ],
+              Icon(Icons.how_to_reg_rounded, size: 15, color: pagePalette.primary),
+              const SizedBox(width: 5),
+              const Text(
+                '당일 출석 인원',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppTheme.textMuted),
               ),
-              _buildSummaryStatusChip(
-                label: '출전 $activeCount명',
-                bg: pagePalette.softTint,
-                fg: pagePalette.primary,
+              const SizedBox(width: 6),
+              Text(
+                '$attendeeCount',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppTheme.textDark),
               ),
-              _buildSummaryStatusChip(
-                label: '휴식 $restingCount명',
-                bg: AppTheme.background,
-                fg: AppTheme.textDark,
+              const Text('명', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+            ],
+          ),
+          const SizedBox(height: 7),
+          // 1단 하단: [출전 / 휴식 / 조퇴] 칩 3등분 가로 배치(Row)로 정렬 (3자리 인원수 대응)
+          Row(
+            key: const Key('attendance_status_chips_3col_row'),
+            children: [
+              Expanded(
+                child: _buildSummaryStatusChip(
+                  label: '출전 $activeCount명',
+                  bg: pagePalette.softTint,
+                  fg: pagePalette.primary,
+                  centerText: true,
+                ),
               ),
-              _buildSummaryStatusChip(
-                label: '조퇴 $withdrawnCount명',
-                bg: withdrawnCount > 0 ? AppTheme.pastelRose.withValues(alpha: 0.55) : AppTheme.background,
-                fg: withdrawnCount > 0 ? AppTheme.pastelRoseDark : AppTheme.textMuted,
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildSummaryStatusChip(
+                  label: '휴식 $restingCount명',
+                  bg: AppTheme.background,
+                  fg: AppTheme.textDark,
+                  centerText: true,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildSummaryStatusChip(
+                  label: '조퇴 $withdrawnCount명',
+                  bg: withdrawnCount > 0 ? AppTheme.pastelRose.withValues(alpha: 0.55) : AppTheme.background,
+                  fg: withdrawnCount > 0 ? AppTheme.pastelRoseDark : AppTheme.textMuted,
+                  centerText: true,
+                ),
               ),
             ],
           ),
@@ -1516,8 +1526,20 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     required Color bg,
     required Color fg,
     bool isSelected = false,
+    bool centerText = false,
     VoidCallback? onTap,
   }) {
+    final textWidget = Text(
+      label,
+      maxLines: 1,
+      softWrap: false,
+      textAlign: centerText ? TextAlign.center : TextAlign.start,
+      style: TextStyle(
+        fontSize: 10.5,
+        fontWeight: FontWeight.w800,
+        color: isSelected ? Colors.white : fg,
+      ),
+    );
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1526,7 +1548,8 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
         borderRadius: BorderRadius.circular(7),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          alignment: centerText ? Alignment.center : null,
           decoration: BoxDecoration(
             color: isSelected ? fg : bg,
             borderRadius: BorderRadius.circular(7),
@@ -1535,16 +1558,12 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               width: isSelected ? 1.4 : 1.0,
             ),
           ),
-          child: Text(
-            label,
-            maxLines: 1,
-            softWrap: false,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              color: isSelected ? Colors.white : fg,
-            ),
-          ),
+          child: centerText
+              ? FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: textWidget,
+                )
+              : textWidget,
         ),
       ),
     );
@@ -2722,21 +2741,20 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     );
   }
 
-  /// 6. 하단 플로팅 액션 바 [출전 가능 N명 · 대진표 동적 상태 전환 및 진입 보호]
+  /// 6. 하단 고정 대진표 액션바 ([현재 대진표 확인] 및 [대진표 설정수정] 버튼 중심 깔끔한 2분할 구조)
   Widget _buildBottomConfirmBar({
     required BuildContext context,
     required WidgetRef ref,
     required GameSession session,
     required int activeCount,
   }) {
-    final possibleCourts = (activeCount ~/ 4).clamp(0, 15);
     final canGenerate = activeCount >= 4;
     final matches = ref.watch(matchesProvider);
     final hasOngoingBracket = matches.isNotEmpty;
     final pagePalette = AppTheme.getPagePalette(1);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [pagePalette.primary, const Color(0xFF406948)],
@@ -2754,110 +2772,78 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
       ),
       child: Row(
         children: [
+          // 동적 기본 액션 버튼: 초기 [⚡ 대진 생성 및 시작] ↔ 진행 중 [현재 대진표 확인]
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.sports_tennis_rounded, size: 15, color: Colors.white),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        '출전 $activeCount명',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  hasOngoingBracket
-                      ? '진행 대진 ${matches.length}경기 보존 중'
-                      : (canGenerate
-                          ? '최대 $possibleCourts코트 가동 (${activeCount % 4}명 대기)'
-                          : '4명 이상 출전 시 대진 생성 가능'),
-                  style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.85)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 6),
-          // 동적 기본 액션 버튼: 초기 [⚡ 대진 생성 및 시작] ↔ 진행 중 [📋 현재 대진표 이어보기]
-          ElevatedButton(
-            key: Key(
-              hasOngoingBracket
-                  ? 'bottom_bar_continue_bracket_button'
-                  : 'bottom_bar_generate_bracket_button',
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: (hasOngoingBracket || canGenerate)
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.25),
-              foregroundColor: (hasOngoingBracket || canGenerate)
-                  ? pagePalette.primary
-                  : Colors.white70,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: hasOngoingBracket
-                ? () {
-                    // 기존 데이터 유실 없이 단순 화면 이동만 수행
-                    ref.read(currentTabProvider.notifier).setTab(2);
-                  }
-                : (canGenerate
-                    ? () {
-                        _showSessionConfirmSheet(
-                          context,
-                          ref,
-                          session.activeAttendees,
-                          session,
-                        );
-                      }
-                    : null),
-            child: Text(
-              hasOngoingBracket ? '현재 대진표 확인' : '⚡ 대진 생성 및 시작',
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // 대진표 설정수정 버튼 (상세 설정 및 부분 재편성/초기화 모달 호출)
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: canGenerate
-                  ? Colors.white.withValues(alpha: 0.18)
-                  : Colors.white.withValues(alpha: 0.1),
-              foregroundColor: canGenerate ? Colors.white : Colors.white54,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+            child: ElevatedButton(
+              key: Key(
+                hasOngoingBracket
+                    ? 'bottom_bar_continue_bracket_button'
+                    : 'bottom_bar_generate_bracket_button',
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: (hasOngoingBracket || canGenerate)
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.25),
+                foregroundColor: (hasOngoingBracket || canGenerate)
+                    ? pagePalette.primary
+                    : Colors.white70,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: hasOngoingBracket
+                  ? () {
+                      // 기존 데이터 유실 없이 단순 화면 이동만 수행
+                      ref.read(currentTabProvider.notifier).setTab(2);
+                    }
+                  : (canGenerate
+                      ? () {
+                          _showSessionConfirmSheet(
+                            context,
+                            ref,
+                            session.activeAttendees,
+                            session,
+                          );
+                        }
+                      : null),
+              child: Text(
+                hasOngoingBracket ? '현재 대진표 확인' : '⚡ 대진 생성 및 시작',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5),
+              ),
             ),
-            icon: const Icon(Icons.tune_rounded, size: 14),
-            label: const Text(
-              '대진표 설정수정',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5),
+          ),
+          const SizedBox(width: 8),
+          // 대진표 설정수정 버튼 (상세 설정 및 부분 재편성/초기화 모달 호출)
+          Expanded(
+            child: ElevatedButton.icon(
+              key: const Key('bottom_bar_bracket_settings_button'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: canGenerate
+                    ? Colors.white.withValues(alpha: 0.18)
+                    : Colors.white.withValues(alpha: 0.1),
+                foregroundColor: canGenerate ? Colors.white : Colors.white54,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              icon: const Icon(Icons.tune_rounded, size: 15),
+              label: const Text(
+                '대진표 설정수정',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+              ),
+              onPressed: canGenerate
+                  ? () {
+                      _showSessionConfirmSheet(context, ref, session.activeAttendees, session);
+                    }
+                  : null,
             ),
-            onPressed: canGenerate
-                ? () {
-                    _showSessionConfirmSheet(context, ref, session.activeAttendees, session);
-                  }
-                : null,
           ),
         ],
       ),
