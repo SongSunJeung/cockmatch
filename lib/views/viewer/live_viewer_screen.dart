@@ -53,8 +53,6 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
   /// [실시간 코트 전광판] 모드의 선택 라운드 (null이면 현재 라운드)
   int? _liveSelectedRound;
 
-  /// 완료 리포트에서 경기 방식 미리보기 오버라이드 (null이면 선택된 세션의 matchFormat 사용)
-  MatchFormat? _formatPreviewOverride;
 
   @override
   void dispose() {
@@ -256,7 +254,6 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
         setState(() {
           _selectedSessionId = next?.id;
           _isCompletedViewOverride = null;
-          _formatPreviewOverride = null;
           _scoreFilterRound = null;
           _liveSelectedRound = null;
         });
@@ -302,7 +299,13 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
 
     final bool isCompletedView = _isCompletedViewOverride ??
         (targetSession.isCompleted || targetSession.isGameEnded);
-    final MatchFormat activeFormat = _formatPreviewOverride ?? targetSession.matchFormat;
+
+    final bool hasTournament = targetSession.matchFormat == MatchFormat.tournament ||
+        sessionMatches.any((m) => m.bracketRoundSize != null);
+
+    final MatchFormat activeFormat = hasTournament
+        ? MatchFormat.tournament
+        : targetSession.matchFormat;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -385,26 +388,26 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                     side: BorderSide(color: pagePalette.borderTint),
                   ),
                 ),
-                icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 22),
+                icon: Icon(Icons.menu_rounded, color: pagePalette.primary, size: 20),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Container(
-                width: 40,
-                height: 40,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: pagePalette.softTint,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: pagePalette.borderTint),
                 ),
                 child: Center(
                   child: Icon(
                     isCompletedView ? Icons.emoji_events_rounded : Icons.live_tv_rounded,
                     color: pagePalette.primary,
-                    size: 20,
+                    size: 18,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,25 +418,27 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                           child: Text(
                             clubName,
                             style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w900,
                               color: AppTheme.textDark,
+                              letterSpacing: -0.3,
                             ),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: pagePalette.softTint,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: pagePalette.borderTint),
                           ),
                           child: Text(
                             isCompletedView ? '경기 결과' : 'LIVE 전광판',
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: 10,
                               fontWeight: FontWeight.w900,
                               color: pagePalette.primary,
                             ),
@@ -443,18 +448,27 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${targetSession.title} (${targetSession.sessionDate})',
+                      () {
+                        final sDate = targetSession.sessionDate;
+                        final sDateDots = sDate.replaceAll('-', '.');
+                        final title = targetSession.title ?? '$sDateDots 정기 모임';
+                        if (title.contains(sDate) || title.contains(sDateDots)) {
+                          return title;
+                        }
+                        return '$sDateDots $title';
+                      }(),
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11.5,
                         color: AppTheme.textMuted,
                         fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               PopupMenuButton<String>(
                 key: const Key('web_viewer_share_popup_button'),
                 tooltip: '공유 및 복사',
@@ -611,14 +625,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                       child: InkWell(
                         onTap: () {
                           setState(() {
-                            // 완료된 모임이 있으면 가장 최근 완료 모임을 자동 선택
-                            final completedList =
-                                allAvailableSessions.where((s) => s.isCompleted).toList();
-                            if (completedList.isNotEmpty && !targetSession.isCompleted) {
-                              _selectedSessionId = completedList.first.id;
-                            }
                             _isCompletedViewOverride = true;
-                            _formatPreviewOverride = null;
                           });
                         },
                         borderRadius: BorderRadius.circular(12),
@@ -743,7 +750,6 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                               setState(() {
                                 _selectedSessionId = picked.id;
                                 _isCompletedViewOverride = picked.isCompleted;
-                                _formatPreviewOverride = null;
                                 _scoreFilterRound = null;
                                 _liveSelectedRound = null;
                               });
@@ -1476,15 +1482,18 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
             children: [
               const Icon(Icons.schedule_rounded, size: 18, color: AppTheme.primaryMint),
               const SizedBox(width: 6),
-              const Text(
-                '다음 라운드 대기자 / 휴식자 명단',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.textDark,
+              const Expanded(
+                child: Text(
+                  '대기자 / 휴식자 명단',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.textDark,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text(
                 '대기 ${waitingMembers.length}명 · 휴식 ${restingMembers.length}명',
                 style: const TextStyle(
@@ -1638,8 +1647,87 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     );
   }
 
+  /// 진행 중인 모임에서 [경기 결과] 탭을 눌렀을 때 표시하는 안내 Empty State
+  Widget _buildOngoingSessionEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: const BoxDecoration(
+              color: AppTheme.pastelMint,
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.sports_tennis_rounded,
+                size: 36,
+                color: AppTheme.pastelMintDark,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            '현재 경기가 진행 중입니다',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.textDark,
+              letterSpacing: -0.3,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "운영진이 '오늘 경기 종료'를 확정하면 최종 순위와 스코어 리포트가 이곳에 공개됩니다.",
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textMuted,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            key: const Key('ongoing_session_goto_live_button'),
+            onPressed: () {
+              setState(() {
+                _isCompletedViewOverride = false;
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.live_tv_rounded, size: 18),
+            label: const Text(
+              '실시간 코트 전광판 확인하기',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ===========================================================================
-  // 2. 모임 완료(종료) 후: 2개 서브 탭 ([종합 순위 & 리포트] / [라운드별 스코어])
+  // 2. 모임 완료(종료) 후: 2개 서브 탭 ([종합 순위] / [라운드별 스코어])
   // ===========================================================================
   Widget _buildCompletedReportBody({
     required GameSession session,
@@ -1648,6 +1736,15 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     required MatchFormat activeFormat,
     required List<GameSession> archivedSessions,
   }) {
+    // 아직 당일 경기가 종료(결과 확정)되지 않은 진행 중 모임일 경우 Empty State 안내 표시
+    final bool isSessionOngoing = !session.isCompleted && !session.isGameEnded;
+    if (isSessionOngoing) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: _buildOngoingSessionEmptyState(),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -1655,7 +1752,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
         children: [
           const SizedBox(height: 6),
 
-          // 2개 서브 탭 바: [종합 순위 & 리포트] / [라운드별 스코어]
+          // 2개 서브 탭 바: [종합 순위] / [라운드별 스코어]
           Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
@@ -1679,7 +1776,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          '종합 순위 & 리포트',
+                          '종합 순위',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
@@ -1766,66 +1863,18 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
         ? members.where((m) => session.attendees.contains(m.id)).toList()
         : members;
 
+    final bool hasTournament = session.matchFormat == MatchFormat.tournament ||
+        effectiveMatches.any((m) => m.bracketRoundSize != null);
+
+    final MatchFormat effectiveFormat = hasTournament
+        ? MatchFormat.tournament
+        : session.matchFormat;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 경기 방식 표시 및 경기 방식별 리포트 전환 칩
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: AppTheme.softShadow,
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.auto_graph_rounded, size: 18, color: AppTheme.primaryMint),
-              const SizedBox(width: 6),
-              const Text(
-                '경기 방식:',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.textMuted,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildFormatSwitchChip(
-                        format: MatchFormat.regular,
-                        label: '정기 로테이션 (개인 기준)',
-                        activeFormat: activeFormat,
-                        archivedSessions: archivedSessions,
-                      ),
-                      const SizedBox(width: 6),
-                      _buildFormatSwitchChip(
-                        format: MatchFormat.league,
-                        label: '풀리그전 (팀 기준)',
-                        activeFormat: activeFormat,
-                        archivedSessions: archivedSessions,
-                      ),
-                      const SizedBox(width: 6),
-                      _buildFormatSwitchChip(
-                        format: MatchFormat.tournament,
-                        label: '토너먼트',
-                        activeFormat: activeFormat,
-                        archivedSessions: archivedSessions,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // 경기 방식별 자동 분기 렌더링
-        if (activeFormat == MatchFormat.tournament)
+        // 모임 경기 방식에 따른 자동 순위표/결과 매핑 (서브 버튼 바 없이 모임 방식에 따라 직결)
+        if (effectiveFormat == MatchFormat.tournament)
           _buildTournamentFinalTreeView(
             tree: generator.buildTournamentResultTree(
               matches: effectiveMatches,
@@ -1834,7 +1883,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
             matches: effectiveMatches,
             memberMap: {for (final m in members) m.id: m},
           )
-        else if (activeFormat == MatchFormat.league)
+        else if (effectiveFormat == MatchFormat.league)
           _buildLeagueTeamStandingsView(
             teamStandings: generator.calculateLeagueTeamRankings(
               finishedMatches: effectiveMatches,
@@ -1853,49 +1902,8 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
         const SizedBox(height: 16),
 
         // 순위표 하단: 해당 모드의 [순위 결정 기준 안내] 정보 박스 상시 노출
-        _buildRankingCriteriaInfoBox(activeFormat),
+        _buildRankingCriteriaInfoBox(effectiveFormat),
       ],
-    );
-  }
-
-  Widget _buildFormatSwitchChip({
-    required MatchFormat format,
-    required String label,
-    required MatchFormat activeFormat,
-    required List<GameSession> archivedSessions,
-  }) {
-    final isSelected = activeFormat == format;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          // 해당 경기 방식의 완료된 아카이브 모임이 있으면 함께 선택하여 실제 데이터 표시
-          final matchingArchived =
-              archivedSessions.where((s) => s.matchFormat == format).toList();
-          if (matchingArchived.isNotEmpty) {
-            _selectedSessionId = matchingArchived.first.id;
-            _isCompletedViewOverride = true;
-            _formatPreviewOverride = null;
-          } else {
-            _formatPreviewOverride = format;
-          }
-        });
-      },
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryMint : AppTheme.surfaceGrey,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w800,
-            color: isSelected ? Colors.white : AppTheme.textDark,
-          ),
-        ),
-      ),
     );
   }
 
@@ -2240,15 +2248,18 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
             children: [
               const Icon(Icons.groups_rounded, size: 20, color: AppTheme.primaryMint),
               const SizedBox(width: 8),
-              const Text(
-                '풀리그전 팀별 순위표 (팀 기준)',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.textDark,
+              const Expanded(
+                child: Text(
+                  '팀 순위',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.textDark,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text(
                 '총 ${teamStandings.length}팀',
                 style: const TextStyle(
@@ -2271,11 +2282,11 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
             child: const Row(
               children: [
                 SizedBox(
-                  width: 38,
+                  width: 34,
                   child: Text(
                     '순위',
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textMuted,
                     ),
@@ -2285,43 +2296,43 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   child: Text(
                     '팀 (복식 페어)',
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textMuted,
                     ),
                   ),
                 ),
                 SizedBox(
-                  width: 56,
+                  width: 62,
                   child: Text(
-                    '다승(전적)',
+                    '전적 (다승)',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textMuted,
                     ),
                   ),
                 ),
                 SizedBox(
-                  width: 48,
+                  width: 46,
                   child: Text(
                     '득실차',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textMuted,
                     ),
                   ),
                 ),
                 SizedBox(
-                  width: 48,
+                  width: 44,
                   child: Text(
                     '다득점',
                     textAlign: TextAlign.right,
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textMuted,
                     ),
@@ -2350,7 +2361,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   : '${team.pointDifference}';
               return Container(
                 margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: team.rank == 1
                       ? AppTheme.pastelYellow.withValues(alpha: 0.38)
@@ -2363,52 +2374,67 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                 child: Row(
                   children: [
                     SizedBox(
-                      width: 38,
+                      width: 34,
                       child: _buildRankBadge(team.rank),
                     ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            team.teamName,
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.textDark,
+                          for (int i = 0; i < team.playerNames.length; i++) ...[
+                            if (i > 0) const SizedBox(height: 2),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    team.playerNames[i],
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.textDark,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (i < team.playerTiers.length) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(${team.playerTiers[i].label})',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
-                          ),
-                          if (team.playerTiers.isNotEmpty)
-                            Text(
-                              team.playerTiers.map((t) => t.label).join(' · '),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppTheme.textMuted,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                          ],
                         ],
                       ),
                     ),
                     SizedBox(
-                      width: 56,
+                      width: 62,
                       child: Text(
                         '${team.wins}승 ${team.losses}패',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.primaryDark,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textDark,
                         ),
                       ),
                     ),
                     SizedBox(
-                      width: 48,
+                      width: 46,
                       child: Text(
                         diffStr,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
                           color: team.pointDifference >= 0
                               ? AppTheme.primaryMint
@@ -2417,12 +2443,12 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                       ),
                     ),
                     SizedBox(
-                      width: 48,
+                      width: 44,
                       child: Text(
                         '${team.pointsFor}점',
                         textAlign: TextAlign.right,
                         style: const TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppTheme.textDark,
                         ),
@@ -2457,15 +2483,18 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
             children: [
               const Icon(Icons.leaderboard_rounded, size: 20, color: AppTheme.primaryMint),
               const SizedBox(width: 8),
-              const Text(
-                '정기 로테이션 개인별 순위표 (개인 기준)',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: AppTheme.textDark,
+              const Expanded(
+                child: Text(
+                  '개인 순위',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.textDark,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text(
                 '총 ${playerStandings.length}명',
                 style: const TextStyle(
@@ -2488,7 +2517,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
             child: const Row(
               children: [
                 SizedBox(
-                  width: 36,
+                  width: 34,
                   child: Text(
                     '순위',
                     style: TextStyle(
@@ -2509,9 +2538,9 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   ),
                 ),
                 SizedBox(
-                  width: 48,
+                  width: 62,
                   child: Text(
-                    '승률',
+                    '전적 (다승)',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11,
@@ -2521,7 +2550,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   ),
                 ),
                 SizedBox(
-                  width: 44,
+                  width: 46,
                   child: Text(
                     '득실차',
                     textAlign: TextAlign.center,
@@ -2533,19 +2562,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   ),
                 ),
                 SizedBox(
-                  width: 52,
-                  child: Text(
-                    '다승(전적)',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textMuted,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 42,
+                  width: 44,
                   child: Text(
                     '다득점',
                     textAlign: TextAlign.right,
@@ -2593,20 +2610,22 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                 child: Row(
                   children: [
                     SizedBox(
-                      width: 36,
+                      width: 34,
                       child: _buildRankBadge(p.rank),
                     ),
                     Expanded(
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Flexible(
                             child: Text(
                               p.memberName,
                               style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
                                 color: AppTheme.textDark,
                               ),
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -2618,19 +2637,19 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                       ),
                     ),
                     SizedBox(
-                      width: 48,
+                      width: 62,
                       child: Text(
-                        '${p.winRate.toStringAsFixed(0)}%',
+                        '${p.wins}승 ${p.losses}패',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.primaryDark,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textDark,
                         ),
                       ),
                     ),
                     SizedBox(
-                      width: 44,
+                      width: 46,
                       child: Text(
                         diffStr,
                         textAlign: TextAlign.center,
@@ -2644,19 +2663,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                       ),
                     ),
                     SizedBox(
-                      width: 52,
-                      child: Text(
-                        '${p.wins}승${p.losses}패',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textDark,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 42,
+                      width: 44,
                       child: Text(
                         '${p.pointsFor}점',
                         textAlign: TextAlign.right,

@@ -246,44 +246,57 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                       children: [
                         Expanded(
                           child: Container(
-                            height: 44,
+                            height: 36,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.grey.shade200),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.grey.shade300),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withValues(alpha: 0.025),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
                                 ),
                               ],
                             ),
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: InputDecoration(
-                                hintText: '이름 또는 초성 검색 (예: 안세영, ㅇㅅㅇ, ㅎㄱㄷ)',
-                                hintStyle: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                                prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 18),
-                                suffixIcon: _searchController.text.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(Icons.cancel_rounded, size: 16, color: AppTheme.textMuted),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          ref.read(memberFilterProvider.notifier).update(
-                                                (prev) => prev.copyWith(searchQuery: ''),
-                                              );
-                                        },
-                                      )
-                                    : null,
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                              ),
-                              onChanged: (val) {
-                                ref.read(memberFilterProvider.notifier).update(
-                                      (prev) => prev.copyWith(searchQuery: val),
-                                    );
-                              },
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search, size: 18, color: Colors.grey.shade500),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    textAlignVertical: TextAlignVertical.center,
+                                    style: const TextStyle(fontSize: 13, color: AppTheme.textDark),
+                                    decoration: InputDecoration(
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 7),
+                                      hintText: '이름 또는 초성 검색...',
+                                      hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                                    ),
+                                    onChanged: (val) {
+                                      ref.read(memberFilterProvider.notifier).update(
+                                            (prev) => prev.copyWith(searchQuery: val),
+                                          );
+                                    },
+                                  ),
+                                ),
+                                if (_searchController.text.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () {
+                                      _searchController.clear();
+                                      ref.read(memberFilterProvider.notifier).update(
+                                            (prev) => prev.copyWith(searchQuery: ''),
+                                          );
+                                    },
+                                    child: Icon(Icons.cancel_rounded, size: 16, color: Colors.grey.shade400),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -645,57 +658,56 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
         (activeFilter.gender != null ? 1 : 0);
     final bool hasFilter = detailFilterCount > 0;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return SizedBox(
+      height: 36,
+      child: OutlinedButton(
         key: const Key('member_filter_button'),
-        onTap: () => _showMemberFilterModalBottomSheet(context),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: hasFilter ? pagePalette.softTint : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: hasFilter ? pagePalette.primary : Colors.grey.shade300,
-              width: hasFilter ? 1.5 : 1.0,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          backgroundColor: hasFilter ? pagePalette.softTint : Colors.white,
+          side: BorderSide(
+            color: hasFilter ? pagePalette.primary : Colors.grey.shade300,
+            width: hasFilter ? 1.5 : 1.0,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+        ),
+        onPressed: () => _showMemberFilterModalBottomSheet(context),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Badge(
+              isLabelVisible: hasFilter,
+              label: Text(
+                '$detailFilterCount',
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              backgroundColor: pagePalette.primary,
+              child: Icon(
+                Icons.tune,
+                size: 16,
+                color: hasFilter ? pagePalette.primary : AppTheme.textDark,
+              ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.025),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
+            const SizedBox(width: 5),
+            Text(
+              isCustomSort ? activeFilter.sortBy.label : '필터',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: hasFilter ? FontWeight.w800 : FontWeight.w600,
+                color: hasFilter ? pagePalette.primary : AppTheme.textDark,
               ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Badge(
-                isLabelVisible: hasFilter,
-                label: Text(
-                  '$detailFilterCount',
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                backgroundColor: pagePalette.primary,
-                child: Icon(
-                  Icons.tune_rounded,
-                  size: 20,
-                  color: hasFilter ? pagePalette.primary : AppTheme.textDark,
-                ),
-              ),
-              const SizedBox(width: 5),
-              Text(
-                isCustomSort ? activeFilter.sortBy.label : '필터',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: hasFilter ? FontWeight.w800 : FontWeight.w600,
-                  color: hasFilter ? pagePalette.primary : AppTheme.textDark,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1014,13 +1026,13 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? pagePalette.primary : Colors.grey.shade300,
           ),

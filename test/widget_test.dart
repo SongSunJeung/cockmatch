@@ -120,7 +120,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('session_header_more_menu')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('모임 목록 (진행/지난 모임)'));
+    await tester.tap(find.text('모임 목록'));
     await tester.pumpAndSettle();
     expect(find.text('2026.09.22 화요 정기 모임'), findsOneWidget);
 
@@ -362,22 +362,39 @@ void main() {
     expect(find.text('실시간 코트 전광판'), findsWidgets);
     expect(find.byKey(const Key('live_scoreboard_round_chips_scroll')), findsOneWidget);
     expect(find.text('대기'), findsNothing);
-    expect(find.text('다음 라운드 대기자 / 휴식자 명단'), findsOneWidget);
+    expect(find.text('대기자 / 휴식자 명단'), findsOneWidget);
 
-    // [경기 결과] 전환 시 2개 서브 탭([종합 순위 & 리포트] / [라운드별 스코어]) 및 [순위 결정 기준 안내] 확인
+    // [경기 결과] 전환 시 진행 중 모임에서는 과거 모임 강제 전환 없이 '현재 경기가 진행 중입니다' Empty State 노출
     await tester.tap(find.text('경기 결과').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('종합 순위 & 리포트'), findsOneWidget);
+    expect(find.text('현재 경기가 진행 중입니다'), findsOneWidget);
+    expect(find.textContaining('운영진이 \'오늘 경기 종료\'를 확정하면'), findsOneWidget);
+    expect(find.byKey(const Key('ongoing_session_goto_live_button')), findsOneWidget);
+
+    // [실시간 코트 전광판 확인하기] 버튼 탭 시 실시간 코트 전광판으로 복귀
+    await tester.tap(find.byKey(const Key('ongoing_session_goto_live_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('대기자 / 휴식자 명단'), findsOneWidget);
+
+    // 드롭다운에서 완료된 모임(2026.09.22 화요 정기 모임) 선택 시 [종합 순위] / [라운드별 스코어] 리포트 확인
+    await tester.tap(find.byKey(const Key('viewer_session_selector_dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('2026.09.22').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('종합 순위'), findsOneWidget);
     expect(find.text('라운드별 스코어'), findsOneWidget);
     expect(find.textContaining('순위 결정 기준 안내'), findsOneWidget);
 
-    // 경기 방식 전환: 풀리그전 (팀 기준) -> 토너먼트 (최종 트리) 확인
-    await tester.tap(find.text('풀리그전 (팀 기준)'));
-    await tester.pumpAndSettle();
-    expect(find.text('풀리그전 팀별 순위표 (팀 기준)'), findsOneWidget);
+    // 로테이션 모임(MatchFormat.regular) 선택 시 [개인 순위] 테이블 자동 노출 및 토너먼트 미노출 검증
+    expect(find.text('개인 순위'), findsOneWidget);
+    expect(find.text('토너먼트'), findsNothing);
 
-    await tester.tap(find.text('토너먼트'));
+    // 드롭다운에서 토너먼트 모임(2026.09.15) 선택 시 토너먼트 최종 트리 확인
+    await tester.tap(find.byKey(const Key('viewer_session_selector_dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('2026.09.15').last);
     await tester.pumpAndSettle();
     expect(find.text('토너먼트 최종 트리 (진출 단계 기준)'), findsOneWidget);
 
@@ -385,9 +402,7 @@ void main() {
     await tester.tap(find.text('라운드별 스코어'));
     await tester.pumpAndSettle();
     expect(find.text('전체'), findsOneWidget);
-    expect(find.text('1R'), findsWidgets);
     expect(find.text('완료'), findsWidgets);
-    expect(find.text('대기'), findsNothing);
     expect(find.text('WIN'), findsWidgets);
 
     // 최하단으로 스크롤하여 [앱 다운로드 유도 배너] 플레이스홀더 노출 확인
@@ -425,23 +440,23 @@ void main() {
     await tester.tap(startSessionBtn);
     await tester.pumpAndSettle();
 
-    expect(find.text('오늘 모임 세션 & 대진 설정'), findsOneWidget);
+    expect(find.text('대진 생성 및 시작'), findsWidgets);
     expect(find.byKey(const Key('reset_session_settings_button')), findsOneWidget);
     expect(find.text('설정 초기화'), findsOneWidget);
     // 기본 화면에서 '시작 코트 번호 지정' 섹션이 제거되었는지 확인
     expect(find.text('시작 코트 번호 지정'), findsNothing);
 
-    // 1. 설정값 변경: [풀리그전], [통합 밸런스 매칭], [전원 고정 페어 (복식팀 대전)]
+    // 1. 설정값 변경: [풀리그전], [급수 밸런스], [고정 파트너]
     await tester.tap(find.text('풀리그전'));
     await tester.pumpAndSettle();
 
-    final balanceModeCard = find.text('통합 밸런스 매칭');
+    final balanceModeCard = find.text('급수 밸런스');
     await tester.ensureVisible(balanceModeCard);
     await tester.pumpAndSettle();
     await tester.tap(balanceModeCard);
     await tester.pumpAndSettle();
 
-    final fixedPartnerBtn = find.text('전원 고정 페어 (복식팀 대전)');
+    final fixedPartnerBtn = find.text('고정 파트너');
     await tester.ensureVisible(fixedPartnerBtn);
     await tester.pumpAndSettle();
     await tester.tap(fixedPartnerBtn);
@@ -450,7 +465,7 @@ void main() {
     expect(find.text('복식 페어 편성 목록'), findsOneWidget);
 
     // 2. 바텀시트를 닫았다가 다시 열어도 직전 설정값이 그대로 유지되는지 검증
-    Navigator.of(tester.element(find.text('오늘 모임 세션 & 대진 설정'))).pop();
+    Navigator.of(tester.element(find.text('대진 생성 및 시작').first)).pop();
     await tester.pumpAndSettle();
 
     await tester.tap(startSessionBtn);
@@ -468,7 +483,7 @@ void main() {
 
     expect(find.text('기본 권장 설정'), findsOneWidget);
     expect(find.text('복식 페어 편성 목록'), findsNothing);
-    expect(find.text('+ 특정 고정 페어 추가'), findsOneWidget);
+    expect(find.text('+ 고정 파트너 추가'), findsOneWidget);
   });
 
   testWidgets('대진표 탭: 실시간 코트 증감([+ 코트 추가] / [- 코트 축소]), 빈 코트 슬롯 생성 및 축소 확인 다이얼로그 검증', (WidgetTester tester) async {
@@ -492,7 +507,7 @@ void main() {
     await tester.tap(find.text('대진표 설정수정'));
     await tester.pumpAndSettle();
 
-    final balanceModeOption = find.text('통합 밸런스 매칭');
+    final balanceModeOption = find.text('급수 밸런스');
     await tester.ensureVisible(balanceModeOption);
     await tester.pumpAndSettle();
     await tester.tap(balanceModeOption);
@@ -501,7 +516,7 @@ void main() {
     await tester.tap(find.byKey(const Key('start_session_and_generate_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('오늘 모임 세션 & 대진 설정'), findsNothing);
+    expect(find.text('대진 생성 및 시작'), findsNothing);
     // 1) 진입 즉시 상단 스크롤 없이 [1 라운드] 탭과 [1번 코트], [2번 코트] 매칭 카드가 즉시 노출되는지 확인
     expect(find.text('1 라운드'), findsOneWidget);
     expect(find.text('1번 코트'), findsOneWidget);

@@ -43,6 +43,16 @@ class CockMatchApp extends StatelessWidget {
             ),
           );
         }
+        if (uri != null && (uri.path.startsWith('/viewer') || uri.path.startsWith('/live'))) {
+          final segments = uri.pathSegments;
+          final sessionId = segments.length >= 2 ? segments.last : 'session_mega_today';
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => LiveViewerScreen(
+              sessionId: sessionId == 'viewer' || sessionId == 'live' ? 'session_mega_today' : sessionId,
+            ),
+          );
+        }
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => const CockMatchShellScreen(),

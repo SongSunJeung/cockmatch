@@ -2610,7 +2610,7 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -2868,13 +2868,21 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                 ),
               ),
 
-              // 중앙 VS 구분
+              // 중앙 VS 구분 및 세로 구분선 (컴팩트 & 가로 오버플로우 방어)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 3),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      width: 1,
+                      height: 14,
+                      color: Colors.grey.shade200,
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: Colors.grey.shade100,
                         shape: BoxShape.circle,
@@ -2882,11 +2890,17 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                       child: const Text(
                         'VS',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w900,
                           color: AppTheme.textMuted,
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      width: 1,
+                      height: 14,
+                      color: Colors.grey.shade200,
                     ),
                   ],
                 ),
@@ -3167,7 +3181,7 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
     required ValueChanged<Member> onPlayerTap,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: isWinner
             ? AppTheme.pastelMint.withValues(alpha: 0.6)
@@ -3190,14 +3204,20 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                teamTitle,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+              Flexible(
+                child: Text(
+                  teamTitle,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               if (isWinner)
-                Text(
-                  widget.isTournament ? 'WIN · 진출' : 'WIN',
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.pastelMintDark),
+                Flexible(
+                  child: Text(
+                    widget.isTournament ? 'WIN · 진출' : 'WIN',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.pastelMintDark),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 )
               else if (widget.isTournament && isLoser)
                 const Text(
@@ -3273,14 +3293,15 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
           // 인라인 실시간 점수 입력창 (포커스/터치 시 기존 숫자 전체 선택되어 바로 새 점수 입력 가능)
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                '점수: ',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
+                '점수 ',
+                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppTheme.textMuted),
               ),
               SizedBox(
-                width: 56,
-                height: 38,
+                width: 48,
+                height: 36,
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,
@@ -3289,12 +3310,12 @@ class _CourtMatchCardState extends ConsumerState<CourtMatchCard> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.w900,
                     color: AppTheme.textDark,
                   ),
                   decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
                     filled: true,
                     fillColor: isFinished ? Colors.grey.shade100 : Colors.white,
                     border: OutlineInputBorder(
@@ -4223,7 +4244,7 @@ class _AddCustomMatchSheetState extends ConsumerState<_AddCustomMatchSheet> {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Column(
                               children: [
                                 const Text(

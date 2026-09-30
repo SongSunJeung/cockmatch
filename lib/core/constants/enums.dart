@@ -149,9 +149,9 @@ enum MemberStatus {
 /// 2. all: 통합 밸런스 매칭 - 전체 인원 통합 후 A+D vs B+C 실력 밸런스 배정
 /// 3. random: 급수 무관 (랜덤 매칭) - 급수 점수를 고려하지 않고 출전 인원 내 완전 무작위 셔플 매칭
 enum MatchMode {
-  tiered('tiered', '급수별 분리 매칭 (추천)', '상위부/하위부 독립 코트 배정'),
-  all('all', '통합 밸런스 매칭', '전체 인원 통합 후 A+D vs B+C 실력 밸런스 배정'),
-  random('random', '급수 무관 (랜덤 매칭)', '급수 점수를 고려하지 않고 출전 인원 내 완전 무작위 셔플 매칭');
+  tiered('tiered', '급수 분리', '상위부/하위부 독립 코트 배정'),
+  all('all', '급수 밸런스', '전체 인원 통합 후 A+D vs B+C 실력 밸런스 배정'),
+  random('random', '급수 무관', '급수 점수를 고려하지 않고 출전 인원 내 완전 무작위 셔플 매칭');
 
   final String code;
   final String label;
@@ -159,7 +159,7 @@ enum MatchMode {
 
   const MatchMode(this.code, this.label, this.description);
 
-  /// 가독성용 별칭 (통합 밸런스 매칭)
+  /// 가독성용 별칭 (통합 밸런스 매칭 / 급수 밸런스)
   static const MatchMode balanced = MatchMode.all;
 
   static MatchMode fromCode(String? code) {
@@ -169,7 +169,9 @@ enum MatchMode {
         normalized == 'balanced' ||
         normalized == '통합' ||
         normalized == '통합매칭' ||
-        normalized == '통합밸런스매칭') {
+        normalized == '통합밸런스매칭' ||
+        normalized == '급수밸런스' ||
+        normalized == '급수 밸런스') {
       return MatchMode.all;
     }
     if (normalized == 'random' ||
@@ -184,8 +186,8 @@ enum MatchMode {
 
 /// 파트너 편성 방식 (개인별 로테이션 vs 전원 고정 페어)
 enum PartnerMode {
-  rotation('rotation', '개인별 로테이션 (기본값)', '매 라운드 파트너와 상대가 자동 교체/순환'),
-  fixedAll('fixedAll', '전원 고정 페어 (복식팀 대전)', '모든 참가자가 2인 1조 페어를 구성하여 모임 내내 해당 팀 단위로 대결');
+  rotation('rotation', '랜덤 파트너', '매 라운드 파트너와 상대가 자동 교체/순환'),
+  fixedAll('fixedAll', '고정 파트너', '모든 참가자가 2인 1조 페어를 구성하여 모임 내내 해당 팀 단위로 대결');
 
   final String code;
   final String label;
@@ -199,6 +201,8 @@ enum PartnerMode {
     if (normalized == 'fixedall' ||
         normalized == 'fixed_all' ||
         normalized == 'fixed' ||
+        normalized == '고정파트너' ||
+        normalized == '고정 파트너' ||
         normalized == '전원고정페어') {
       return PartnerMode.fixedAll;
     }
@@ -230,14 +234,14 @@ enum MatchFormat {
 }
 
 /// 성별 매칭 규칙 / 경기 종목 유형
-/// 1. normal: 전체 혼합 (기본값) - 성별 무관 실력/로테이션 위주 자유 매칭
-/// 2. separate: 남복 / 여복 분리 - 남성은 남복, 여성은 여복 코트로 분리 배정
-/// 3. mixedOnly: 혼합복식 (혼복) - 한 팀당 '남1 + 여1' 조합으로 매칭 강제
+/// 1. normal: 성별무관 - 성별 무관 실력/로테이션 위주 자유 매칭
+/// 2. separate: 남복/여복 - 남성은 남복, 여성은 여복 코트로 분리 배정
+/// 3. mixedOnly: 혼합복식 - 한 팀당 '남1 + 여1' 조합으로 매칭 강제
 /// 4. genderPriority: 남복/여복 우선 - 남복/여복을 최우선 배정하고 성비 불균형 시에만 혼복 혼용
 enum MatchType {
-  normal('normal', '전체 혼합', '성별 무관 실력/로테이션 위주 자유 매칭'),
-  separate('separate', '남복 / 여복 분리', '남성은 남복, 여성은 여복 코트로 분리 배정'),
-  mixedOnly('mixedOnly', '혼합복식 (혼복)', '한 팀당 남1 + 여1 조합으로 매칭 강제'),
+  normal('normal', '성별무관', '성별 무관 실력/로테이션 위주 자유 매칭'),
+  separate('separate', '남복/여복', '남성은 남복, 여성은 여복 코트로 분리 배정'),
+  mixedOnly('mixedOnly', '혼합복식', '한 팀당 남1 + 여1 조합으로 매칭 강제'),
   genderPriority('genderPriority', '남복/여복 우선', '남복/여복 최우선 배정, 성비 불균형 시만 혼복 혼용'),
   menOnly('menOnly', '남자복식 전용', '남성 회원만 출전 배정'),
   womenOnly('womenOnly', '여자복식 전용', '여성 회원만 출전 배정');
