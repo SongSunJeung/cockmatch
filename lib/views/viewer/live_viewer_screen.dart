@@ -300,7 +300,8 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
       }
     }
 
-    final bool isCompletedView = _isCompletedViewOverride ?? targetSession.isCompleted;
+    final bool isCompletedView = _isCompletedViewOverride ??
+        (targetSession.isCompleted || targetSession.isGameEnded);
     final MatchFormat activeFormat = _formatPreviewOverride ?? targetSession.matchFormat;
 
     return Scaffold(
@@ -430,7 +431,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                             border: Border.all(color: pagePalette.borderTint),
                           ),
                           child: Text(
-                            isCompletedView ? '모임 완료 리포트' : 'LIVE 전광판',
+                            isCompletedView ? '경기 결과' : 'LIVE 전광판',
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w900,
@@ -637,7 +638,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                               ),
                               const SizedBox(width: 5),
                               Text(
-                                '모임 완료 결과 리포트',
+                                '경기 결과',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w800,
@@ -699,17 +700,17 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                                       decoration: BoxDecoration(
                                         color: s.isCompleted
                                             ? pagePalette.softTint
-                                            : AppTheme.pastelMint,
+                                            : (s.isGameEnded ? AppTheme.pastelYellow : AppTheme.pastelMint),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
-                                        s.isCompleted ? '완료' : 'LIVE',
+                                        s.isCompleted ? '완료' : (s.isGameEnded ? '결과' : 'LIVE'),
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w900,
                                           color: s.isCompleted
                                               ? pagePalette.primary
-                                              : AppTheme.pastelMintDark,
+                                              : (s.isGameEnded ? AppTheme.pastelYellowDark : AppTheme.pastelMintDark),
                                         ),
                                       ),
                                     ),
@@ -1006,6 +1007,8 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                   matches: matches,
                   memberMap: memberMap,
                   searchQuery: _searchQuery,
+                  courtCount: session.courtCount,
+                  startCourtNumber: session.startCourtNumber,
                 ),
               ),
             ),

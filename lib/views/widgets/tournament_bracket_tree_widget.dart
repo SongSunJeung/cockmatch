@@ -15,6 +15,8 @@ class TournamentBracketTreeWidget extends StatefulWidget {
   final bool showControls;
   final double initialScale;
   final EdgeInsets? padding;
+  final int courtCount;
+  final int startCourtNumber;
 
   const TournamentBracketTreeWidget({
     super.key,
@@ -24,6 +26,8 @@ class TournamentBracketTreeWidget extends StatefulWidget {
     this.showControls = true,
     this.initialScale = 1.0,
     this.padding,
+    this.courtCount = 5,
+    this.startCourtNumber = 1,
   });
 
   @override
@@ -259,12 +263,17 @@ class _TournamentBracketTreeWidgetState
       }
     }
 
+    final initialMatchCount = max(1, (stageRoundSizes[1] ?? 8) ~/ 2);
     const double matchCardWidth = 240.0;
     const double matchCardHeight = 112.0;
     const double columnSpacing = 56.0;
+    const double headerHeight = 52.0;
+    const double slotHeight = 132.0;
+    final double contentHeight = max(initialMatchCount * slotHeight, 360.0);
+    final double totalHeight = contentHeight + headerHeight;
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (int r = 1; r <= totalRounds; r++) ...[
           _buildStageColumn(
@@ -273,25 +282,34 @@ class _TournamentBracketTreeWidgetState
             matches: roundMatchesMap[r] ?? [],
             cardWidth: matchCardWidth,
             cardHeight: matchCardHeight,
+            totalHeight: totalHeight,
+            headerHeight: headerHeight,
+            contentHeight: contentHeight,
             totalRounds: totalRounds,
           ),
           if (r < totalRounds) ...[
-            SizedBox(
-              width: columnSpacing,
-              child: _buildStageConnector(
-                currentRound: r,
-                currentMatchCount: max(1, (stageRoundSizes[r] ?? 4) ~/ 2),
-                nextMatchCount: max(1, (stageRoundSizes[r + 1] ?? 2) ~/ 2),
-                cardHeight: matchCardHeight,
-              ),
+            _buildStageConnector(
+              currentMatchCount: max(1, (stageRoundSizes[r] ?? 4) ~/ 2),
+              nextMatchCount: max(1, (stageRoundSizes[r + 1] ?? 2) ~/ 2),
+              totalHeight: totalHeight,
+              headerHeight: headerHeight,
+              contentHeight: contentHeight,
+              columnSpacing: columnSpacing,
             ),
           ],
         ],
+        // 결승전과 최종 챔피언 트로피 카드 사이 연결선
+        _buildChampionConnector(
+          totalHeight: totalHeight,
+          headerHeight: headerHeight,
+          contentHeight: contentHeight,
+          columnSpacing: columnSpacing,
+        ),
         // 우측 끝: 최종 챔피언 트로피 카드
-        const SizedBox(width: columnSpacing),
         _buildChampionColumn(
           completedFinalMatch: completedFinalMatch,
           cardWidth: matchCardWidth,
+          totalHeight: totalHeight,
         ),
       ],
     );
@@ -303,6 +321,9 @@ class _TournamentBracketTreeWidgetState
     required List<GameMatch> matches,
     required double cardWidth,
     required double cardHeight,
+    required double totalHeight,
+    required double headerHeight,
+    required double contentHeight,
     required int totalRounds,
   }) {
     final expectedMatchCount = max(1, bracketSize ~/ 2);
@@ -312,90 +333,106 @@ class _TournamentBracketTreeWidgetState
 
     final stageTitle = GameMatch.stageTitleForSize(bracketSize);
     final isFinalRound = bracketSize <= 2;
+    final slotAreaHeight = contentHeight / expectedMatchCount;
 
     return SizedBox(
       width: cardWidth,
+      height: totalHeight,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // 라운드 헤더 배너
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: isFinalRound ? AppTheme.primaryDark : AppTheme.primaryMint,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: (isFinalRound
-                          ? AppTheme.primaryDark
-                          : AppTheme.primaryMint)
-                      .withValues(alpha: 0.25),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+          // 라운드 헤더 배너 (고정 높이)
+          SizedBox(
+            height: headerHeight,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                decoration: BoxDecoration(
+                  color: isFinalRound ? AppTheme.primaryDark : AppTheme.primaryMint,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isFinalRound
+                              ? AppTheme.primaryDark
+                              : AppTheme.primaryMint)
+                          .withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  isFinalRound
-                      ? Icons.emoji_events_rounded
-                      : Icons.sports_tennis_rounded,
-                  size: 15,
-                  color: isFinalRound ? AppTheme.pastelYellow : Colors.white,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isFinalRound
+                          ? Icons.emoji_events_rounded
+                          : Icons.sports_tennis_rounded,
+                      size: 15,
+                      color: isFinalRound ? AppTheme.pastelYellow : Colors.white,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isFinalRound
+                          ? '결승전 (FINAL)'
+                          : (bracketSize == 4 ? '준결승 (4강)' : '$stageTitle ($round R)'),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  isFinalRound
-                      ? '결승전 (FINAL)'
-                      : (bracketSize == 4 ? '준결승 (4강)' : '$stageTitle ($round R)'),
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w900,
-                    color: isFinalRound ? Colors.white : Colors.white,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
 
-          // 해당 라운드의 매치 슬롯 리스트
-          for (int slotIdx = 1; slotIdx <= expectedMatchCount; slotIdx++) ...[
-            Builder(builder: (ctx) {
-              final actualMatch = sortedMatches.firstWhere(
-                (m) =>
-                    m.bracketMatchIndex == slotIdx ||
-                    (m.bracketMatchIndex == null &&
-                        sortedMatches.indexOf(m) + 1 == slotIdx),
-                orElse: () => GameMatch(
-                  id: 'placeholder_r${round}_m$slotIdx',
-                  sessionId: '',
-                  round: round,
-                  courtNumber: slotIdx,
-                  teamA: const [],
-                  teamB: const [],
-                  bracketRoundSize: bracketSize,
-                  bracketMatchIndex: slotIdx,
-                  status: MatchStatus.pending,
-                ),
-              );
+          // 해당 라운드의 매치 슬롯 리스트 (각 슬롯의 중심에 배치)
+          Expanded(
+            child: Column(
+              children: [
+                for (int slotIdx = 1; slotIdx <= expectedMatchCount; slotIdx++) ...[
+                  SizedBox(
+                    height: slotAreaHeight,
+                    child: Center(
+                      child: Builder(builder: (ctx) {
+                        final assignedCourt = widget.startCourtNumber +
+                            ((slotIdx - 1) % widget.courtCount);
+                        final actualMatch = sortedMatches.firstWhere(
+                          (m) =>
+                              m.bracketMatchIndex == slotIdx ||
+                              (m.bracketMatchIndex == null &&
+                                  sortedMatches.indexOf(m) + 1 == slotIdx),
+                          orElse: () => GameMatch(
+                            id: 'placeholder_r${round}_m$slotIdx',
+                            sessionId: '',
+                            round: round,
+                            courtNumber: assignedCourt,
+                            teamA: const [],
+                            teamB: const [],
+                            bracketRoundSize: bracketSize,
+                            bracketMatchIndex: slotIdx,
+                            status: MatchStatus.pending,
+                          ),
+                        );
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: _buildMatchSlotCard(
-                  match: actualMatch,
-                  stageTitle: stageTitle,
-                  slotIndex: slotIdx,
-                  cardWidth: cardWidth,
-                  cardHeight: cardHeight,
-                ),
-              );
-            }),
-          ],
+                        return _buildMatchSlotCard(
+                          match: actualMatch,
+                          stageTitle: stageTitle,
+                          slotIndex: slotIdx,
+                          cardWidth: cardWidth,
+                          cardHeight: cardHeight,
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -482,21 +519,30 @@ class _TournamentBracketTreeWidgetState
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '${match.courtNumber}코트',
-                        style: const TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
+                    Builder(
+                      builder: (ctx) {
+                        final rawCourt = match.courtNumber;
+                        final maxAllowedCourt = widget.startCourtNumber + widget.courtCount - 1;
+                        final effectiveCourt = (rawCourt < widget.startCourtNumber || rawCourt > maxAllowedCourt)
+                            ? widget.startCourtNumber + (((match.bracketMatchIndex ?? slotIndex) - 1) % widget.courtCount)
+                            : rawCourt;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$effectiveCourt코트',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -690,23 +736,55 @@ class _TournamentBracketTreeWidgetState
   }
 
   Widget _buildStageConnector({
-    required int currentRound,
     required int currentMatchCount,
     required int nextMatchCount,
-    required double cardHeight,
+    required double totalHeight,
+    required double headerHeight,
+    required double contentHeight,
+    required double columnSpacing,
   }) {
-    return CustomPaint(
-      painter: _BracketConnectorPainter(
-        color: AppTheme.primaryMint.withValues(alpha: 0.6),
-        strokeWidth: 2.0,
+    return SizedBox(
+      width: columnSpacing,
+      height: totalHeight,
+      child: CustomPaint(
+        size: Size(columnSpacing, totalHeight),
+        painter: _BracketConnectorPainter(
+          currentMatchCount: currentMatchCount,
+          nextMatchCount: nextMatchCount,
+          headerHeight: headerHeight,
+          contentHeight: contentHeight,
+          color: AppTheme.primaryMint.withValues(alpha: 0.8),
+          strokeWidth: 2.2,
+        ),
       ),
-      child: Container(),
+    );
+  }
+
+  Widget _buildChampionConnector({
+    required double totalHeight,
+    required double headerHeight,
+    required double contentHeight,
+    required double columnSpacing,
+  }) {
+    final finalY = headerHeight + 0.5 * contentHeight;
+    return SizedBox(
+      width: columnSpacing,
+      height: totalHeight,
+      child: CustomPaint(
+        size: Size(columnSpacing, totalHeight),
+        painter: _ChampionConnectorPainter(
+          targetY: finalY,
+          color: AppTheme.pastelYellowDark,
+          strokeWidth: 2.2,
+        ),
+      ),
     );
   }
 
   Widget _buildChampionColumn({
     required GameMatch? completedFinalMatch,
     required double cardWidth,
+    required double totalHeight,
   }) {
     final bool hasChampion = completedFinalMatch != null;
     List<String> championIds = const [];
@@ -731,11 +809,10 @@ class _TournamentBracketTreeWidgetState
 
     return SizedBox(
       width: cardWidth,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
+      height: totalHeight,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: hasChampion
@@ -841,18 +918,86 @@ class _TournamentBracketTreeWidgetState
               ],
             ),
           ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
   }
-}
 
-/// 브래킷 피더 매치와 상위 라운드 매치를 연결하는 2D 꺾임선 페인터
+/// 브래킷 피더 매치와 상위 라운드 매치를 연결하는 클래식한 2D 꺾임선(├─) 페인터
 class _BracketConnectorPainter extends CustomPainter {
+  final int currentMatchCount;
+  final int nextMatchCount;
+  final double headerHeight;
+  final double contentHeight;
   final Color color;
   final double strokeWidth;
 
   _BracketConnectorPainter({
+    required this.currentMatchCount,
+    required this.nextMatchCount,
+    required this.headerHeight,
+    required this.contentHeight,
+    required this.color,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final midX = size.width / 2;
+    final pairCount = nextMatchCount;
+
+    for (int i = 0; i < pairCount; i++) {
+      // 상단 매치 중앙 Y
+      final y1 = headerHeight + (2 * i + 0.5) * (contentHeight / currentMatchCount);
+      // 하단 매치 중앙 Y
+      final y2 = headerHeight + (2 * i + 1.5) * (contentHeight / currentMatchCount);
+      // 다음 라운드 매치 중앙 Y (상단과 하단의 중점)
+      final yNext = headerHeight + (i + 0.5) * (contentHeight / nextMatchCount);
+
+      final path = Path()
+        // 1. 상단 피더 매치 우측 -> 중간 수직선 (0, y1) -> (midX, y1)
+        ..moveTo(0, y1)
+        ..lineTo(midX, y1)
+        // 2. 하단 피더 매치 우측 -> 중간 수직선 (0, y2) -> (midX, y2)
+        ..moveTo(0, y2)
+        ..lineTo(midX, y2)
+        // 3. 상단과 하단을 잇는 클래식 수직선 (midX, y1) -> (midX, y2)
+        ..moveTo(midX, y1)
+        ..lineTo(midX, y2)
+        // 4. 수직선 중앙(yNext)에서 다음 라운드 매치로 이어지는 진출 수평선 (midX, yNext) -> (size.width, yNext)
+        ..moveTo(midX, yNext)
+        ..lineTo(size.width, yNext);
+
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BracketConnectorPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.currentMatchCount != currentMatchCount ||
+        oldDelegate.nextMatchCount != nextMatchCount ||
+        oldDelegate.headerHeight != headerHeight ||
+        oldDelegate.contentHeight != contentHeight;
+  }
+}
+
+/// 결승전 매치에서 챔피언 트로피 카드로 이어지는 연결선 페인터
+class _ChampionConnectorPainter extends CustomPainter {
+  final double targetY;
+  final Color color;
+  final double strokeWidth;
+
+  _ChampionConnectorPainter({
+    required this.targetY,
     required this.color,
     required this.strokeWidth,
   });
@@ -865,28 +1010,17 @@ class _BracketConnectorPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    final midX = size.width / 2;
-
-    // 좌측 상단/하단 피더 매치에서 중앙으로 모여 우측으로 나가는 수평+수직 연결선
     final path = Path()
-      // 상단 피더에서 중앙으로
-      ..moveTo(0, size.height * 0.25)
-      ..lineTo(midX, size.height * 0.25)
-      // 하단 피더에서 중앙으로
-      ..moveTo(0, size.height * 0.75)
-      ..lineTo(midX, size.height * 0.75)
-      // 상단과 하단을 잇는 수직선
-      ..moveTo(midX, size.height * 0.25)
-      ..lineTo(midX, size.height * 0.75)
-      // 중앙에서 다음 라운드 매치로 진출하는 수평선
-      ..moveTo(midX, size.height * 0.5)
-      ..lineTo(size.width, size.height * 0.5);
+      ..moveTo(0, targetY)
+      ..lineTo(size.width, targetY);
 
     canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(covariant _BracketConnectorPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
+  bool shouldRepaint(covariant _ChampionConnectorPainter oldDelegate) {
+    return oldDelegate.targetY != targetY ||
+        oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }

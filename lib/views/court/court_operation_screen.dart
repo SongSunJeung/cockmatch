@@ -202,10 +202,6 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
         .where((id) => eliminatedPlayerIds.contains(id) && memberMap.containsKey(id))
         .map((id) => memberMap[id]!)
         .toList();
-    final activeAttendeeMembers = session.activeAttendees
-        .where((id) => memberMap.containsKey(id))
-        .map((id) => memberMap[id]!)
-        .toList();
 
     // 사용 가능한 총 라운드 목록
     final existingRounds = allMatches.map((m) => m.round).toSet().toList()..sort();
@@ -223,12 +219,16 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
     final isPastCompletedRound = selectedRound < maxRound &&
         roundMatches.isNotEmpty &&
         roundMatches.every((m) => m.isFinished);
-    final int finishedMatchesCount = allMatches.where((m) => m.isFinished).length;
 
-    // 현재 라운드에 표시할 코트 번호 목록 (운영 코트 범위 + 범위 밖 특별 매치 코트 번호 합집합, 오름차순 정렬)
+    // 현재 라운드에 표시할 코트 번호 목록 (운영 코트 범위 내로 엄격히 제한하여 초과 유령 슬롯 방지)
     final displayCourtNumbers = isPastCompletedRound
-        ? (roundMatches.map((m) => m.courtNumber).toSet().toList()..sort())
-        : (<int>{...activeCourtNumbers, ...roundMatches.map((m) => m.courtNumber)}.toList()..sort());
+        ? (roundMatches
+            .map((m) => m.courtNumber)
+            .where((c) => activeCourtNumbers.contains(c))
+            .toSet()
+            .toList()
+          ..sort())
+        : activeCourtNumbers;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -304,155 +304,92 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            '운영 코트 ${session.courtCount}면 · ${session.matchFormat.label} · ${session.matchMode.label}${session.partnerMode == PartnerMode.fixedAll ? ' · 전원 고정 페어' : session.fixedPairs.isNotEmpty ? ' · 고정 페어 ${session.fixedPairs.length}팀' : ''}',
+                            '운영 코트 ${session.courtCount}면${!isPastCompletedRound && emptyCourtNumbers.isNotEmpty ? ' (빈 코트 ${emptyCourtNumbers.length}면)' : ''} · ${session.matchFormat.label} · ${session.matchMode.label}${session.partnerMode == PartnerMode.fixedAll ? ' · 전원 고정 페어' : session.fixedPairs.isNotEmpty ? ' · 고정 페어 ${session.fixedPairs.length}팀' : ''}',
                             style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 6),
+                        InkWell(
+                          key: const Key('court_end_game_button'),
+                          onTap: () {
+                            if (session.isGameEnded) {
+                              _showGameEndedStatusDialog(context, ref, session);
+                            } else {
+                              _showEndGameMatchesConfirmDialog(context, ref, session);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: session.isGameEnded ? Colors.amber.shade50 : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: session.isGameEnded ? Colors.amber.shade400 : AppTheme.errorRed.withValues(alpha: 0.45),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  session.isGameEnded ? Icons.check_circle_rounded : Icons.sports_score_rounded,
+                                  size: 13,
+                                  color: session.isGameEnded ? Colors.amber.shade800 : AppTheme.errorRed,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  session.isGameEnded ? '경기 종료됨' : '오늘 경기 종료',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: session.isGameEnded ? Colors.amber.shade900 : AppTheme.errorRed,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    // 1-2. [코트 설정 및 전적 바 콤팩트화] 한 줄 미니 툴바 (칩 형태)
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          InkWell(
-                            key: const Key('open_court_change_dialog_button'),
-                            onTap: () => _showCourtCountChangeDialog(context, ref, memberMap),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: pagePalette.borderTint),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.settings_outlined,
-                                    size: 13.5,
-                                    color: pagePalette.primary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${session.courtCount}코트 변경',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: pagePalette.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (!isPastCompletedRound && emptyCourtNumbers.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: AppTheme.pastelMint,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                    if (session.isGameEnded)
+                      Container(
+                        margin: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.amber.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.flag_rounded, size: 16, color: Colors.amber.shade800),
+                            const SizedBox(width: 8),
+                            Expanded(
                               child: Text(
-                                '빈 코트 ${emptyCourtNumbers.length}면',
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppTheme.pastelMintDark,
+                                '오늘 경기가 공식 종료되었습니다. (웹 뷰어: 경기 결과 확정)\n회비 정산 및 참석 관리는 [모임/행사] 탭에서 계속 진행할 수 있습니다.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.amber.shade900,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
+                            ),
+                            TextButton(
+                              key: const Key('court_banner_resume_button'),
+                              onPressed: () => _showResumeGameConfirmDialog(context, ref),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('경기 재개', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                             ),
                           ],
-                          const SizedBox(width: 6),
-                          InkWell(
-                            key: const Key('open_match_history_dialog_button'),
-                            onTap: () => _showSessionMatchHistoryDialog(
-                              context,
-                              allMatches,
-                              memberMap,
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.sports_tennis_rounded,
-                                    size: 13,
-                                    color: pagePalette.primary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '모임 경기 전적 ($finishedMatchesCount/${allMatches.length}완료 · ${existingRounds.length}R)',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.textDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 3),
-                                  const Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 14,
-                                    color: AppTheme.textMuted,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (isTournament) ...[
-                            const SizedBox(width: 6),
-                            InkWell(
-                              key: const Key('open_tournament_tree_dialog_button'),
-                              onTap: () => _showTournamentBracketTreeDialog(
-                                context,
-                                allMatches,
-                                memberMap,
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.pastelYellow,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: AppTheme.pastelYellowDark),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.account_tree_rounded,
-                                      size: 13.5,
-                                      color: AppTheme.pastelYellowDark,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      '🏆 전체 트리 보기',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppTheme.pastelYellowDark,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -514,13 +451,23 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                                 color: Colors.white.withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Text(
-                                _isSummaryExpanded ? '운영 요약 및 설정 ⌃' : '운영 요약 및 설정 ⌵',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: pagePalette.primary,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.settings,
+                                    size: 13,
+                                    color: pagePalette.primary,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Icon(
+                                    _isSummaryExpanded
+                                        ? Icons.expand_less_rounded
+                                        : Icons.expand_more_rounded,
+                                    size: 16,
+                                    color: pagePalette.primary,
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -554,7 +501,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                                     context: context,
                                     title: '탈락 인원 명단',
                                     subtitle: '토너먼트 패배 탈락 선수 (${eliminatedMembers.length}명)',
-                                  members: eliminatedMembers,
+                                    members: eliminatedMembers,
                                   ),
                                 ),
                               )
@@ -573,34 +520,15 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                                 ),
                               ),
                             const SizedBox(width: 6),
-                            if (isTournament && selectedRound > 1)
-                              Expanded(
-                                child: _buildMetricItem(
-                                  '부전승 대기',
-                                  '${restingMembers.length}명',
-                                  '차기 라운드 진출',
-                                  onTap: () => _showRoundMemberListPopup(
-                                    context: context,
-                                    title: '부전승 대기 명단',
-                                    subtitle: '차기 라운드 진출 대기 선수 (${restingMembers.length}명)',
-                                    members: restingMembers,
-                                  ),
-                                ),
-                              )
-                            else
-                              Expanded(
-                                child: _buildMetricItem(
-                                  '출석 인원',
-                                  '${session.activeAttendees.length}명',
-                                  '총원 대비 실시간',
-                                  onTap: () => _showRoundMemberListPopup(
-                                    context: context,
-                                    title: '출석 인원 명단',
-                                    subtitle: '현재 모임 출전 가능 출석자 (${activeAttendeeMembers.length}명)',
-                                    members: activeAttendeeMembers,
-                                  ),
-                                ),
+                            Expanded(
+                              child: _buildMetricItem(
+                                '코트 수',
+                                '${session.courtCount}코트',
+                                '터치하여 코트 수 설정',
+                                key: const Key('open_court_change_dialog_button'),
+                                onTap: () => _showCourtCountChangeDialog(context, ref, memberMap),
                               ),
+                            ),
                           ],
                         ),
                       ],
@@ -610,123 +538,130 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
               ),
             ),
 
-            // 3. 라운드 선택 탭 ('1 라운드' 옆 '+ 라운드 추가' 첫 화면 즉시 노출) + [+ 특별 매치 추가]
+            // 3. 라운드 선택 탭 ('1 라운드' 옆 '+ 라운드 추가' 첫 화면 즉시 노출)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            ...existingRounds.map(
-                              (r) => Padding(
-                                padding: const EdgeInsets.only(right: 5),
-                                child: InkWell(
-                                  onTap: () {
-                                    ref.read(selectedRoundProvider.notifier).setRound(r);
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 180),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: selectedRound == r ? pagePalette.primary : Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: selectedRound == r ? pagePalette.secondary : Colors.grey.shade200,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      '$r 라운드',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: selectedRound == r ? Colors.white : AppTheme.textDark,
-                                      ),
-                                    ),
-                                  ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ...existingRounds.map(
+                        (r) => Padding(
+                          padding: const EdgeInsets.only(right: 5),
+                          child: InkWell(
+                            onTap: () {
+                              ref.read(selectedRoundProvider.notifier).setRound(r);
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: selectedRound == r ? pagePalette.primary : Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: selectedRound == r ? pagePalette.secondary : Colors.grey.shade200,
+                                ),
+                              ),
+                              child: Text(
+                                '$r 라운드',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: selectedRound == r ? Colors.white : AppTheme.textDark,
                                 ),
                               ),
                             ),
-                            // '+ 라운드 추가' 버튼 (가로 스크롤 뒤로 숨지 않고 첫 화면에서 즉시 노출)
-                            InkWell(
-                              key: const Key('court_add_round_button'),
-                              onTap: () {
-                                final nextRound = (existingRounds.isEmpty ? 0 : existingRounds.last) + 1;
-                                _handleGenerateRound(
-                                  context: context,
-                                  ref: ref,
-                                  targetRound: nextRound,
-                                  isTournament: isTournament,
-                                  allMatches: allMatches,
-                                  switchRound: true,
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: pagePalette.softTint,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: pagePalette.borderTint),
-                                ),
-                                child: Text(
-                                  '+ 라운드 추가',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: pagePalette.primary,
-                                  ),
-                                ),
-                              ),
+                          ),
+                        ),
+                      ),
+                      // '+ 라운드 추가' 버튼 (가로 스크롤 뒤로 숨지 않고 첫 화면에서 즉시 노출)
+                      InkWell(
+                        key: const Key('court_add_round_button'),
+                        onTap: () {
+                          if (session.isGameEnded) {
+                            _showGameEndedStatusDialog(context, ref, session);
+                            return;
+                          }
+                          final nextRound = (existingRounds.isEmpty ? 0 : existingRounds.last) + 1;
+                          _handleGenerateRound(
+                            context: context,
+                            ref: ref,
+                            targetRound: nextRound,
+                            isTournament: isTournament,
+                            allMatches: allMatches,
+                            switchRound: true,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: pagePalette.softTint,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: pagePalette.borderTint),
+                          ),
+                          child: Text(
+                            '+ 라운드 추가',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: pagePalette.primary,
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    // 우측 미니 버튼: [+ 특별 매치 추가] ([다음 라운드 스마트 편성] 중복 버튼 제거)
-                    OutlinedButton.icon(
-                      key: const Key('court_add_custom_match_button'),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppTheme.textDark,
-                        side: BorderSide(color: Colors.grey.shade300),
-                        minimumSize: const Size(0, 28),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      ),
-                      icon: Icon(Icons.add_circle_outline, size: 12, color: pagePalette.primary),
-                      label: const Text(
-                        '+ 특별 매치 추가',
-                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () => _showAddCustomMatchModal(
-                        context,
-                        ref,
-                        session,
-                        selectedRound,
-                        roundMatches,
-                        allMembers,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
 
-            // 3-2. 핵심 운영 버튼 외부 상시 노출 바 ([남은 라운드 재편성] / [대진표 초기화 후 재생성])
+            // 3-2. 핵심 운영 버튼 외부 상시 노출 바 ([+ 특별 매치 추가] / [남은 라운드 재편성] / [대진표 전체 재편성])
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
                 child: Row(
                   children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('court_add_custom_match_button'),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: pagePalette.primary,
+                          side: BorderSide(color: pagePalette.borderTint),
+                          minimumSize: const Size(0, 28),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                        ),
+                        icon: Icon(Icons.add_circle_outline, size: 12, color: pagePalette.primary),
+                        label: const Text(
+                          '+ 특별 매치 추가',
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () {
+                          if (session.isGameEnded) {
+                            _showGameEndedStatusDialog(context, ref, session);
+                            return;
+                          }
+                          _showAddCustomMatchModal(
+                            context,
+                            ref,
+                            session,
+                            selectedRound,
+                            roundMatches,
+                            allMembers,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 5),
                     Expanded(
                       child: OutlinedButton.icon(
                         key: const Key('court_reshuffle_remaining_button'),
@@ -739,21 +674,29 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                         ),
-                        icon: const Icon(Icons.autorenew_rounded, size: 13),
+                        icon: const Icon(Icons.autorenew_rounded, size: 12),
                         label: const Text(
                           '남은 라운드 재편성',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        onPressed: () => _showReshuffleRemainingConfirmDialog(
-                          context,
-                          ref,
-                          selectedRound,
-                        ),
+                        onPressed: () {
+                          if (session.isGameEnded) {
+                            _showGameEndedStatusDialog(context, ref, session);
+                            return;
+                          }
+                          _showReshuffleRemainingConfirmDialog(
+                            context,
+                            ref,
+                            selectedRound,
+                          );
+                        },
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Expanded(
                       child: OutlinedButton.icon(
                         key: const Key('court_reset_and_regenerate_button'),
@@ -766,15 +709,22 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                         ),
-                        icon: const Icon(Icons.restart_alt_rounded, size: 13),
+                        icon: const Icon(Icons.restart_alt_rounded, size: 12),
                         label: const Text(
-                          '대진표 초기화 후 재생성',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                          '대진표 전체 재편성',
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        onPressed: () =>
-                            _showResetAndRegenerateConfirmDialog(context, ref, session),
+                        onPressed: () {
+                          if (session.isGameEnded) {
+                            _showGameEndedStatusDialog(context, ref, session);
+                            return;
+                          }
+                          _showResetAndRegenerateConfirmDialog(context, ref, session);
+                        },
                       ),
                     ),
                   ],
@@ -829,37 +779,70 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                 ),
               ),
 
-            if (isTournament && eliminatedMembers.isNotEmpty)
+            if (isTournament)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.pastelRose.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.pastelRoseDark.withValues(alpha: 0.25)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.cancel_outlined, size: 14, color: AppTheme.pastelRoseDark),
-                        const SizedBox(width: 6),
-                        Text(
-                          '토너먼트 탈락 (${eliminatedMembers.length}명): ',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.pastelRoseDark,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      key: const Key('open_tournament_tree_dialog_button'),
+                      onTap: () => _showTournamentBracketTreeDialog(
+                        context,
+                        allMatches,
+                        memberMap,
+                        courtCount: session.courtCount,
+                        startCourtNumber: session.startCourtNumber,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Ink(
+                        padding: const EdgeInsets.symmetric(vertical: 10.5, horizontal: 16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFF9DE), Color(0xFFFEEDAA)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            eliminatedMembers.map((m) => m.name).join(', '),
-                            style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                            overflow: TextOverflow.ellipsis,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppTheme.pastelYellowDark.withValues(alpha: 0.55),
+                            width: 1.2,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.pastelYellowDark.withValues(alpha: 0.15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ],
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.account_tree_rounded,
+                              size: 17,
+                              color: AppTheme.pastelYellowDark,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              '🏆 전체 토너먼트 트리 보기',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF6B4E00),
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 12,
+                              color: Color(0xFF8C6500),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -929,9 +912,12 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final courtNum = displayCourtNumbers[index];
-                      final matchesOnCourt = roundMatches
-                          .where((m) => m.courtNumber == courtNum)
-                          .toList();
+                      final matchesOnCourt = roundMatches.where((m) {
+                        final effectiveCourt = activeCourtNumbers.contains(m.courtNumber)
+                            ? m.courtNumber
+                            : startCourt + (((m.bracketMatchIndex ?? m.courtNumber) - 1) % session.courtCount);
+                        return effectiveCourt == courtNum;
+                      }).toList();
 
                       if (matchesOnCourt.isEmpty) {
                         return _buildEmptyCourtSlotCard(
@@ -968,6 +954,168 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showEndGameMatchesConfirmDialog(BuildContext context, WidgetRef ref, GameSession session) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.sports_score_rounded, color: AppTheme.errorRed, size: 24),
+            SizedBox(width: 8),
+            Text('오늘 경기 종료', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '오늘 진행된 경기를 공식 종료하고 결과를 확정하시겠습니까?',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+            ),
+            SizedBox(height: 10),
+            Text(
+              '• 대진표 작성이 마감되며, 실시간 웹 뷰어 및 공유 링크 화면이 \'경기 결과\'로 확정되어 노출됩니다.\n• 모임 자체가 완전 마감되는 것은 아니므로, [모임/행사] 탭에서 미납 회비 정산 및 출석부 관리를 계속 진행하실 수 있습니다.',
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.45),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('취소', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            key: const Key('confirm_end_game_matches_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              ref.read(sessionProvider.notifier).endGameMatches();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('오늘 경기가 종료되었습니다. 웹 뷰어 화면이 [경기 결과]로 전환되었습니다.'),
+                  backgroundColor: AppTheme.primaryDark,
+                ),
+              );
+            },
+            child: const Text('경기 종료 및 결과 확정', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showGameEndedStatusDialog(BuildContext context, WidgetRef ref, GameSession session) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: Colors.amber.shade800, size: 24),
+            const SizedBox(width: 8),
+            const Text('경기 종료 상태 안내', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.shade300),
+              ),
+              child: Text(
+                '현재 오늘 경기가 공식 종료된 상태입니다.\n웹 뷰어에는 [경기 결과]로 확정 노출되고 있습니다.',
+                style: TextStyle(fontSize: 12.5, color: Colors.amber.shade900, height: 1.4, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '• 회비 미납 관리나 최종 마감은 [모임/행사] 화면에서 진행하세요.\n• 추가 경기를 더 편성해야 한다면 [경기 다시 재개하기]를 누르세요.',
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted, height: 1.45),
+            ),
+          ],
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _showResumeGameConfirmDialog(context, ref);
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.primaryDark,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('경기 다시 재개하기'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryMint,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              ref.read(currentTabProvider.notifier).setTab(1);
+            },
+            child: const Text('모임/정산 관리로 이동', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showResumeGameConfirmDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('경기를 다시 재개하시겠습니까?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+        content: const Text(
+          '경기를 재개하면 대진표 작성이 다시 활성화되며, 웹 뷰어도 실시간 LIVE 화면으로 복귀합니다.',
+          style: TextStyle(fontSize: 13, color: AppTheme.textMuted, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('취소', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            key: const Key('confirm_resume_game_matches_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryDark,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              ref.read(sessionProvider.notifier).resumeGameMatches();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('경기가 재개되었습니다. 대진표 추가 및 실시간 진행이 활성화되었습니다.'),
+                  backgroundColor: AppTheme.primaryDark,
+                ),
+              );
+            },
+            child: const Text('경기 재개', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -1143,149 +1291,14 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
     );
   }
 
-  /// [2. 전적 바 콤팩트화] 미니 툴바의 `[모임 경기 전적]` 칩 클릭 시 열리는 전적 상세 팝업
-  void _showSessionMatchHistoryDialog(
-    BuildContext context,
-    List<GameMatch> matches,
-    Map<String, Member> memberMap,
-  ) {
-    final finishedMatches = matches.where((m) => m.isFinished).toList();
-    final rounds = matches.map((m) => m.round).toSet().toList()..sort();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: Row(
-          children: [
-            const Icon(Icons.sports_tennis_rounded, color: AppTheme.pastelPeriwinkleDark, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '모임 경기 전적 (${finishedMatches.length}/${matches.length}경기 완료 · 총 ${rounds.length}R)',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
-              ),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: 440,
-          child: matches.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    '아직 기록된 대진 경기가 없습니다.',
-                    style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                  ),
-                )
-              : ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.55,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: matches.map((m) {
-                        final teamANames = m.teamA.map((id) => memberMap[id]?.name ?? '선수').join('·');
-                        final teamBNames = m.teamB.map((id) => memberMap[id]?.name ?? '선수').join('·');
-                        final aWon = m.isTeamAWon || (m.isFinished && m.scoreA > m.scoreB);
-                        final bWon = m.isTeamBWon || (m.isFinished && m.scoreB > m.scoreA);
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.background,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '${m.round}R · ${m.courtNumber}코트',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.textDark,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  teamANames,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: aWon ? FontWeight.w900 : FontWeight.w600,
-                                    color: aWon ? AppTheme.primaryDark : AppTheme.textDark,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.right,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: m.isFinished ? AppTheme.pastelMint : AppTheme.pastelYellow,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    m.isFinished ? '${m.scoreA} : ${m.scoreB}' : '진행중',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: m.isFinished
-                                          ? AppTheme.pastelMintDark
-                                          : AppTheme.pastelYellowDark,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  teamBNames,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: bWon ? FontWeight.w900 : FontWeight.w600,
-                                    color: bWon ? AppTheme.primaryDark : AppTheme.textDark,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              '닫기',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// [🏆 전체 트리 보기] 팝업 다이얼로그 (InteractiveViewer 2D 줌/팬 지원)
   void _showTournamentBracketTreeDialog(
     BuildContext context,
     List<GameMatch> matches,
-    Map<String, Member> memberMap,
-  ) {
+    Map<String, Member> memberMap, {
+    int courtCount = 5,
+    int startCourtNumber = 1,
+  }) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -1346,6 +1359,8 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                   child: TournamentBracketTreeWidget(
                     matches: matches,
                     memberMap: memberMap,
+                    courtCount: courtCount,
+                    startCourtNumber: startCourtNumber,
                   ),
                 ),
               ),
@@ -2056,7 +2071,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                '대진표 초기화 후 재생성',
+                '대진표 전체 재편성',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
@@ -2230,9 +2245,11 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
     String title,
     String val,
     String sub, {
+    Key? key,
     VoidCallback? onTap,
   }) {
     return Material(
+      key: key,
       color: Colors.white.withValues(alpha: 0.65),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(

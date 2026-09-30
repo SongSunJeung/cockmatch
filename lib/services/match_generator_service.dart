@@ -122,7 +122,11 @@ class MatchGeneratorService {
         opponentHistory: opponentHistory,
       );
       return session.matchFormat == MatchFormat.tournament
-          ? _tagTournamentBracketMetadata(fixedMatches)
+          ? _tagTournamentBracketMetadata(
+              fixedMatches,
+              courtCount: courtCount,
+              startCourtNumber: startCourtNumber,
+            )
           : fixedMatches;
     }
 
@@ -232,16 +236,33 @@ class MatchGeneratorService {
     }
 
     return session.matchFormat == MatchFormat.tournament
-        ? _tagTournamentBracketMetadata(generatedMatches)
+        ? _tagTournamentBracketMetadata(
+            generatedMatches,
+            courtCount: courtCount,
+            startCourtNumber: startCourtNumber,
+          )
         : generatedMatches;
   }
 
-  /// 토너먼트 라운드 경기 목록에 강수(4강/8강/16강) 및 경기 순번 메타데이터 부여
-  List<GameMatch> _tagTournamentBracketMetadata(List<GameMatch> matches) {
+  /// 토너먼트 라운드 경기 목록에 강수(4강/8강/16강) 및 경기 순번 메타데이터 부여 및 코트 범위 보정
+  List<GameMatch> _tagTournamentBracketMetadata(
+    List<GameMatch> matches, {
+    int? courtCount,
+    int? startCourtNumber,
+  }) {
     if (matches.isEmpty) return matches;
     final bracketSize = GameMatch.inferBracketSize(matches.length);
     return List.generate(matches.length, (i) {
-      return matches[i].copyWith(
+      final m = matches[i];
+      int finalCourt = m.courtNumber;
+      if (courtCount != null && courtCount > 0 && startCourtNumber != null) {
+        if (finalCourt < startCourtNumber ||
+            finalCourt > startCourtNumber + courtCount - 1) {
+          finalCourt = startCourtNumber + (i % courtCount);
+        }
+      }
+      return m.copyWith(
+        courtNumber: finalCourt,
         bracketRoundSize: bracketSize,
         bracketMatchIndex: i + 1,
       );
@@ -699,31 +720,35 @@ class MatchGeneratorService {
     if (survivingPairs.length < 2) return [];
 
     // 5. 살아남은 승자 페어들끼리만 맞붙도록 2팀당 1개 코트 생성 (2인 페어 불변 유지!)
+    final courtCount = session.courtCount > 0 ? session.courtCount : maxCourtCount;
     final generatedMatches = <GameMatch>[];
-    int courtNumber = startCourtNumber;
     int pairIdx = 0;
 
     while (pairIdx + 1 < survivingPairs.length && generatedMatches.length < maxCourtCount) {
       final teamA = survivingPairs[pairIdx];
       final teamB = survivingPairs[pairIdx + 1];
+      final assignedCourt = startCourtNumber + (generatedMatches.length % courtCount);
 
       generatedMatches.add(
         GameMatch(
-          id: 'tournament_r${targetRound}_c${courtNumber}_${_uuid.v4().substring(0, 8)}',
+          id: 'tournament_r${targetRound}_c${assignedCourt}_${_uuid.v4().substring(0, 8)}',
           sessionId: session.id,
           round: targetRound,
-          courtNumber: courtNumber,
+          courtNumber: assignedCourt,
           teamA: List.from(teamA),
           teamB: List.from(teamB),
           status: MatchStatus.playing,
         ),
       );
 
-      courtNumber++;
       pairIdx += 2;
     }
 
-    return _tagTournamentBracketMetadata(generatedMatches);
+    return _tagTournamentBracketMetadata(
+      generatedMatches,
+      courtCount: courtCount,
+      startCourtNumber: startCourtNumber,
+    );
   }
 
   /// [토너먼트 승자 자동 승급 로직]
@@ -760,7 +785,8 @@ class MatchGeneratorService {
     final nextMatchIdx = (matchIdxInRound + 1) ~/ 2;
     final isSlotA = matchIdxInRound.isOdd;
     final startCourt = session.startCourtNumber;
-    final targetCourt = startCourt + nextMatchIdx - 1;
+    final courtCount = session.courtCount > 0 ? session.courtCount : 5;
+    final targetCourt = startCourt + ((nextMatchIdx - 1) % courtCount);
 
     final working = List<GameMatch>.from(allMatches);
     final existingUpperIdx = working.indexWhere(

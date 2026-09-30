@@ -562,11 +562,25 @@ final sessionHistoryProvider = NotifierProvider<SessionHistoryNotifier, List<Gam
   SessionHistoryNotifier.new,
 );
 
-/// 현재 선택된 클럽의 [진행 모임] 목록 Provider
+/// 현재 선택된 클럽의 [진행 모임] 목록 Provider (경기 진행 중 + 정산 대기)
 final currentClubOngoingSessionsProvider = Provider<List<GameSession>>((ref) {
   final history = ref.watch(sessionHistoryProvider);
   final clubId = ref.watch(currentClubIdProvider);
   return history.where((s) => s.clubId == clubId && !s.isCompleted).toList();
+});
+
+/// 현재 선택된 클럽의 [경기 진행 중인 모임] 목록 Provider
+final currentClubActiveSessionsProvider = Provider<List<GameSession>>((ref) {
+  final history = ref.watch(sessionHistoryProvider);
+  final clubId = ref.watch(currentClubIdProvider);
+  return history.where((s) => s.clubId == clubId && !s.isCompleted && !s.isGameEnded).toList();
+});
+
+/// 현재 선택된 클럽의 [정산 대기 모임] (경기 종료 후 회비 정산 중) 목록 Provider
+final currentClubSettlingSessionsProvider = Provider<List<GameSession>>((ref) {
+  final history = ref.watch(sessionHistoryProvider);
+  final clubId = ref.watch(currentClubIdProvider);
+  return history.where((s) => s.clubId == clubId && !s.isCompleted && s.isGameEnded).toList();
 });
 
 /// 현재 선택된 클럽의 [지난 모임] (종료/보관된 아카이브) 목록 Provider
@@ -574,6 +588,13 @@ final currentClubArchivedSessionsProvider = Provider<List<GameSession>>((ref) {
   final history = ref.watch(sessionHistoryProvider);
   final clubId = ref.watch(currentClubIdProvider);
   return history.where((s) => s.clubId == clubId && s.isCompleted).toList();
+});
+
+/// 현재 선택된 클럽의 모든 세션 (진행 중, 정산 대기, 지난 모임 포함)
+final currentClubAllSessionsProvider = Provider<List<GameSession>>((ref) {
+  final history = ref.watch(sessionHistoryProvider);
+  final clubId = ref.watch(currentClubIdProvider);
+  return history.where((s) => s.clubId == clubId).toList();
 });
 
 /// 현재 열려 있는 게임 세션 상태 관리 Notifier (null은 모임 목록/미선택 상태)
@@ -656,6 +677,9 @@ class SessionNotifier extends Notifier<GameSession?> {
   /// 모임 목록에서 특정 모임([진행 모임] 또는 [지난 모임]) 선택하여 열기
   void selectSession(GameSession targetSession) {
     _hasLocalMutation = true;
+    if (state != null) {
+      _syncToHistory(state);
+    }
     if (targetSession.clubId != ref.read(currentClubIdProvider)) {
       ref.read(currentClubIdProvider.notifier).switchClub(targetSession.clubId);
     }
@@ -693,6 +717,9 @@ class SessionNotifier extends Notifier<GameSession?> {
     List<List<String>>? fixedPairs,
   }) {
     _hasLocalMutation = true;
+    if (state != null) {
+      _syncToHistory(state);
+    }
     final savedPrefs = ref.read(sessionPreferencesProvider);
     final recommendedCourts = (attendeeIds.length ~/ 4).clamp(1, 15);
     final effectiveCourtCount =
@@ -777,6 +804,26 @@ class SessionNotifier extends Notifier<GameSession?> {
     _clubSessionsCache[currentClubId] = null;
     state = null;
     _persistActiveSession(null);
+  }
+
+  /// 오늘 경기 종료 (결과 확정: 대진표 작성 마감 및 웹뷰어 결과 확정, 회비 수납 및 모임은 정산 대기 상태로 유지)
+  void endGameMatches() {
+    if (state == null) return;
+    state = state!.copyWith(
+      isGameEnded: true,
+      gameEndedAt: DateTime.now(),
+    );
+    _syncToHistory(state);
+  }
+
+  /// 오늘 경기 다시 진행하기 (경기 재개)
+  void resumeGameMatches() {
+    if (state == null) return;
+    state = state!.copyWith(
+      isGameEnded: false,
+      gameEndedAt: null,
+    );
+    _syncToHistory(state);
   }
 
   /// [모임 기록 영구 삭제] 총무가 수동으로 확인 팝업을 거쳤을 때만 호출되는 영구 삭제 메서드

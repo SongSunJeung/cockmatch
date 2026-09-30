@@ -24,6 +24,8 @@ class GameSession {
   final int currentRound; // 현재 진행 중인 라운드
   final bool isCompleted; // 모임 종료(완료/아카이빙) 여부 (true = 지난 모임, false = 진행 모임)
   final DateTime? completedAt; // 모임 종료 시각
+  final bool isGameEnded; // 당일 경기 종료 여부 (true = 경기 종료됨/결과 확정, false = 경기 진행 중)
+  final DateTime? gameEndedAt; // 경기 종료 시각
   final DateTime? createdAt;
 
   const GameSession({
@@ -47,6 +49,8 @@ class GameSession {
     this.currentRound = 1,
     this.isCompleted = false,
     this.completedAt,
+    this.isGameEnded = false,
+    this.gameEndedAt,
     this.createdAt,
     // ignore: prefer_initializing_formals
   }) : _activeAttendees = activeAttendees;
@@ -58,6 +62,16 @@ class GameSession {
     }
     final formattedDate = sessionDate.replaceAll('-', '.');
     return '$formattedDate 정기 모임';
+  }
+
+  /// 경기 종료 후 회비 수납 및 모임 정산 진행 중인지 여부 (정산 대기)
+  bool get isSettling => isGameEnded && !isCompleted;
+
+  /// 모임 진행/정산/종료 라이프사이클 라벨
+  String get lifecycleStatusText {
+    if (isCompleted) return '지난 모임';
+    if (isGameEnded) return '정산 대기';
+    return '진행 모임';
   }
 
   /// 당일 전체 출석 인원 수
@@ -210,6 +224,8 @@ class GameSession {
       'currentRound': currentRound,
       'isCompleted': isCompleted,
       if (completedAt != null) 'completedAt': completedAt!.toIso8601String(),
+      'isGameEnded': isGameEnded,
+      if (gameEndedAt != null) 'gameEndedAt': gameEndedAt!.toIso8601String(),
       'createdAt': createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
     };
   }
@@ -285,6 +301,10 @@ class GameSession {
       completedAt: map['completedAt'] != null
           ? DateTime.tryParse(map['completedAt'] as String)
           : null,
+      isGameEnded: (map['isGameEnded'] as bool?) ?? false,
+      gameEndedAt: map['gameEndedAt'] != null
+          ? DateTime.tryParse(map['gameEndedAt'] as String)
+          : null,
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt'] as String)
           : null,
@@ -312,6 +332,8 @@ class GameSession {
     int? currentRound,
     bool? isCompleted,
     DateTime? completedAt,
+    bool? isGameEnded,
+    DateTime? gameEndedAt,
     DateTime? createdAt,
   }) {
     return GameSession(
@@ -335,6 +357,8 @@ class GameSession {
       currentRound: currentRound ?? this.currentRound,
       isCompleted: isCompleted ?? this.isCompleted,
       completedAt: completedAt ?? this.completedAt,
+      isGameEnded: isGameEnded ?? this.isGameEnded,
+      gameEndedAt: gameEndedAt ?? this.gameEndedAt,
       createdAt: createdAt ?? this.createdAt,
     );
   }

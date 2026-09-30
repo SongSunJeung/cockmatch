@@ -103,133 +103,78 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                 size: 20,
                                 color: AppTheme.primaryDark,
                               ),
-                              tooltip: '신규 회원 직접 등록',
+                              tooltip: '신규 회원 등록',
                               visualDensity: VisualDensity.compact,
                               padding: const EdgeInsets.all(6),
                               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                              onPressed: () => _showAddMemberDialog(context),
+                              onPressed: () => _showMemberRegistrationMethodBottomSheet(
+                                context,
+                                currentClub,
+                                clubMembers,
+                              ),
                             ),
                             PopupMenuButton<String>(
-                                icon: const Icon(
-                                  Icons.more_vert_rounded,
-                                  size: 21,
-                                  color: AppTheme.textDark,
+                              icon: const Icon(
+                                Icons.more_vert_rounded,
+                                size: 21,
+                                color: AppTheme.textDark,
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              tooltip: '더보기 메뉴',
+                              offset: const Offset(0, 40),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              color: Colors.white,
+                              elevation: 8,
+                              onSelected: (value) {
+                                if (value == 'csv_export') {
+                                  _showCsvExportDialog(context, currentClub, clubMembers);
+                                }
+                              },
+                              itemBuilder: (ctx) => [
+                                PopupMenuItem<String>(
+                                  value: 'csv_export',
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.pastelPeriwinkle.withValues(alpha: 0.45),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Icon(
+                                          Icons.download_rounded,
+                                          size: 18,
+                                          color: AppTheme.pastelPeriwinkleDark,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              '회원명부 CSV 다운로드',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800,
+                                                color: AppTheme.textDark,
+                                              ),
+                                            ),
+                                            Text(
+                                              '전체 회원 백업 내보내기 (UTF-8 BOM)',
+                                              style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                tooltip: '더보기 메뉴',
-                                offset: const Offset(0, 40),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                color: Colors.white,
-                                elevation: 8,
-                                onSelected: (value) {
-                            if (value == 'csv_import') {
-                              _showCsvImportDialog(context, currentClub, clubMembers);
-                            } else if (value == 'csv_export') {
-                              _showCsvExportDialog(context, currentClub, clubMembers);
-                            } else if (value == 'text_batch') {
-                              _showBatchAddDialog(context);
-                            }
-                          },
-                          itemBuilder: (ctx) => [
-                            PopupMenuItem<String>(
-                              value: 'csv_import',
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.pastelMint.withValues(alpha: 0.45),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.upload_file_rounded,
-                                      size: 18,
-                                      color: AppTheme.pastelMintDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'CSV로 회원 대량 등록',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppTheme.textDark,
-                                          ),
-                                        ),
-                                        Text(
-                                          '엑셀/CSV 파일 업로드 및 미리보기 검증',
-                                          style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              ],
                             ),
-                            PopupMenuItem<String>(
-                              value: 'csv_export',
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.pastelPeriwinkle.withValues(alpha: 0.45),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.download_rounded,
-                                      size: 18,
-                                      color: AppTheme.pastelPeriwinkleDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '회원명부 CSV 다운로드',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppTheme.textDark,
-                                          ),
-                                        ),
-                                        Text(
-                                          '전체 회원 백업 내보내기 (UTF-8 BOM)',
-                                          style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuDivider(),
-                            const PopupMenuItem<String>(
-                              value: 'text_batch',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.playlist_add_rounded, size: 18, color: AppTheme.textMuted),
-                                  SizedBox(width: 10),
-                                  Text(
-                                    '명단 텍스트 대량 등록',
-                                    style: TextStyle(fontSize: 12.5, color: AppTheme.textDark),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
                     ),
                   const SizedBox(height: 4),
@@ -293,17 +238,19 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
             ),
           ),
 
-                // 2. 실시간 이름/초성 검색창 + 우측 컴팩트 정렬 버튼(⇅)
+                // 2. [줄 1] 슬림한 실시간 이름/초성 검색창 + 우측 정렬/세부 필터 아이콘 버튼(Icons.tune)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
                     child: Row(
                       children: [
                         Expanded(
                           child: Container(
+                            height: 44,
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade200),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withValues(alpha: 0.025),
@@ -316,11 +263,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                               controller: _searchController,
                               decoration: InputDecoration(
                                 hintText: '이름 또는 초성 검색 (예: 안세영, ㅇㅅㅇ, ㅎㄱㄷ)',
-                                hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                                prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 20),
+                                hintStyle: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 18),
                                 suffixIcon: _searchController.text.isNotEmpty
                                     ? IconButton(
-                                        icon: const Icon(Icons.cancel_rounded, size: 18, color: AppTheme.textMuted),
+                                        icon: const Icon(Icons.cancel_rounded, size: 16, color: AppTheme.textMuted),
                                         onPressed: () {
                                           _searchController.clear();
                                           ref.read(memberFilterProvider.notifier).update(
@@ -330,7 +277,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                       )
                                     : null,
                                 border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                               ),
                               onChanged: (val) {
                                 ref.read(memberFilterProvider.notifier).update(
@@ -341,93 +288,73 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _buildMemberSortButton(activeFilter.sortBy),
+                        _buildMemberFilterButton(context, ref, activeFilter),
                       ],
                     ),
                   ),
                 ),
 
-                // 3. 컴팩트 드롭다운 필터 3종 (급수 / 회원 구분 / 성별 - 한 줄 균등 배치)
+                // 3. [줄 2] 회원 활동 상태 필터 칩 (가로 1줄 스크롤: [전체 N] [활동 N] [휴면 N] [탈퇴 N])
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-                    child: Row(
-                      children: [
-                        // 1) [급수]: 전체, A조, B조, C조, D조, 초심
-                        Expanded(
-                          child: _buildCompactDropdownFilter(
-                            filterTitle: '급수',
-                            selectedLabel: activeFilter.tier?.label ?? '전체',
-                            isActive: activeFilter.tier != null,
-                            currentKey: activeFilter.tier?.code ?? 'ALL',
-                            items: [
-                              (key: 'ALL', label: '전체'),
-                              ...Tier.values.map((t) => (key: t.code, label: t.label)),
-                            ],
-                            onSelected: (key) {
-                              ref.read(memberFilterProvider.notifier).update((prev) {
-                                if (key == 'ALL') {
-                                  return prev.copyWith(clearTier: true);
-                                }
-                                final selectedTier = Tier.fromString(key);
-                                return prev.copyWith(tier: selectedTier);
-                              });
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildMemberStatusCountChip(
+                            label: '전체',
+                            count: clubMembers.length,
+                            isSelected: activeFilter.status == null,
+                            onTap: () {
+                              ref.read(memberFilterProvider.notifier).update(
+                                    (prev) => prev.copyWith(clearStatus: true),
+                                  );
                             },
                           ),
-                        ),
-                        const SizedBox(width: 8),
-
-                        // 2) [회원 구분]: 전체, 운영진, 정회원, 준회원
-                        Expanded(
-                          child: _buildCompactDropdownFilter(
-                            filterTitle: '회원 구분',
-                            selectedLabel: activeFilter.grade?.label ?? '전체',
-                            isActive: activeFilter.grade != null,
-                            currentKey: activeFilter.grade?.code ?? 'ALL',
-                            items: [
-                              (key: 'ALL', label: '전체'),
-                              ...MemberGrade.values.map((g) => (key: g.code, label: g.label)),
-                            ],
-                            onSelected: (key) {
-                              ref.read(memberFilterProvider.notifier).update((prev) {
-                                if (key == 'ALL') {
-                                  return prev.copyWith(clearGrade: true);
-                                }
-                                final selectedGrade = MemberGrade.values.firstWhere(
-                                  (g) => g.code == key,
-                                  orElse: () => MemberGrade.regular,
-                                );
-                                return prev.copyWith(grade: selectedGrade);
-                              });
+                          const SizedBox(width: 6),
+                          _buildMemberStatusCountChip(
+                            label: '활동',
+                            count: clubMembers.where((m) => m.status == MemberStatus.active).length,
+                            isSelected: activeFilter.status == MemberStatus.active,
+                            onTap: () {
+                              ref.read(memberFilterProvider.notifier).update(
+                                    (prev) => prev.status == MemberStatus.active
+                                        ? prev.copyWith(clearStatus: true)
+                                        : prev.copyWith(status: MemberStatus.active),
+                                  );
                             },
                           ),
-                        ),
-                        const SizedBox(width: 8),
-
-                        // 3) [성별]: 전체, 남성, 여성
-                        Expanded(
-                          child: _buildCompactDropdownFilter(
-                            filterTitle: '성별',
-                            selectedLabel: activeFilter.gender?.label ?? '전체',
-                            isActive: activeFilter.gender != null,
-                            currentKey: activeFilter.gender?.code ?? 'ALL',
-                            items: [
-                              (key: 'ALL', label: '전체'),
-                              (key: Gender.male.code, label: Gender.male.label),
-                              (key: Gender.female.code, label: Gender.female.label),
-                            ],
-                            onSelected: (key) {
-                              ref.read(memberFilterProvider.notifier).update((prev) {
-                                if (key == 'ALL') {
-                                  return prev.copyWith(clearGender: true);
-                                }
-                                final selectedGender = Gender.fromCode(key);
-                                return prev.copyWith(gender: selectedGender);
-                              });
+                          const SizedBox(width: 6),
+                          _buildMemberStatusCountChip(
+                            label: '휴면',
+                            count: clubMembers.where((m) => m.status == MemberStatus.resting).length,
+                            isSelected: activeFilter.status == MemberStatus.resting,
+                            onTap: () {
+                              ref.read(memberFilterProvider.notifier).update(
+                                    (prev) => prev.status == MemberStatus.resting
+                                        ? prev.copyWith(clearStatus: true)
+                                        : prev.copyWith(status: MemberStatus.resting),
+                                  );
                             },
                           ),
-                        ),
-                      ],
+                          if (clubMembers.any((m) => m.status == MemberStatus.withdrawn)) ...[
+                            const SizedBox(width: 6),
+                            _buildMemberStatusCountChip(
+                              label: '탈퇴',
+                              count: clubMembers.where((m) => m.status == MemberStatus.withdrawn).length,
+                              isSelected: activeFilter.status == MemberStatus.withdrawn,
+                              onTap: () {
+                                ref.read(memberFilterProvider.notifier).update(
+                                      (prev) => prev.status == MemberStatus.withdrawn
+                                          ? prev.copyWith(clearStatus: true)
+                                          : prev.copyWith(status: MemberStatus.withdrawn),
+                                    );
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -526,14 +453,144 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   ),
                 ),
 
-                // 5. 회원 목록 가상 스크롤
+                // 5. 회원 목록 가상 스크롤 (또는 빈 화면 Empty State)
                 if (filteredMembers.isEmpty)
-                  const SliverFillRemaining(
+                  SliverFillRemaining(
                     hasScrollBody: false,
                     child: Center(
-                      child: Text(
-                        '검색 또는 필터 조건에 일치하는 회원이 없습니다.',
-                        style: TextStyle(color: AppTheme.textMuted),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+                        child: clubMembers.isEmpty
+                            ? Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 72,
+                                    height: 72,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryDark.withValues(alpha: 0.08),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.group_add_rounded,
+                                      size: 38,
+                                      color: AppTheme.primaryDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  const Text(
+                                    '등록된 회원이 없습니다.',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    '카카오톡 명단을 복사해 한 번에 등록해 보세요!',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.textMuted,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 22),
+                                  // 눈에 띄는 메인 액션 버튼: [📋 텍스트로 대량 등록하기] (강조 색상)
+                                  ElevatedButton.icon(
+                                    onPressed: () => _showBatchAddDialog(context),
+                                    icon: const Text('📋', style: TextStyle(fontSize: 15)),
+                                    label: const Text(
+                                      '텍스트로 대량 등록하기',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.primaryDark,
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      elevation: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  // 보조 텍스트 버튼: [1명씩 직접 등록]
+                                  TextButton.icon(
+                                    onPressed: () => _showAddMemberDialog(context),
+                                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 16, color: AppTheme.textSecondary),
+                                    label: const Text(
+                                      '1명씩 직접 등록',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textSecondary,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 56,
+                                    height: 56,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.search_off_rounded,
+                                      size: 28,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  const Text(
+                                    '검색 또는 필터 조건에 일치하는 회원이 없습니다.',
+                                    style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    '검색어 또는 필터 조건을 변경해 보세요.',
+                                    style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      ref.read(memberFilterProvider.notifier).reset();
+                                    },
+                                    icon: const Icon(Icons.refresh_rounded, size: 16, color: AppTheme.primaryDark),
+                                    label: const Text(
+                                      '검색 및 필터 초기화',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.primaryDark,
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: AppTheme.primaryDark.withValues(alpha: 0.3)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
                   )
@@ -574,85 +631,426 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     );
   }
 
-  /// 회원명부 컴팩트 정렬 버튼 위젯 (검색창 우측 배치)
-  /// - 기본값: 이름순 (가나다) [ㄱ -> ㅎ]
-  /// - 선택 옵션: 이름순 (가나다) [기본], 급수순 (상위 급수 우선: A -> 초심), 회원 구분순 (운영진 -> 정회원 -> 준회원), 최근 등록순
-  Widget _buildMemberSortButton(MemberSortBy currentSort) {
-    final bool isCustomSort = currentSort != MemberSortBy.nameAsc;
+  /// 회원명부 세부 필터 & 정렬 모달 호출 버튼 위젯 (검색창 우측 배치)
+  Widget _buildMemberFilterButton(
+    BuildContext context,
+    WidgetRef ref,
+    MemberFilter activeFilter,
+  ) {
     final pagePalette = AppTheme.getPagePalette(0);
-    return PopupMenuButton<MemberSortBy>(
-      tooltip: '회원명부 정렬',
-      offset: const Offset(0, 44),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Colors.white,
-      elevation: 6,
-      onSelected: (selected) {
-        ref.read(memberFilterProvider.notifier).update(
-              (prev) => prev.copyWith(sortBy: selected),
-            );
-      },
-      itemBuilder: (ctx) => MemberSortBy.memberPoolOptions.map((option) {
-        final isSelected = option == currentSort;
-        return PopupMenuItem<MemberSortBy>(
-          value: option,
-          height: 40,
-          child: Row(
-            children: [
-              Icon(
-                isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                size: 16,
-                color: isSelected ? pagePalette.primary : Colors.grey.shade400,
+    final isCustomSort = activeFilter.sortBy != MemberSortBy.nameAsc;
+    final int detailFilterCount = (isCustomSort ? 1 : 0) +
+        (activeFilter.tier != null ? 1 : 0) +
+        (activeFilter.grade != null ? 1 : 0) +
+        (activeFilter.gender != null ? 1 : 0);
+    final bool hasFilter = detailFilterCount > 0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const Key('member_filter_button'),
+        onTap: () => _showMemberFilterModalBottomSheet(context),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: hasFilter ? pagePalette.softTint : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: hasFilter ? pagePalette.primary : Colors.grey.shade300,
+              width: hasFilter ? 1.5 : 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.025),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  option.menuLabel,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                    color: isSelected ? pagePalette.primary : AppTheme.textDark,
-                  ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Badge(
+                isLabelVisible: hasFilter,
+                label: Text(
+                  '$detailFilterCount',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                backgroundColor: pagePalette.primary,
+                child: Icon(
+                  Icons.tune_rounded,
+                  size: 20,
+                  color: hasFilter ? pagePalette.primary : AppTheme.textDark,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                isCustomSort ? activeFilter.sortBy.label : '필터',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: hasFilter ? FontWeight.w800 : FontWeight.w600,
+                  color: hasFilter ? pagePalette.primary : AppTheme.textDark,
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// 회원명부 세부 필터 (정렬 / 급수 / 회원 구분 / 성별) BottomSheet 모달
+  void _showMemberFilterModalBottomSheet(BuildContext context) {
+    final pagePalette = AppTheme.getPagePalette(0);
+    final activeFilter = ref.read(memberFilterProvider);
+    MemberSortBy tempSort = activeFilter.sortBy;
+    Tier? tempTier = activeFilter.tier;
+    MemberGrade? tempGrade = activeFilter.grade;
+    Gender? tempGender = activeFilter.gender;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 핸들 바
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 10, bottom: 6),
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    // 헤더
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.tune_rounded, size: 20, color: pagePalette.primary),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '필터 및 정렬',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textDark,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20, color: AppTheme.textMuted),
+                            onPressed: () => Navigator.pop(bottomSheetContext),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    // 스크롤 옵션 영역
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 1. 정렬 방식
+                            _buildFilterSectionTitle('정렬 방식'),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: MemberSortBy.memberPoolOptions.map((option) {
+                                final isSelected = tempSort == option;
+                                return _buildModalFilterChip(
+                                  label: option.menuLabel,
+                                  isSelected: isSelected,
+                                  primaryColor: pagePalette.primary,
+                                  onTap: () {
+                                    setModalState(() {
+                                      tempSort = option;
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 18),
+
+                            // 2. 급수 선택
+                            _buildFilterSectionTitle('급수'),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _buildModalFilterChip(
+                                  label: '전체',
+                                  isSelected: tempTier == null,
+                                  primaryColor: pagePalette.primary,
+                                  onTap: () {
+                                    setModalState(() {
+                                      tempTier = null;
+                                    });
+                                  },
+                                ),
+                                ...[
+                                  Tier.novice,
+                                  Tier.d,
+                                  Tier.c,
+                                  Tier.b,
+                                  Tier.a,
+                                  Tier.s,
+                                ].map((t) {
+                                  final isSelected = tempTier == t;
+                                  return _buildModalFilterChip(
+                                    label: t.label,
+                                    isSelected: isSelected,
+                                    primaryColor: pagePalette.primary,
+                                    onTap: () {
+                                      setModalState(() {
+                                        tempTier = isSelected ? null : t;
+                                      });
+                                    },
+                                  );
+                                }),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+
+                            // 3. 회원 구분 선택
+                            _buildFilterSectionTitle('회원 구분'),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _buildModalFilterChip(
+                                  label: '전체',
+                                  isSelected: tempGrade == null,
+                                  primaryColor: pagePalette.primary,
+                                  onTap: () {
+                                    setModalState(() {
+                                      tempGrade = null;
+                                    });
+                                  },
+                                ),
+                                ...[
+                                  MemberGrade.regular,
+                                  MemberGrade.associate,
+                                  MemberGrade.executive,
+                                ].map((g) {
+                                  final isSelected = tempGrade == g;
+                                  return _buildModalFilterChip(
+                                    label: g.label,
+                                    isSelected: isSelected,
+                                    primaryColor: pagePalette.primary,
+                                    onTap: () {
+                                      setModalState(() {
+                                        tempGrade = isSelected ? null : g;
+                                      });
+                                    },
+                                  );
+                                }),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+
+                            // 4. 성별 선택
+                            _buildFilterSectionTitle('성별'),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _buildModalFilterChip(
+                                  label: '전체',
+                                  isSelected: tempGender == null,
+                                  primaryColor: pagePalette.primary,
+                                  onTap: () {
+                                    setModalState(() {
+                                      tempGender = null;
+                                    });
+                                  },
+                                ),
+                                _buildModalFilterChip(
+                                  label: '남성',
+                                  isSelected: tempGender == Gender.male,
+                                  primaryColor: pagePalette.primary,
+                                  onTap: () {
+                                    setModalState(() {
+                                      tempGender = tempGender == Gender.male ? null : Gender.male;
+                                    });
+                                  },
+                                ),
+                                _buildModalFilterChip(
+                                  label: '여성',
+                                  isSelected: tempGender == Gender.female,
+                                  primaryColor: pagePalette.primary,
+                                  onTap: () {
+                                    setModalState(() {
+                                      tempGender = tempGender == Gender.female ? null : Gender.female;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    // 하단 액션 버튼 ([초기화] | [적용하기])
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: OutlinedButton.icon(
+                              key: const Key('member_filter_reset_btn'),
+                              onPressed: () {
+                                setModalState(() {
+                                  tempSort = MemberSortBy.nameAsc;
+                                  tempTier = null;
+                                  tempGrade = null;
+                                  tempGender = null;
+                                });
+                              },
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text(
+                                '초기화',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.textDark,
+                                side: BorderSide(color: Colors.grey.shade300),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              key: const Key('member_filter_apply_btn'),
+                              onPressed: () {
+                                ref.read(memberFilterProvider.notifier).update(
+                                      (prev) => prev.copyWith(
+                                        sortBy: tempSort,
+                                        tier: tempTier,
+                                        clearTier: tempTier == null,
+                                        grade: tempGrade,
+                                        clearGrade: tempGrade == null,
+                                        gender: tempGender,
+                                        clearGender: tempGender == null,
+                                      ),
+                                    );
+                                Navigator.pop(bottomSheetContext);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: pagePalette.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text(
+                                '적용하기',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
-      }).toList(),
+      },
+    );
+  }
+
+  /// [줄 2] 회원 활동 상태 필터 칩 위젯
+  Widget _buildMemberStatusCountChip({
+    required String label,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final pagePalette = AppTheme.getPagePalette(0);
+    final Color bg = isSelected ? pagePalette.primary : Colors.white;
+    final Color textColor = isSelected ? Colors.white : AppTheme.textDark;
+    final Color badgeBg = isSelected ? Colors.white.withValues(alpha: 0.2) : AppTheme.surfaceGrey;
+    final Color badgeText = isSelected ? Colors.white : AppTheme.textMuted;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        height: 44,
-        padding: const EdgeInsets.symmetric(horizontal: 11),
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isCustomSort ? pagePalette.softTint : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isCustomSort ? pagePalette.primary : Colors.grey.shade300,
-            width: isCustomSort ? 1.5 : 1.0,
+            color: isSelected ? pagePalette.primary : Colors.grey.shade300,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.025),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '⇅ ${currentSort.label}',
+              label,
               style: TextStyle(
                 fontSize: 11.5,
-                fontWeight: isCustomSort ? FontWeight.w900 : FontWeight.w800,
-                color: isCustomSort ? pagePalette.primary : AppTheme.textDark,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                color: textColor,
               ),
             ),
-            const SizedBox(width: 2),
-            Icon(
-              Icons.arrow_drop_down_rounded,
-              size: 18,
-              color: isCustomSort ? pagePalette.primary : AppTheme.textMuted,
+            const SizedBox(width: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: badgeBg,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: badgeText,
+                ),
+              ),
             ),
           ],
         ),
@@ -660,81 +1058,43 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     );
   }
 
-  /// 컴팩트 드롭다운 필터 버튼 위젯 (급수 / 회원 구분 / 성별)
-  /// - 기본값: '급수: 전체 ▾', '회원 구분: 전체 ▾', '성별: 전체 ▾'
-  /// - 선택 시: '급수: B조 ▾' 등 라벨 변경 및 활성화 스타일(테두리/텍스트 강조) 적용
-  Widget _buildCompactDropdownFilter({
-    required String filterTitle,
-    required String selectedLabel,
-    required bool isActive,
-    required String currentKey,
-    required List<({String key, String label})> items,
-    required ValueChanged<String> onSelected,
+  Widget _buildFilterSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w800,
+        color: AppTheme.textDark,
+      ),
+    );
+  }
+
+  Widget _buildModalFilterChip({
+    required String label,
+    required bool isSelected,
+    required Color primaryColor,
+    required VoidCallback onTap,
   }) {
-    final pagePalette = AppTheme.getPagePalette(0);
-    return PopupMenuButton<String>(
-      tooltip: '$filterTitle 필터 선택',
-      offset: const Offset(0, 42),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      color: Colors.white,
-      elevation: 6,
-      onSelected: onSelected,
-      itemBuilder: (ctx) => items.map((item) {
-        final isItemSelected = item.key == currentKey;
-        return PopupMenuItem<String>(
-          value: item.key,
-          height: 38,
-          child: Row(
-            children: [
-              Icon(
-                isItemSelected ? Icons.check_rounded : Icons.circle_outlined,
-                size: 15,
-                color: isItemSelected ? pagePalette.primary : Colors.transparent,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  item.label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isItemSelected ? FontWeight.w900 : FontWeight.w600,
-                    color: isItemSelected ? pagePalette.primary : AppTheme.textDark,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: isActive ? pagePalette.softTint : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? primaryColor.withValues(alpha: 0.12) : const Color(0xFFF6F7F9),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isActive ? pagePalette.primary : Colors.grey.shade300,
-            width: isActive ? 1.6 : 1.0,
+            color: isSelected ? primaryColor : Colors.grey.shade300,
+            width: isSelected ? 1.5 : 1.0,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
-        child: Center(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              '$filterTitle: $selectedLabel ▾',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w900 : FontWeight.w700,
-                color: isActive ? pagePalette.primary : AppTheme.textDark,
-              ),
-            ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+            color: isSelected ? primaryColor : AppTheme.textDark,
           ),
         ),
       ),
@@ -1401,6 +1761,193 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
   /// 신규 회원 직접 등록 다이얼로그
   void _showAddMemberDialog(BuildContext context) {
     _showMemberFormDialog(context, ref);
+  }
+
+  /// [A안] 신규 회원 등록 방식 선택 바텀시트
+  void _showMemberRegistrationMethodBottomSheet(
+    BuildContext context,
+    Club currentClub,
+    List<Member> clubMembers,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Row(
+                children: [
+                  Icon(Icons.person_add_alt_1_rounded, color: AppTheme.primaryDark, size: 22),
+                  SizedBox(width: 8),
+                  Text(
+                    '신규 회원 등록 방식 선택',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textDark),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '원하시는 등록 방식을 선택해 주세요.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 16),
+              // 1. 텍스트 대량 등록 (카톡 명단 복사/붙여넣기 - '추천' 뱃지 부착)
+              _buildRegistrationOptionTile(
+                context: ctx,
+                icon: Icons.playlist_add_rounded,
+                iconBgColor: AppTheme.pastelYellow.withValues(alpha: 0.55),
+                iconColor: AppTheme.pastelYellowDark,
+                title: '텍스트 대량 등록',
+                subtitle: '카톡 명단 복사/붙여넣기로 여러 명을 한 번에 등록',
+                hasRecommendBadge: true,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showBatchAddDialog(context);
+                },
+              ),
+              const SizedBox(height: 10),
+              // 2. 1명씩 직접 등록 (기존 단일 회원 등록 팝업 연결)
+              _buildRegistrationOptionTile(
+                context: ctx,
+                icon: Icons.person_add_rounded,
+                iconBgColor: AppTheme.pastelPeriwinkle.withValues(alpha: 0.55),
+                iconColor: AppTheme.primaryDark,
+                title: '1명씩 직접 등록',
+                subtitle: '이름, 급수, 연락처, 회비 등 개별 상세 입력',
+                hasRecommendBadge: false,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showAddMemberDialog(context);
+                },
+              ),
+              const SizedBox(height: 10),
+              // 3. CSV 파일 업로드 (기존 CSV 등록 모달 연결)
+              _buildRegistrationOptionTile(
+                context: ctx,
+                icon: Icons.upload_file_rounded,
+                iconBgColor: AppTheme.pastelMint.withValues(alpha: 0.45),
+                iconColor: AppTheme.pastelMintDark,
+                title: 'CSV 파일 업로드',
+                subtitle: '엑셀/CSV 양식 파일 업로드 및 검증 후 일괄 등록',
+                hasRecommendBadge: false,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showCsvImportDialog(context, currentClub, clubMembers);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRegistrationOptionTile({
+    required BuildContext context,
+    required IconData icon,
+    required Color iconBgColor,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required bool hasRecommendBadge,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: hasRecommendBadge ? const Color(0xFFF9FAFD) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: hasRecommendBadge ? AppTheme.primaryDark.withValues(alpha: 0.3) : Colors.grey.shade200,
+              width: hasRecommendBadge ? 1.5 : 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                        if (hasRecommendBadge) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.pastelMint,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              '추천',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.pastelMintDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, size: 20, color: AppTheme.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// 날짜 선택 달력 픽커(showDatePicker) 헬퍼 ("YYYY.MM.DD" 포맷 반환)

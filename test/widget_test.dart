@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cockmatch/main.dart';
 import 'package:cockmatch/core/theme/app_theme.dart';
 import 'package:cockmatch/views/widgets/tournament_bracket_tree_widget.dart';
+import 'package:cockmatch/views/club/club_member_pool_screen.dart';
+import 'package:cockmatch/providers/providers.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -30,9 +32,10 @@ void main() {
     await tester.tap(archivedCard);
     await tester.pumpAndSettle();
 
-    expect(find.text('당일 출석 인원'), findsOneWidget);
-    expect(find.text('회비 수납 현황'), findsOneWidget);
-    expect(find.text('미납자 안내 문자 발송'), findsOneWidget);
+    // 슬림 요약 대시보드(출석/수납 텍스트 및 미납자 안내 문자 IconButton) 확인
+    expect(find.textContaining('출석'), findsWidgets);
+    expect(find.textContaining('수납'), findsWidgets);
+    expect(find.byKey(const Key('unpaid_guide_sms_button')), findsOneWidget);
     // 출석부 화면에서 '모임 경기 전적' 카드 및 상단 '모임 목록' 중복 버튼 제거 확인
     expect(find.textContaining('모임 경기 전적'), findsNothing);
     expect(find.text('모임 목록'), findsNothing);
@@ -40,15 +43,12 @@ void main() {
     expect(find.text('게스트 즉시 추가'), findsOneWidget);
     expect(find.text('문자 발송'), findsNothing);
 
-    // 출석부 상단 필터 & 정렬(기본값: 급수순 A -> 초심) 확인
-    expect(find.text('⇅ 급수순 (A -> 초심)'), findsOneWidget);
-    expect(find.text('급수: 전체 ▾'), findsWidgets);
-    expect(find.text('회원 구분: 전체 ▾'), findsWidgets);
-    expect(find.text('성별: 전체 ▾'), findsWidgets);
+    // 출석부 상단 필터 버튼 및 상태 필터 칩 확인
+    expect(find.byKey(const Key('attendance_filter_button')), findsOneWidget);
     expect(find.text('출전'), findsWidgets);
     expect(find.text('휴식'), findsWidgets);
     expect(find.text('조퇴'), findsWidgets);
-    expect(find.text('미납자만'), findsOneWidget);
+    expect(find.text('미납'), findsWidgets);
     expect(find.text('완납'), findsWidgets);
     expect(find.text('면제'), findsWidgets);
 
@@ -79,30 +79,33 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('선택한 회원(1명) 문자 발송'), findsNothing);
 
-    // 출석부 정렬 옵션 변경: [급수순 (A -> 초심)] -> [회비 상태순 (미납자 최우선 정렬)] -> [급수순 (A -> 초심)]
-    await tester.tap(find.text('⇅ 급수순 (A -> 초심)'));
+    // 출석부 세부 필터 & 정렬 모달 바텀시트 열기
+    await tester.tap(find.byKey(const Key('attendance_filter_button')));
     await tester.pumpAndSettle();
+    expect(find.text('필터 및 정렬'), findsOneWidget);
     expect(find.text('급수순 (A -> 초심) [기본]'), findsOneWidget);
     expect(find.text('이름순 (가나다)'), findsOneWidget);
     expect(find.text('출전 상태순 (출전 -> 휴식 -> 조퇴)'), findsOneWidget);
     expect(find.text('회비 상태순 (미납자 최우선 정렬)'), findsOneWidget);
+
+    // [회비 상태순 (미납자 최우선 정렬)] 선택 후 적용하기
     await tester.tap(find.text('회비 상태순 (미납자 최우선 정렬)'));
     await tester.pumpAndSettle();
-    expect(find.text('⇅ 회비 상태순'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('attendance_filter_apply_btn')));
+    await tester.pumpAndSettle();
+    expect(find.text('회비 상태순'), findsOneWidget);
 
-    await tester.tap(find.text('⇅ 회비 상태순'));
+    // 다시 필터 모달 열기 -> [급수순 (A -> 초심) [기본]] 복원 및 [급수: A조] 선택 후 적용하기
+    await tester.tap(find.byKey(const Key('attendance_filter_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('급수순 (A -> 초심) [기본]'));
     await tester.pumpAndSettle();
-    expect(find.text('⇅ 급수순 (A -> 초심)'), findsOneWidget);
-
-    // 복합 필터링(AND) 테스트: [급수: A조] + [출전] + [완납] 동시 선택
-    await tester.tap(find.text('급수: 전체 ▾').last);
-    await tester.pumpAndSettle();
     await tester.tap(find.text('A조').last);
     await tester.pumpAndSettle();
-    expect(find.text('급수: A조 ▾'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('attendance_filter_apply_btn')));
+    await tester.pumpAndSettle();
 
+    // 복합 필터링(AND) 테스트: [출전] + [완납] 동시 선택
     await tester.tap(find.text('출전').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('완납').first);
@@ -111,7 +114,6 @@ void main() {
     // [필터 초기화] 클릭 시 출석부 필터 전체 초기화 확인
     await tester.tap(find.text('필터 초기화').last);
     await tester.pumpAndSettle();
-    expect(find.text('급수: A조 ▾'), findsNothing);
 
     // 다시 위로 스크롤하여 우측 상단 팝업 메뉴로 모임 목록 복귀 후 데이터 보존 및 지난 모임 카드 삭제 다이얼로그 확인
     await tester.drag(find.byType(CustomScrollView).first, const Offset(0, 250));
@@ -144,12 +146,12 @@ void main() {
 
     // 회원명부 화면: 기본 정렬 '⇅ 이름순 (가나다)' 및 가나다순 최상단 회원(강호동: 010-6666-7777, 가족회원 뱃지) 노출 확인
     expect(find.text('메가 배드민턴 클럽'), findsOneWidget);
-    expect(find.byTooltip('신규 회원 직접 등록'), findsOneWidget);
+    expect(find.byTooltip('신규 회원 등록'), findsOneWidget);
     // 최상단 AppBar 우측 말풍선(문자) 아이콘 중복 제거 및 본문 리스트 상단 [단체 문자 발송] 단일 유지 확인
     expect(find.byTooltip('단체 문자 발송'), findsNothing);
     expect(find.text('단체 문자 발송'), findsOneWidget);
     expect(find.byIcon(Icons.phone_in_talk_rounded), findsNothing);
-    expect(find.text('⇅ 이름순 (가나다)'), findsOneWidget);
+    expect(find.byKey(const Key('member_filter_button')), findsOneWidget);
     expect(find.text('010-6666-7777'), findsOneWidget);
     expect(find.text('가족회원'), findsOneWidget);
     // 회원 명부 카드 우측 급수 뱃지: 내부 점수 표기 없이 급수 명칭만 깔끔하게 노출되는지 확인
@@ -160,8 +162,13 @@ void main() {
     expect(find.text('초심 (1점)'), findsNothing);
     expect(find.text('A조'), findsWidgets);
 
-    // 신규 회원 등록 모달 오픈 -> [회원 활동 상태]('활동 회원' 간소화), [회원 등급 / 직책] 커스텀 직접 추가, [회비 부과 기준] UI 검증
-    await tester.tap(find.byTooltip('신규 회원 직접 등록'));
+    // 신규 회원 등록 바텀시트 오픈 -> [1명씩 직접 등록] 선택 -> [회원 활동 상태]('활동 회원' 간소화), [회원 등급 / 직책] 커스텀 직접 추가, [회비 부과 기준] UI 검증
+    await tester.tap(find.byTooltip('신규 회원 등록'));
+    await tester.pumpAndSettle();
+    expect(find.text('신규 회원 등록 방식 선택'), findsOneWidget);
+    expect(find.text('텍스트 대량 등록'), findsOneWidget);
+    expect(find.text('CSV 파일 업로드'), findsOneWidget);
+    await tester.tap(find.text('1명씩 직접 등록'));
     await tester.pumpAndSettle();
     expect(find.text('활동 회원 (기본값)'), findsNothing);
     expect(find.text('활동 회원'), findsOneWidget);
@@ -200,70 +207,66 @@ void main() {
     await tester.tap(find.text('취소'));
     await tester.pumpAndSettle();
 
-    // 회원명부 정렬 변경: [급수순 (상위 급수 우선: A -> 초심)] 선택 시 A조 회원(안세영: 010-1111-2222) 최상단 정렬 확인
-    await tester.tap(find.text('⇅ 이름순 (가나다)'));
+    // 회원명부 세부 필터 & 정렬 모달 바텀시트 열기
+    await tester.tap(find.byKey(const Key('member_filter_button')));
     await tester.pumpAndSettle();
+    expect(find.text('필터 및 정렬'), findsOneWidget);
     expect(find.text('이름순 (가나다) [기본]'), findsOneWidget);
     expect(find.text('급수순 (상위 급수 우선: A -> 초심)'), findsOneWidget);
     expect(find.text('회원 구분순 (운영진 -> 정회원 -> 준회원)'), findsOneWidget);
     expect(find.text('최근 등록순'), findsOneWidget);
+
+    // [급수순] 선택 후 적용하기 -> A조 회원(안세영: 010-1111-2222) 최상단 정렬 확인
     await tester.tap(find.text('급수순 (상위 급수 우선: A -> 초심)'));
     await tester.pumpAndSettle();
-    expect(find.text('⇅ 급수순 (A -> 초심)'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('member_filter_apply_btn')));
+    await tester.pumpAndSettle();
+    expect(find.text('급수순 (A -> 초심)'), findsOneWidget);
     expect(find.text('010-1111-2222'), findsOneWidget);
 
-    // 다시 [최근 등록순]으로 정렬하여 이후 CSV 신규 등록 회원이 최상단에 표시되도록 전환
-    await tester.tap(find.text('⇅ 급수순 (A -> 초심)'));
+    // 다시 필터 모달 열기 -> [최근 등록순] + [급수: B조] + [회원 구분: 운영진] + [성별: 여성] 선택 후 적용
+    await tester.tap(find.byKey(const Key('member_filter_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('최근 등록순'));
-    await tester.pumpAndSettle();
-    expect(find.text('⇅ 최근 등록순'), findsOneWidget);
-
-    expect(find.text('급수: 전체 ▾'), findsOneWidget);
-    expect(find.text('회원 구분: 전체 ▾'), findsOneWidget);
-    expect(find.text('성별: 전체 ▾'), findsOneWidget);
-
-    // 드롭다운 1) [급수] 선택 -> 'S조' 포함 확인 후 '급수: B조 ▾'로 변경 확인
-    await tester.tap(find.text('급수: 전체 ▾'));
     await tester.pumpAndSettle();
     expect(find.text('S조'), findsWidgets);
     await tester.tap(find.text('B조').last);
     await tester.pumpAndSettle();
-    expect(find.text('급수: B조 ▾'), findsOneWidget);
-
-    // 드롭다운 2) [회원 구분] 선택 -> '회원 구분: 운영진 ▾'로 변경 확인
-    await tester.tap(find.text('회원 구분: 전체 ▾'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('운영진').last);
-    await tester.pumpAndSettle();
-    expect(find.text('회원 구분: 운영진 ▾'), findsOneWidget);
-
-    // 드롭다운 3) [성별] 선택 -> '성별: 여성 ▾'로 변경 및 AND 결합 필터링 확인
-    await tester.tap(find.text('성별: 전체 ▾'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('여성').last);
     await tester.pumpAndSettle();
-    expect(find.text('성별: 여성 ▾'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('member_filter_apply_btn')));
+    await tester.pumpAndSettle();
 
-    // 필터 초기화 버튼 클릭 시 3종 드롭다운 모두 기본값('전체 ▾')으로 복원되고 정렬 상태는 유지됨 확인
+    // 상단 요약 바의 [필터 초기화] 클릭 시 세부 필터 초기화 확인
     await tester.tap(find.text('필터 초기화'));
     await tester.pumpAndSettle();
-    expect(find.text('급수: 전체 ▾'), findsOneWidget);
-    expect(find.text('회원 구분: 전체 ▾'), findsOneWidget);
-    expect(find.text('성별: 전체 ▾'), findsOneWidget);
-    expect(find.text('⇅ 최근 등록순'), findsOneWidget);
 
-    // 2-2. 회원명부 우측 상단 '더보기 메뉴' -> [CSV로 회원 대량 등록] 및 [회원명부 CSV 다운로드] 검증
+    // 다시 필터 모달을 열어 정렬을 [최근 등록순]으로 설정하여 이후 CSV 신규 등록 회원이 최상단에 표시되도록 설정
+    await tester.tap(find.byKey(const Key('member_filter_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('최근 등록순').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('member_filter_apply_btn')));
+    await tester.pumpAndSettle();
+    expect(find.text('최근 등록순'), findsWidgets);
+
+    // 2-2. 회원명부 우측 상단 '더보기 메뉴' -> [회원명부 CSV 다운로드] 데이터 관리 메뉴 유지 확인
     final moreMenuBtn = find.byTooltip('더보기 메뉴');
     expect(moreMenuBtn, findsOneWidget);
     await tester.tap(moreMenuBtn);
     await tester.pumpAndSettle();
 
-    expect(find.text('CSV로 회원 대량 등록'), findsOneWidget);
     expect(find.text('회원명부 CSV 다운로드'), findsOneWidget);
+    // 메뉴 바깥 탭하여 닫기
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
 
-    // [CSV로 회원 대량 등록] 클릭 -> 표준 템플릿 링크 및 미리보기 팝업(총 N명 검출) 흐름 확인
-    await tester.tap(find.text('CSV로 회원 대량 등록'));
+    // 신규 등록 바텀시트에서 [CSV 파일 업로드] 클릭 -> 표준 템플릿 링크 및 미리보기 팝업(총 N명 검출) 흐름 확인
+    await tester.tap(find.byTooltip('신규 회원 등록'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CSV 파일 업로드'));
     await tester.pumpAndSettle();
 
     expect(find.text('표준 템플릿 CSV 다운로드'), findsOneWidget);
@@ -361,8 +364,8 @@ void main() {
     expect(find.text('대기'), findsNothing);
     expect(find.text('다음 라운드 대기자 / 휴식자 명단'), findsOneWidget);
 
-    // [모임 완료 결과 리포트] 전환 시 2개 서브 탭([종합 순위 & 리포트] / [라운드별 스코어]) 및 [순위 결정 기준 안내] 확인
-    await tester.tap(find.text('모임 완료 결과 리포트'));
+    // [경기 결과] 전환 시 2개 서브 탭([종합 순위 & 리포트] / [라운드별 스코어]) 및 [순위 결정 기준 안내] 확인
+    await tester.tap(find.text('경기 결과').first);
     await tester.pumpAndSettle();
 
     expect(find.text('종합 순위 & 리포트'), findsOneWidget);
@@ -504,22 +507,22 @@ void main() {
     expect(find.text('1번 코트'), findsOneWidget);
     expect(find.text('2번 코트'), findsOneWidget);
 
-    // 2) 상단 설정/통계 영역은 기본적으로 접힌 상태(Collapsed)이며 [운영 요약 및 설정 ⌵] 토글 버튼 제공 확인
-    expect(find.text('운영 요약 및 설정 ⌵'), findsOneWidget);
+    // 2) 상단 설정/통계 영역은 기본적으로 접힌 상태(Collapsed)이며 설정 아이콘 토글 버튼 제공 확인
+    expect(find.byKey(const Key('toggle_operation_summary_button')), findsOneWidget);
     expect(find.text('출전 인원'), findsNothing);
 
-    // 3) 1줄 미니 툴바(칩 형태): [⚙️ 5코트 변경] 2D 플랫 아웃라인 버튼 및 [모임 경기 전적] 확인
-    expect(find.text('5코트 변경'), findsOneWidget);
+    // 3) 상단 불필요 요소 제거 확인: 모임 경기 전적 버튼 제거, 5코트 변경은 운영 요약 내부로 이동
+    expect(find.textContaining('모임 경기 전적'), findsNothing);
     expect(find.textContaining('🏟️'), findsNothing);
-    expect(find.textContaining('모임 경기 전적'), findsOneWidget);
     expect(find.textContaining('(1~5번)'), findsNothing);
     expect(find.textContaining('급수합'), findsNothing);
 
-    // [운영 요약 및 설정 ⌵] 토글 클릭 -> 통계 박스 펼치기 및 '출전 인원' 명단 팝업 확인
+    // [운영 요약 및 설정] 토글 클릭 -> 통계 박스 펼치기 및 '출전 인원' 명단 팝업 확인
     await tester.tap(find.byKey(const Key('toggle_operation_summary_button')));
     await tester.pumpAndSettle();
-    expect(find.text('운영 요약 및 설정 ⌃'), findsOneWidget);
     expect(find.text('출전 인원'), findsOneWidget);
+    expect(find.text('코트 수'), findsOneWidget);
+    expect(find.text('5코트'), findsOneWidget);
 
     await tester.tap(find.text('출전 인원'));
     await tester.pumpAndSettle();
@@ -528,12 +531,7 @@ void main() {
     await tester.tap(find.text('확인'));
     await tester.pumpAndSettle();
 
-    // 다시 접어서 코트 가시성 확보
-    await tester.tap(find.byKey(const Key('toggle_operation_summary_button')));
-    await tester.pumpAndSettle();
-    expect(find.text('운영 요약 및 설정 ⌵'), findsOneWidget);
-
-    // 4) [5코트 변경] 칩 버튼 클릭 -> 코트 변경 다이얼로그 오픈 및 [+ 코트 추가] / [- 코트 축소] 확인
+    // 4) [코트 수] 카드 클릭 -> 코트 변경 다이얼로그 오픈 및 [+ 코트 추가] / [- 코트 축소] 확인
     await tester.tap(find.byKey(const Key('open_court_change_dialog_button')));
     await tester.pumpAndSettle();
     expect(find.text('실시간 운영 코트 변경'), findsOneWidget);
@@ -553,7 +551,7 @@ void main() {
     // 다이얼로그 닫고 아래로 스크롤하여 새로 생성된 '빈 코트 슬롯' 카드 노출 확인
     await tester.tap(find.text('닫기'));
     await tester.pumpAndSettle();
-    expect(find.text('6코트 변경'), findsOneWidget);
+    expect(find.text('6코트'), findsOneWidget);
 
     final courtScrollable = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
@@ -565,7 +563,7 @@ void main() {
     expect(find.text('빈 코트 슬롯'), findsOneWidget);
     expect(find.text('배정된 경기가 없는 빈 코트 슬롯입니다'), findsOneWidget);
 
-    // 다시 상단으로 스크롤하여 [6코트 변경] 다이얼로그에서 [- 코트 축소] 클릭 -> 빈 코트 우선 제거 확인
+    // 다시 상단으로 스크롤하여 [6코트] 다이얼로그에서 [- 코트 축소] 클릭 -> 빈 코트 우선 제거 확인
     await tester.scrollUntilVisible(
       find.byKey(const Key('open_court_change_dialog_button')),
       -350.0,
@@ -594,7 +592,7 @@ void main() {
     await tester.tap(find.byKey(const Key('reduce_court_to_waiting_button')));
     await tester.pumpAndSettle();
     expect(find.text('진행/배정 중인 코트 축소 확인'), findsNothing);
-    expect(find.text('4코트 변경'), findsOneWidget);
+    expect(find.text('4코트'), findsOneWidget);
     expect(find.text('현재 휴식 중: '), findsOneWidget);
   });
 
@@ -758,18 +756,15 @@ void main() {
     await tester.tap(archivedCard);
     await tester.pumpAndSettle();
 
-    // 1. [출석부] 상단 회비 수납 현황 카드 내 [연간/월별 회비 현황표 ->] 버튼이 삭제되었는지 및 출전/회비 3등분 가로 배치(Row) 확인
+    // 1. [출석부] 상단 회비 수납 현황 카드 내 [연간/월별 회비 현황표 ->] 버튼이 삭제되었는지 및 슬림 대시보드(출석/수납/SMS 아이콘) 확인
     expect(find.textContaining('연간/월별 회비 현황표'), findsNothing);
-    expect(find.byKey(const Key('attendance_status_chips_3col_row')), findsOneWidget);
-    expect(find.byKey(const Key('fee_status_chips_3col_row')), findsOneWidget);
+    expect(find.textContaining('출석'), findsWidgets);
+    expect(find.textContaining('수납'), findsWidgets);
+    expect(find.byKey(const Key('unpaid_guide_sms_button')), findsOneWidget);
 
-    // 1-2. [출석부] 상단 회비 수납 칩([미납 N명], [완납 N명], [면제 N명]) 터치 시 참석자 리스트 즉시 필터링 및 재터치 시 해제 검증
-    final unpaidChip = find.byKey(const Key('attendance_summary_fee_chip_unpaid'));
-    final paidChip = find.byKey(const Key('attendance_summary_fee_chip_paid'));
-    final exemptChip = find.byKey(const Key('attendance_summary_fee_chip_exempt'));
+    // 1-2. [출석부] 필터 바 내 [미납] 필터 칩 터치 시 참석자 리스트 즉시 필터링 및 재터치 시 해제 검증
+    final unpaidChip = find.text('미납');
     expect(unpaidChip, findsOneWidget);
-    expect(paidChip, findsOneWidget);
-    expect(exemptChip, findsOneWidget);
 
     await tester.tap(unpaidChip);
     await tester.pumpAndSettle();
@@ -786,15 +781,15 @@ void main() {
     expect(find.text('대진표 설정수정'), findsOneWidget);
     expect(find.textContaining('진행 대진'), findsNothing);
 
-    // 3. [대진표 설정수정] 모달 내부에서도 [📋 현재 대진표 이어보기], [남은 라운드 재편성], [대진표 초기화 후 재생성] 분리 확인
+    // 3. [대진표 설정수정] 모달 내부에서도 [📋 현재 대진표 이어보기], [남은 라운드 재편성], [대진표 전체 재편성] 분리 확인
     await tester.tap(find.text('대진표 설정수정'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('continue_existing_bracket_button')), findsOneWidget);
     expect(find.byKey(const Key('reshuffle_remaining_rounds_button')), findsOneWidget);
-    expect(find.text('대진표 초기화 후 재생성'), findsOneWidget);
+    expect(find.text('대진표 전체 재편성'), findsOneWidget);
 
-    // [대진표 초기화 후 재생성] 클릭 시 2단계 파괴적 액션 방지 경고 모달 필수 노출 확인
-    await tester.tap(find.text('대진표 초기화 후 재생성'));
+    // [대진표 전체 재편성] 클릭 시 2단계 파괴적 액션 방지 경고 모달 필수 노출 확인
+    await tester.tap(find.text('대진표 전체 재편성'));
     await tester.pumpAndSettle();
     expect(
       find.text('⚠️ 경고: 이미 진행된 매칭과 입력된 경기 점수/기록이 모두 영구 삭제됩니다. 정말 새로 생성하시겠습니까?'),
@@ -833,7 +828,7 @@ void main() {
       tappedScoreField.controller?.text.length,
     );
 
-    // 5. [남은 라운드 재편성] 및 [대진표 초기화 후 재생성] 버튼이 '운영 요약 펼침' 안이 아닌 바깥에 즉시 노출되는지 확인
+    // 5. [남은 라운드 재편성] 및 [대진표 전체 재편성] 버튼이 '운영 요약 펼침' 안이 아닌 바깥에 즉시 노출되는지 확인
     final reshuffleBtn = find.byKey(const Key('court_reshuffle_remaining_button'));
     final courtResetBtn = find.byKey(const Key('court_reset_and_regenerate_button'));
     expect(reshuffleBtn, findsOneWidget);
@@ -851,7 +846,7 @@ void main() {
     await tester.tap(find.byKey(const Key('court_cancel_reshuffle_button')));
     await tester.pumpAndSettle();
 
-    // 7. [대진표 초기화 후 재생성] 클릭 시 경고 팝업 필수 노출 검증
+    // 7. [대진표 전체 재편성] 클릭 시 경고 팝업 필수 노출 검증
     await tester.tap(courtResetBtn);
     await tester.pumpAndSettle();
     expect(
@@ -1131,15 +1126,15 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    // 3. 대진표 화면: 토너먼트 모드일 때만 상단 미니 툴바에 [ 🏆 전체 트리 보기 ] 버튼 노출 확인
+    // 3. 대진표 화면: 토너먼트 모드일 때 [ 🏆 전체 토너먼트 트리 보기 ] 단독 가로 버튼 노출 확인
     final openTreeBtn = find.byKey(const Key('open_tournament_tree_dialog_button'));
     expect(openTreeBtn, findsOneWidget);
-    expect(find.textContaining('전체 트리 보기'), findsOneWidget);
+    expect(find.textContaining('전체 토너먼트 트리 보기'), findsOneWidget);
 
     // 코트 매치 카드 상단에 토너먼트 라운드/경기 라벨 표시 확인 (예: [8강 1경기], [준결승 1경기], [결승전] 등)
     expect(find.textContaining('경기'), findsWidgets);
 
-    // 4. [전체 트리 보기] 버튼 클릭 -> 팝업 다이얼로그 오픈 및 TournamentBracketTreeWidget 렌더링 확인
+    // 4. [전체 토너먼트 트리 보기] 버튼 클릭 -> 팝업 다이얼로그 오픈 및 TournamentBracketTreeWidget 렌더링 확인
     await tester.tap(openTreeBtn);
     await tester.pumpAndSettle();
 
@@ -1175,5 +1170,42 @@ void main() {
     expect(find.byType(TournamentBracketTreeWidget), findsOneWidget);
     expect(find.text('핀치 줌 & 자유 이동'), findsOneWidget);
     expect(find.text('두 손가락 확대/축소 및 상하좌우 드래그 지원'), findsOneWidget);
+  });
+
+  testWidgets('회원 명부 화면: 등록 회원이 0명일 때 빈 화면(Empty State) 디자인 및 등록 액션 버튼 연동 검증', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          currentClubMembersProvider.overrideWith((ref) => []),
+          filteredMembersProvider.overrideWith((ref) => []),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: ClubMemberPoolScreen(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. 전체 회원 0명 빈 화면 UI 확인
+    expect(find.text('등록된 회원이 없습니다.'), findsOneWidget);
+    expect(find.text('카카오톡 명단을 복사해 한 번에 등록해 보세요!'), findsOneWidget);
+    expect(find.text('텍스트로 대량 등록하기'), findsOneWidget);
+    expect(find.text('1명씩 직접 등록'), findsOneWidget);
+
+    // 2. [📋 텍스트로 대량 등록하기] 탭 시 대량 등록 팝업 오픈 확인
+    await tester.tap(find.text('텍스트로 대량 등록하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('명단 텍스트 대량 등록'), findsOneWidget);
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
+
+    // 3. [1명씩 직접 등록] 탭 시 단일 회원 등록 팝업 오픈 확인
+    await tester.tap(find.text('1명씩 직접 등록'));
+    await tester.pumpAndSettle();
+    expect(find.text('신규 회원 등록'), findsOneWidget);
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
   });
 }
