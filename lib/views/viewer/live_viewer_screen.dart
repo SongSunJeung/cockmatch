@@ -7,6 +7,7 @@ import '../../core/utils/korean_search_util.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../widgets/tournament_bracket_tree_widget.dart';
+import '../../widgets/ad_banner_slot.dart';
 
 /// [화면 4] 웹뷰어 (라이브 전광판 & 모임 완료 종합 리포트)
 /// 1. 모임 진행 중: [실시간 코트 전광판]
@@ -307,53 +308,57 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
         ? MatchFormat.tournament
         : targetSession.matchFormat;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // 1. 상단 컴팩트 헤더 (앱바 + 통합 드롭다운 + 한 줄 [탭 | 검색창])
-            _buildTopHeaderAndShareBar(
-              clubName: currentClub.clubName,
-              targetSession: targetSession,
-              allAvailableSessions: allAvailableSessions,
-              sessionMatches: sessionMatches,
-              clubMembers: clubMembers,
-              activeFormat: activeFormat,
-              isCompletedView: isCompletedView,
-            ),
-
-            // 2. 중앙 콘텐츠 독립 스크롤 영역
-            Expanded(
-              child: CustomScrollView(
-                slivers: [
-                  if (!isCompletedView)
-                    SliverToBoxAdapter(
-                      child: _buildLiveScoreboardBody(
-                        session: targetSession,
-                        matches: sessionMatches,
-                        members: clubMembers,
-                      ),
-                    )
-                  else
-                    SliverToBoxAdapter(
-                      child: _buildCompletedReportBody(
-                        session: targetSession,
-                        matches: sessionMatches,
-                        members: clubMembers,
-                        activeFormat: activeFormat,
-                        archivedSessions: archivedSessions,
-                      ),
-                    ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 12)),
-                ],
+    return MediaQuery.removePadding(
+      context: context,
+      removeBottom: true,
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // 1. 상단 컴팩트 헤더 (앱바 + 통합 드롭다운 + 한 줄 [탭 | 검색창])
+              _buildTopHeaderAndShareBar(
+                clubName: currentClub.clubName,
+                targetSession: targetSession,
+                allAvailableSessions: allAvailableSessions,
+                sessionMatches: sessionMatches,
+                clubMembers: clubMembers,
+                activeFormat: activeFormat,
+                isCompletedView: isCompletedView,
               ),
-            ),
 
-            // 3. 최하단 고정 영역: [공식 앱 다운로드 배너] + [광고 띠배너 플레이스홀더]
-            _buildStickyBottomSection(),
-          ],
+              // 2. 중앙 콘텐츠 독립 스크롤 영역
+              Expanded(
+                child: CustomScrollView(
+                  slivers: [
+                    if (!isCompletedView)
+                      SliverToBoxAdapter(
+                        child: _buildLiveScoreboardBody(
+                          session: targetSession,
+                          matches: sessionMatches,
+                          members: clubMembers,
+                        ),
+                      )
+                    else
+                      SliverToBoxAdapter(
+                        child: _buildCompletedReportBody(
+                          session: targetSession,
+                          matches: sessionMatches,
+                          members: clubMembers,
+                          activeFormat: activeFormat,
+                          archivedSessions: archivedSessions,
+                        ),
+                      ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  ],
+                ),
+              ),
+
+              // 3. 최하단 고정 영역: [공식 앱 다운로드 배너] + [광고 띠배너 플레이스홀더]
+              _buildStickyBottomSection(),
+            ],
+          ),
         ),
       ),
     );
@@ -938,46 +943,8 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
 
   /// 5. 최하단 고정 모바일 웹 광고 띠배너 컨테이너 (Google AdSense / Kakao AdFit 등 플레이스홀더)
   Widget _buildStickyAdBanner() {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      child: SafeArea(
-        top: false,
-        bottom: false,
-        child: Container(
-          key: const Key('web_viewer_ad_strip_banner'),
-          height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(
-              top: BorderSide(color: Colors.grey.shade200, width: 0.8),
-            ),
-          ),
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.ad_units_rounded,
-                  size: 15,
-                  color: Colors.grey.shade500,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '배너 광고 영역 (320x50)',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey.shade500,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return const BottomAdBannerArea(
+      bannerKey: Key('web_viewer_ad_strip_banner'),
     );
   }
 

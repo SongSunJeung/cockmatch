@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../widgets/tournament_bracket_tree_widget.dart';
+import '../../widgets/ad_banner_slot.dart';
 
 /// [화면 3] 대진표 및 실시간 코트 운영 화면
 /// - 메인 화면 인라인 직접 점수 입력 (숫자 키패드 TextField, 실시간 자동 저장)
@@ -31,12 +32,15 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
     final pagePalette = AppTheme.getPagePalette(2);
 
     if (session == null) {
-      return Scaffold(
-        backgroundColor: AppTheme.background,
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
+      return MediaQuery.removePadding(
+        context: context,
+        removeBottom: true,
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
               // 1. 최상단 AppBar ([☰] + '대진표' + [○ ○ ●] 고정 인디케이터)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -155,11 +159,13 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                   ),
                 ),
               ),
+              const BottomAdBannerArea(),
             ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
     final allMembers = ref.watch(membersProvider);
     final allMatches = ref.watch(matchesProvider);
@@ -230,12 +236,18 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
           ..sort())
         : activeCourtNumbers;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          slivers: [
+    return MediaQuery.removePadding(
+      context: context,
+      removeBottom: true,
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Expanded(
+                child: CustomScrollView(
+                  slivers: [
             // 1. 최상단 AppBar ([☰] + '대진표' + [○ ○ ●] 고정 인디케이터) & 1줄 미니 툴바 (코트 변경 칩 + 모임 경기 전적 칩)
             SliverToBoxAdapter(
               child: Padding(
@@ -952,11 +964,16 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                   ),
                 ),
               ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
-  }
+        const BottomAdBannerArea(),
+      ],
+    ),
+  ),
+),
+);
+}
 
   void _showEndGameMatchesConfirmDialog(BuildContext context, WidgetRef ref, GameSession session) {
     showDialog(

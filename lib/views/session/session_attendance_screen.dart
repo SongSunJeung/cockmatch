@@ -7,6 +7,7 @@ import '../../models/models.dart';
 import '../../providers/providers.dart';
 import 'widgets/guest_add_dialog.dart';
 import 'widgets/unpaid_fee_guide_dialog.dart';
+import '../../widgets/ad_banner_slot.dart';
 
 /// [화면 2 / 탭 2] 오늘 모임 준비 & 출석 체크 (출석부 화면)
 /// - 모임 기본 정보 설정 (타이틀 수정, 참가비/콕비 설정, 실시간 총 수납 현황 Bento Grid)
@@ -295,8 +296,11 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
           backgroundColor: AppTheme.background,
           body: SafeArea(
             bottom: false,
-            child: CustomScrollView(
-            slivers: [
+            child: Column(
+              children: [
+                Expanded(
+                  child: CustomScrollView(
+                    slivers: [
               // 최상단 AppBar ([☰] + '출석부' + [○ ● ○] 고정 인디케이터)
               SliverToBoxAdapter(
                 child: Padding(
@@ -346,16 +350,16 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               // 새 모임 시작하기 배너 카드
               SliverToBoxAdapter(
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                  margin: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -363,49 +367,49 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        width: 68,
-                        height: 68,
+                        width: 52,
+                        height: 52,
                         decoration: BoxDecoration(
                           color: pagePalette.softTint,
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(18),
                         ),
                         child: Icon(
                           Icons.sports_tennis_rounded,
-                          size: 36,
+                          size: 30,
                           color: pagePalette.primary,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       Text(
                         ongoingSessions.isEmpty
                             ? '진행 중인 모임 세션이 없습니다'
                             : '진행 중인 모임 ${ongoingSessions.length}건이 있습니다',
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.w900,
                           color: AppTheme.textDark,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       const Text(
                         '관리 중인 클럽을 선택하고 오늘 참석할 정회원을 일정/모임에 등록하여 활기찬 모임을 시작해 보세요.',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 12,
                           color: AppTheme.textMuted,
-                          height: 1.45,
+                          height: 1.4,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
-                        height: 48,
+                        height: 44,
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: pagePalette.primary,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             elevation: 0,
                           ),
                           icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
@@ -436,9 +440,13 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             ],
           ),
         ),
-      ),
-    );
-  }
+        const BottomAdBannerArea(),
+      ],
+    ),
+  ),
+),
+);
+}
 
     // 출석부에 등록된 회원 객체 매핑
     final attendeeMembers = session.attendees.map((id) {
@@ -504,16 +512,16 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
       child: Scaffold(
         backgroundColor: AppTheme.background,
         resizeToAvoidBottomInset: false,
-        extendBody: true,
         body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: Stack(
-          children: [
-            SafeArea(
-              bottom: false,
-              child: CustomScrollView(
-                slivers: [
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Expanded(
+                  child: CustomScrollView(
+                    slivers: [
                 // 1. 최상단 AppBar ([☰] + '출석부' + [○ ● ○] 고정 인디케이터) & 모임 기본 정보 카드
                 SliverToBoxAdapter(
                   child: Padding(
@@ -644,14 +652,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   )
                 else
                   SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      0,
-                      16,
-                      isKeyboardOpen
-                          ? 16
-                          : (_isMultiSelectMode ? 120 : 70),
-                    ), // 하단 액션 바 여백
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -673,40 +674,44 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
               ],
             ),
           ),
-          // 6. 하단 고정 대진표 액션 바 (body Stack 내 최하단 Positioned(bottom: 0, left: 0, right: 0) 강제 고정)
+          // 6. 하단 고정 대진표 액션 바 + 최하단 배너 광고 영역 (3단 Column 바닥 0px 고정)
           if (!isKeyboardOpen)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_isMultiSelectMode) ...[
-                      _buildMultiSelectSmsBar(
+            Container(
+              width: double.infinity,
+              color: AppTheme.background,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isMultiSelectMode)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                      child: _buildMultiSelectSmsBar(
                         context: context,
                         session: session,
                         attendeeMembers: attendeeMembers,
                         displayedMembers: displayedMembers,
                       ),
-                      const SizedBox(height: 8),
-                    ],
-                    _buildBottomConfirmBar(
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: _buildBottomConfirmBar(
                       context: context,
                       ref: ref,
                       session: session,
                       activeCount: activeCount,
                     ),
-                  ],
-                ),
+                  ),
+                  const BottomAdBannerArea(),
+                ],
               ),
-            ),
+            )
+          else
+            const BottomAdBannerArea(),
         ],
       ),
     ),
   ),
+),
 );
 }
 
@@ -5950,7 +5955,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
                                           behavior: SnackBarBehavior.floating,
-                                          margin: const EdgeInsets.fromLTRB(20, 0, 20, 88),
+                                          margin: const EdgeInsets.fromLTRB(20, 0, 20, 130),
                                           backgroundColor: AppTheme.primaryDark,
                                           content: Row(
                                             children: [

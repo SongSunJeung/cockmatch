@@ -10,6 +10,7 @@ import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../services/club_service.dart';
 import 'widgets/batch_member_add_dialog.dart';
+import '../../widgets/ad_banner_slot.dart';
 
 /// [화면 1] 회원 명부 화면
 /// - 순수 회원 정보(주소록) 관리: 추가, 수정, 삭제, 검색, 3종 드롭다운 필터링
@@ -68,17 +69,21 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
     final bool isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0 ||
         View.of(context).viewInsets.bottom > 0;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: SafeArea(
-          bottom: false,
-          child: Stack(
-          children: [
-            CustomScrollView(
-              slivers: [
+    return MediaQuery.removePadding(
+      context: context,
+      removeBottom: true,
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Expanded(
+                  child: CustomScrollView(
+                    slivers: [
                 // 1. 최상단 AppBar ([☰] + '회원 명부' + [● ○ ○] 고정 인디케이터) & 클럽 전환 바
                 SliverToBoxAdapter(
                   child: Padding(
@@ -625,12 +630,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   )
                 else
                   SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      20,
-                      2,
-                      20,
-                      (_isMultiSelectMode && !isKeyboardOpen) ? 84 : 16,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 2, 20, 16),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -643,22 +643,23 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                   ),
               ],
             ),
-            if (_isMultiSelectMode && !isKeyboardOpen)
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 12,
-                child: _buildMultiSelectMemberSmsBar(
-                  context: context,
-                  clubMembers: clubMembers,
-                  filteredMembers: filteredMembers,
-                ),
+          ),
+          if (_isMultiSelectMode && !isKeyboardOpen)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: _buildMultiSelectMemberSmsBar(
+                context: context,
+                clubMembers: clubMembers,
+                filteredMembers: filteredMembers,
               ),
-          ],
-        ),
+            ),
+          const BottomAdBannerArea(),
+        ],
       ),
     ),
-  );
+  ),
+),
+);
 }
 
   /// 회원명부 세부 필터 & 정렬 모달 호출 버튼 위젯 (검색창 우측 배치)
