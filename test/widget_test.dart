@@ -3,9 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cockmatch/main.dart';
 import 'package:cockmatch/core/theme/app_theme.dart';
 import 'package:cockmatch/views/widgets/tournament_bracket_tree_widget.dart';
+import 'package:cockmatch/models/models.dart';
 import 'package:cockmatch/views/club/club_member_pool_screen.dart';
+import 'package:cockmatch/views/session/widgets/guest_add_dialog.dart';
+import 'package:cockmatch/views/session/widgets/unpaid_fee_guide_dialog.dart';
 import 'package:cockmatch/providers/providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void main() {
   testWidgets('CockMatchApp reordered navigation, phone UI, unpaid SMS, and session archive smoke test', (WidgetTester tester) async {
@@ -95,9 +99,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('회비 상태순'), findsOneWidget);
 
-    // 다시 필터 모달 열기 -> [급수순 (A -> 초심) [기본]] 복원 및 [급수: A조] 선택 후 적용하기
+    // 다시 필터 모달 열기 -> 회원 구분 [게스트] 칩 확인, [급수순 (A -> 초심) [기본]] 복원 및 [급수: A조] 선택 후 적용하기
     await tester.tap(find.byKey(const Key('attendance_filter_button')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('attendance_filter_grade_all')), findsOneWidget);
+    expect(find.byKey(const Key('attendance_filter_grade_regular')), findsOneWidget);
+    expect(find.byKey(const Key('attendance_filter_grade_associate')), findsOneWidget);
+    expect(find.byKey(const Key('attendance_filter_grade_executive')), findsOneWidget);
+    expect(find.byKey(const Key('attendance_filter_grade_guest')), findsOneWidget);
     await tester.tap(find.text('급수순 (A -> 초심) [기본]'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('A조').last);
@@ -358,8 +367,8 @@ void main() {
     await tester.pumpAndSettle();
 
 
-    // 진행 중 [실시간 코트 전광판] & 하단 대기자/휴식자 명단 확인
-    expect(find.text('실시간 코트 전광판'), findsWidgets);
+    // 진행 중 [실시간 코트 전광판] -> [실시간] 탭 & 하단 대기자/휴식자 명단 확인
+    expect(find.text('실시간'), findsWidgets);
     expect(find.byKey(const Key('live_scoreboard_round_chips_scroll')), findsOneWidget);
     expect(find.text('대기'), findsNothing);
     expect(find.text('대기자 / 휴식자 명단'), findsOneWidget);
@@ -377,9 +386,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('대기자 / 휴식자 명단'), findsOneWidget);
 
-    // 드롭다운에서 완료된 모임(2026.09.22 화요 정기 모임) 선택 시 [종합 순위] / [라운드별 스코어] 리포트 확인
+    // 드롭다운에서 완료된 모임(2026.09.22 화요 정기 모임) 선택 시 [종합 순위] / [라운드별 스코어] 리포트 확인 및 (로테이션) 라벨 검증
     await tester.tap(find.byKey(const Key('viewer_session_selector_dropdown')));
     await tester.pumpAndSettle();
+    expect(find.textContaining('(로테이션)'), findsWidgets);
+    expect(find.textContaining('(토너먼트)'), findsWidgets);
     await tester.tap(find.textContaining('2026.09.22').last);
     await tester.pumpAndSettle();
 
@@ -828,7 +839,7 @@ void main() {
     expect(find.text('1 라운드'), findsOneWidget);
     expect(find.byKey(const Key('court_add_round_button')), findsOneWidget);
     expect(find.text('+ 라운드 추가'), findsOneWidget);
-    expect(find.text('+ 특별 매치 추가'), findsOneWidget);
+    expect(find.text('특별 매치 추가'), findsOneWidget);
     expect(find.text('🔄 다음 라운드 스마트 편성'), findsNothing);
 
     // 4-2. [대진표] 코트 점수 입력 필드 터치(포커스) 시 전체 선택(Select All) 및 숫자 입력 시 선행 '0' 자동 제거 검증
@@ -843,11 +854,13 @@ void main() {
       tappedScoreField.controller?.text.length,
     );
 
-    // 5. [남은 라운드 재편성] 및 [대진표 전체 재편성] 버튼이 '운영 요약 펼침' 안이 아닌 바깥에 즉시 노출되는지 확인
+    // 5. [남은 라운드 재편성] 및 [대진표 전체 재편성] 버튼이 '운영 요약 펼침' 안이 아닌 바깥에 즉시 노출되고 Icons.sync_rounded 아이콘으로 통일되었는지 확인
     final reshuffleBtn = find.byKey(const Key('court_reshuffle_remaining_button'));
     final courtResetBtn = find.byKey(const Key('court_reset_and_regenerate_button'));
     expect(reshuffleBtn, findsOneWidget);
     expect(courtResetBtn, findsOneWidget);
+    expect(find.descendant(of: reshuffleBtn, matching: find.byIcon(Icons.sync_rounded)), findsOneWidget);
+    expect(find.descendant(of: courtResetBtn, matching: find.byIcon(Icons.sync_rounded)), findsOneWidget);
 
     // 6. [남은 라운드 재편성] 클릭 시 경고 팝업 필수 노출 검증
     await tester.tap(reshuffleBtn);
@@ -1222,5 +1235,197 @@ void main() {
     expect(find.text('신규 회원 등록'), findsOneWidget);
     await tester.tap(find.text('취소'));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('게스트 즉시 추가 다이얼로그: 가상 키보드 인셋 대응 SingleChildScrollView, 포커스 및 게스트 등록 검증', (WidgetTester tester) async {
+    Member? addedGuest;
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => GuestAddDialog(
+                      clubId: 'test_club',
+                      onGuestAdded: (guest) {
+                        addedGuest = guest;
+                      },
+                    ),
+                  );
+                },
+                child: const Text('게스트 추가 열기'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. 다이얼로그 열기
+    await tester.tap(find.text('게스트 추가 열기'));
+    await tester.pumpAndSettle();
+
+    // 2. 타이틀 및 구성 요소 확인
+    expect(find.text('게스트 즉시 추가'), findsOneWidget);
+    expect(find.text('오늘 모임에만 참가하는 일회성 게스트입니다.'), findsOneWidget);
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(find.text('이름 (필수)'), findsOneWidget);
+    expect(find.text('원소속 클럽 (선택, 예: 마포콕)'), findsOneWidget);
+    expect(find.text('연락처 (선택)'), findsOneWidget);
+    expect(find.text('참가비 납부 상태'), findsOneWidget);
+    expect(find.text('추가하기'), findsOneWidget);
+
+    // 3. 필드 입력 및 옵션 선택
+    await tester.enterText(find.widgetWithText(TextField, '이름 (필수)'), '신규게스트');
+    await tester.enterText(find.widgetWithText(TextField, '원소속 클럽 (선택, 예: 마포콕)'), '강남배턴');
+    await tester.enterText(find.widgetWithText(TextField, '연락처 (선택)'), '010-9999-8888');
+
+    // 4. 급수 칩 선택 (B조)
+    await tester.tap(find.byKey(const Key('guest_form_tier_chip_B')));
+    await tester.pumpAndSettle();
+
+    // 5. [추가하기] 터치 시 onGuestAdded 콜백 확인
+    await tester.tap(find.text('추가하기'));
+    await tester.pumpAndSettle();
+
+    expect(addedGuest, isNotNull);
+    expect(addedGuest!.name, equals('신규게스트'));
+    expect(addedGuest!.homeClub, equals('강남배턴'));
+    expect(addedGuest!.phoneNumber, equals('010-9999-8888'));
+    expect(addedGuest!.tier, equals(Tier.b));
+    expect(addedGuest!.isGuest, isTrue);
+  });
+
+  testWidgets('회비 미납 안내 메시지 다이얼로그: 미리보기/편집, 수신 대상 안내, 문구 복사 및 닫기 검증', (WidgetTester tester) async {
+    final testSession = GameSession(
+      id: 'session_test',
+      clubId: 'club_test',
+      sessionDate: '2026-09-25',
+      title: '9월 25일 금요 모임',
+      memberFee: 10000,
+      guestFee: 15000,
+    );
+
+    final testClub = Club(
+      id: 'club_test',
+      ownerId: 'owner_test',
+      clubName: '메가배드민턴',
+    );
+
+    final testUnpaidMembers = [
+      Member(id: 'm1', name: '박지성', phoneNumber: '010-1111-2222'),
+      Member(id: 'm2', name: '안세영', phoneNumber: '010-3333-4444'),
+    ];
+
+    final testPolicy = ClubFeePolicy(
+      clubId: 'club_test',
+      bankName: '카카오뱅크',
+      accountNumber: '3333-01-5829104',
+      accountHolder: '홍길동(총무)',
+    );
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (MethodCall methodCall) async => null,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => UnpaidFeeGuideDialog(
+                    session: testSession,
+                    currentClub: testClub,
+                    unpaidMembers: testUnpaidMembers,
+                    feePolicy: testPolicy,
+                  ),
+                );
+              },
+              child: const Text('미납 팝업 열기'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. 다이얼로그 열기
+    await tester.tap(find.text('미납 팝업 열기'));
+    await tester.pumpAndSettle();
+
+    // 2. 타이틀 및 수신 대상 안내 확인
+    expect(find.text('회비 미납 안내 메시지'), findsOneWidget);
+    expect(find.textContaining('수신 대상: 박지성, 안세영 (총 2명)'), findsOneWidget);
+
+    // 3. 메시지 텍스트필드 기본 템플릿 포함 여부 확인
+    expect(find.textContaining('[메가배드민턴] 2026.09.25 정기 모임 회비 안내'), findsOneWidget);
+    expect(find.textContaining('미납 인원: 박지성, 안세영'), findsOneWidget);
+    expect(find.textContaining('카카오뱅크 3333-01-5829104 (예금주: 홍길동(총무))'), findsOneWidget);
+
+    // 4. 액션 버튼 3종 확인
+    expect(find.text('닫기'), findsOneWidget);
+    expect(find.text('문구 복사'), findsOneWidget);
+    expect(find.text('문자 앱 열기'), findsOneWidget);
+
+    // 5. [문구 복사] 터치 시 스낵바 노출 확인
+    await tester.tap(find.text('문구 복사'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('안내 문구가 복사되었습니다. 카카오톡 등에 붙여넣기 하세요.'), findsOneWidget);
+
+    // 6. [닫기] 터치 시 팝업 닫힘 확인
+    await tester.tap(find.text('닫기'));
+    await tester.pumpAndSettle();
+    expect(find.text('회비 미납 안내 메시지'), findsNothing);
+  });
+
+  testWidgets('회원 명부 화면: 검색창 입력 및 초기화(X) 버튼, 바깥 영역 터치 시 Unfocus 검증', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: ClubMemberPoolScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final searchField = find.byKey(const Key('member_search_textfield'));
+    expect(searchField, findsOneWidget);
+
+    // 1. 검색창 탭 및 텍스트 입력
+    await tester.tap(searchField);
+    await tester.pumpAndSettle();
+    await tester.enterText(searchField, '홍길동');
+    await tester.pumpAndSettle();
+
+    // 포커스가 잡혀있고 초기화(X) 버튼이 노출되는지 확인
+    final FocusNode focusNode = tester.widget<TextField>(searchField).focusNode!;
+    expect(focusNode.hasFocus, isTrue);
+    final clearBtn = find.byKey(const Key('member_search_clear_btn'));
+    expect(clearBtn, findsOneWidget);
+
+    // 2. 초기화(X) 버튼 탭 시 텍스트 지워지고 focusNode가 unfocus되는지 확인
+    await tester.tap(clearBtn);
+    await tester.pumpAndSettle();
+    expect(focusNode.hasFocus, isFalse);
+    expect(find.byKey(const Key('member_search_clear_btn')), findsNothing);
+
+    // 3. 다시 검색창 탭하여 포커스 부여 후 바깥 영역(빈 공간) 탭 시 unfocus 검증
+    await tester.tap(searchField);
+    await tester.pumpAndSettle();
+    expect(focusNode.hasFocus, isTrue);
+
+    // 상단 바깥 영역(AppBar 타이틀 등 빈 영역) 탭
+    await tester.tap(find.text('회원 명부').first);
+    await tester.pumpAndSettle();
+    expect(focusNode.hasFocus, isFalse);
   });
 }

@@ -118,23 +118,30 @@ class _CockMatchShellScreenState extends ConsumerState<CockMatchShellScreen> {
       );
     }
 
-    return Scaffold(
-      key: AppTheme.rootScaffoldKey,
-      backgroundColor: AppTheme.background,
-      resizeToAvoidBottomInset: false,
-      drawer: _buildAppDrawer(
-        context: context,
-        ref: ref,
-        currentTab: currentTab,
-        clubName: currentClub.clubName,
-        isProUser: isProUser,
+    final mq = MediaQuery.of(context);
+    return MediaQuery(
+      data: mq.copyWith(
+        padding: mq.padding.copyWith(bottom: 0),
+        viewPadding: mq.viewPadding.copyWith(bottom: 0),
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: (currentTab == 4 && isProUser) ? 1080 : 700,
+      child: Scaffold(
+        key: AppTheme.rootScaffoldKey,
+        backgroundColor: AppTheme.background,
+        resizeToAvoidBottomInset: false,
+        drawer: _buildAppDrawer(
+          context: context,
+          ref: ref,
+          currentTab: currentTab,
+          clubName: currentClub.clubName,
+          isProUser: isProUser,
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: (currentTab == 4 && isProUser) ? 1080 : 700,
+            ),
+            child: activeBody,
           ),
-          child: activeBody,
         ),
       ),
     );

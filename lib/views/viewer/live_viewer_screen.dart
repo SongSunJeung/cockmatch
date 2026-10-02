@@ -311,54 +311,55 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
       backgroundColor: AppTheme.background,
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            // 1. 상단 헤더 + [웹 링크 복사] & [결과 요약 텍스트 복사] 액션 바
-            SliverToBoxAdapter(
-              child: _buildTopHeaderAndShareBar(
-                clubName: currentClub.clubName,
-                targetSession: targetSession,
-                allAvailableSessions: allAvailableSessions,
-                sessionMatches: sessionMatches,
-                clubMembers: clubMembers,
-                activeFormat: activeFormat,
-                isCompletedView: isCompletedView,
+        child: Column(
+          children: [
+            // 1. 상단 컴팩트 헤더 (앱바 + 통합 드롭다운 + 한 줄 [탭 | 검색창])
+            _buildTopHeaderAndShareBar(
+              clubName: currentClub.clubName,
+              targetSession: targetSession,
+              allAvailableSessions: allAvailableSessions,
+              sessionMatches: sessionMatches,
+              clubMembers: clubMembers,
+              activeFormat: activeFormat,
+              isCompletedView: isCompletedView,
+            ),
+
+            // 2. 중앙 콘텐츠 독립 스크롤 영역
+            Expanded(
+              child: CustomScrollView(
+                slivers: [
+                  if (!isCompletedView)
+                    SliverToBoxAdapter(
+                      child: _buildLiveScoreboardBody(
+                        session: targetSession,
+                        matches: sessionMatches,
+                        members: clubMembers,
+                      ),
+                    )
+                  else
+                    SliverToBoxAdapter(
+                      child: _buildCompletedReportBody(
+                        session: targetSession,
+                        matches: sessionMatches,
+                        members: clubMembers,
+                        activeFormat: activeFormat,
+                        archivedSessions: archivedSessions,
+                      ),
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                ],
               ),
             ),
 
-            // 2. 모임 진행 중 vs 모임 완료 후 분기 콘텐츠
-            if (!isCompletedView)
-              SliverToBoxAdapter(
-                child: _buildLiveScoreboardBody(
-                  session: targetSession,
-                  matches: sessionMatches,
-                  members: clubMembers,
-                ),
-              )
-            else
-              SliverToBoxAdapter(
-                child: _buildCompletedReportBody(
-                  session: targetSession,
-                  matches: sessionMatches,
-                  members: clubMembers,
-                  activeFormat: activeFormat,
-                  archivedSessions: archivedSessions,
-                ),
-              ),
-
-            // 3. 최하단 앱 다운로드 유도 배너 (플레이스홀더)
-            SliverToBoxAdapter(
-              child: _buildAppDownloadBanner(),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            // 3. 최하단 고정 영역: [공식 앱 다운로드 배너] + [광고 띠배너 플레이스홀더]
+            _buildStickyBottomSection(),
           ],
         ),
       ),
     );
   }
 
-  /// 1. 상단 헤더, 모임 선택/전환 바, 그리고 [웹 링크 복사] / [결과 요약 텍스트 복사] 버튼
+  /// 1. 상단 헤더, 모임 선택 드롭다운 통합 및 [실시간 | 경기 결과] 탭 + 검색창 한 줄 배치
   Widget _buildTopHeaderAndShareBar({
     required String clubName,
     required GameSession targetSession,
@@ -369,12 +370,21 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     required bool isCompletedView,
   }) {
     final pagePalette = AppTheme.getPagePalette(3);
+
+    final seenIds = <String>{};
+    final uniqueSessions = allAvailableSessions
+        .where((s) => seenIds.add(s.id))
+        .toList();
+    final activeDropdownId = uniqueSessions.any((s) => s.id == targetSession.id)
+        ? targetSession.id
+        : (uniqueSessions.isNotEmpty ? uniqueSessions.first.id : null);
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 클럽명 & 라이브/완료 상태 헤더 + 우측 상단 공유 팝업 버튼
+          // 최상단 앱바: [메뉴] [아이콘] [클럽명 + 모임 선택 드롭다운] [공유 팝업 버튼]
           Row(
             children: [
               IconButton(
@@ -418,7 +428,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                           child: Text(
                             clubName,
                             style: const TextStyle(
-                              fontSize: 16.5,
+                              fontSize: 16,
                               fontWeight: FontWeight.w900,
                               color: AppTheme.textDark,
                               letterSpacing: -0.3,
@@ -429,7 +439,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                           decoration: BoxDecoration(
                             color: pagePalette.softTint,
                             borderRadius: BorderRadius.circular(6),
@@ -438,7 +448,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                           child: Text(
                             isCompletedView ? '경기 결과' : 'LIVE 전광판',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 9.5,
                               fontWeight: FontWeight.w900,
                               color: pagePalette.primary,
                             ),
@@ -446,25 +456,118 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      () {
-                        final sDate = targetSession.sessionDate;
-                        final sDateDots = sDate.replaceAll('-', '.');
-                        final title = targetSession.title ?? '$sDateDots 정기 모임';
-                        if (title.contains(sDate) || title.contains(sDateDots)) {
-                          return title;
-                        }
-                        return '$sDateDots $title';
-                      }(),
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: AppTheme.textMuted,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(height: 1),
+                    // 통합 모임 선택 드롭다운 (상단 중앙 모임 일시/명칭 자리)
+                    if (uniqueSessions.isNotEmpty && activeDropdownId != null)
+                      DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          key: const Key('viewer_session_selector_dropdown'),
+                          value: activeDropdownId,
+                          isExpanded: true,
+                          isDense: true,
+                          icon: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: pagePalette.primary,
+                            size: 16,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          dropdownColor: Colors.white,
+                          items: uniqueSessions.map((s) {
+                            final isSelected = s.id == targetSession.id;
+                            return DropdownMenuItem<String>(
+                              value: s.id,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 1.5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: s.isCompleted
+                                          ? pagePalette.softTint
+                                          : (s.isGameEnded ? AppTheme.pastelYellow : AppTheme.pastelMint),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      s.isCompleted ? '완료' : (s.isGameEnded ? '결과' : 'LIVE'),
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: s.isCompleted
+                                            ? pagePalette.primary
+                                            : (s.isGameEnded ? AppTheme.pastelYellowDark : AppTheme.pastelMintDark),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      '${s.title} (${s.matchFormat.label})',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                                        color: isSelected ? pagePalette.primary : AppTheme.textDark,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          selectedItemBuilder: (context) {
+                            return uniqueSessions.map((s) {
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  '${s.title} (${s.matchFormat.label})',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: AppTheme.textMuted,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              );
+                            }).toList();
+                          },
+                          onChanged: (selectedId) {
+                            if (selectedId == null) return;
+                            final picked = uniqueSessions.firstWhere(
+                              (s) => s.id == selectedId,
+                              orElse: () => targetSession,
+                            );
+                            setState(() {
+                              _selectedSessionId = picked.id;
+                              _isCompletedViewOverride = picked.isCompleted;
+                              _scoreFilterRound = null;
+                              _liveSelectedRound = null;
+                            });
+                          },
+                        ),
+                      )
+                    else
+                      Text(
+                        () {
+                          final sDate = targetSession.sessionDate;
+                          final sDateDots = sDate.replaceAll('-', '.');
+                          final title = targetSession.title ?? '$sDateDots 정기 모임';
+                          if (title.contains(sDate) || title.contains(sDateDots)) {
+                            return title;
+                          }
+                          return '$sDateDots $title';
+                        }(),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: AppTheme.textMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
                   ],
                 ),
               ),
@@ -563,203 +666,268 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
-          // 진행 중 [실시간 코트 전광판] ↔ 모임 완료 [종합 순위 & 리포트 / 라운드별 스코어] 전환 및 모임 선택 바
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: AppTheme.softShadow,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 상태 모드 전환 토글: [실시간 코트 전광판] vs [모임 완료(종료) 후 리포트]
-                Row(
+          // 2. [실시간 | 경기 결과] 세그먼트 탭 + [검색창] 한 줄 배치 (Row)
+          Row(
+            children: [
+              // 세그먼트 탭: [실시간] vs [경기 결과]
+              Container(
+                height: 38,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: AppTheme.softShadow,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          setState(() {
-                            // 진행 중 세션이 있으면 해당 세션으로, 없으면 현재 세션에서 전광판 뷰로 전환
-                            final ongoing = allAvailableSessions.where((s) => !s.isCompleted).toList();
-                            if (ongoing.isNotEmpty && targetSession.isCompleted) {
-                              _selectedSessionId = ongoing.first.id;
-                            }
-                            _isCompletedViewOverride = false;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 9),
-                          decoration: BoxDecoration(
-                            color: !isCompletedView ? pagePalette.primary : AppTheme.surfaceGrey,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.sensors_rounded,
-                                size: 16,
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          final ongoing = allAvailableSessions.where((s) => !s.isCompleted).toList();
+                          if (ongoing.isNotEmpty && targetSession.isCompleted) {
+                            _selectedSessionId = ongoing.first.id;
+                          }
+                          _isCompletedViewOverride = false;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(9),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: !isCompletedView ? pagePalette.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.sensors_rounded,
+                              size: 14,
+                              color: !isCompletedView ? Colors.white : AppTheme.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '실시간',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
                                 color: !isCompletedView ? Colors.white : AppTheme.textMuted,
                               ),
-                              const SizedBox(width: 5),
-                              Text(
-                                '실시간 코트 전광판',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: !isCompletedView ? Colors.white : AppTheme.textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          setState(() {
-                            _isCompletedViewOverride = true;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 9),
-                          decoration: BoxDecoration(
-                            color: isCompletedView ? pagePalette.primary : AppTheme.surfaceGrey,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.assessment_rounded,
-                                size: 16,
+                    const SizedBox(width: 2),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _isCompletedViewOverride = true;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(9),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isCompletedView ? pagePalette.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.assessment_rounded,
+                              size: 14,
+                              color: isCompletedView ? Colors.white : AppTheme.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '경기 결과',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
                                 color: isCompletedView ? Colors.white : AppTheme.textMuted,
                               ),
-                              const SizedBox(width: 5),
-                              Text(
-                                '경기 결과',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: isCompletedView ? Colors.white : AppTheme.textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(width: 8),
 
-                // 클럽 내 모임 선택 드롭다운 (클릭 시 최근 모임 목록이 펼쳐지는 선택형 방식)
-                if (allAvailableSessions.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Builder(
-                    builder: (context) {
-                      final seenIds = <String>{};
-                      final uniqueSessions = allAvailableSessions
-                          .where((s) => seenIds.add(s.id))
-                          .toList();
-                      final activeDropdownId = uniqueSessions.any((s) => s.id == targetSession.id)
-                          ? targetSession.id
-                          : uniqueSessions.first.id;
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceGrey,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: pagePalette.borderTint),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            key: const Key('viewer_session_selector_dropdown'),
-                            value: activeDropdownId,
-                            isExpanded: true,
-                            isDense: true,
-                            icon: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: pagePalette.primary,
-                              size: 20,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            dropdownColor: Colors.white,
-                            items: uniqueSessions.map((s) {
-                              final isSelected = s.id == targetSession.id;
-                              return DropdownMenuItem<String>(
-                                value: s.id,
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: s.isCompleted
-                                            ? pagePalette.softTint
-                                            : (s.isGameEnded ? AppTheme.pastelYellow : AppTheme.pastelMint),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        s.isCompleted ? '완료' : (s.isGameEnded ? '결과' : 'LIVE'),
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          color: s.isCompleted
-                                              ? pagePalette.primary
-                                              : (s.isGameEnded ? AppTheme.pastelYellowDark : AppTheme.pastelMintDark),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        '${s.title} (${s.matchFormat.label})',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight:
-                                              isSelected ? FontWeight.w900 : FontWeight.w700,
-                                          color: isSelected
-                                              ? pagePalette.primary
-                                              : AppTheme.textDark,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (selectedId) {
-                              if (selectedId == null) return;
-                              final picked = uniqueSessions.firstWhere(
-                                (s) => s.id == selectedId,
-                                orElse: () => targetSession,
-                              );
-                              setState(() {
-                                _selectedSessionId = picked.id;
-                                _isCompletedViewOverride = picked.isCompleted;
-                                _scoreFilterRound = null;
-                                _liveSelectedRound = null;
-                              });
-                            },
-                          ),
-                        ),
-                      );
+              // 이름/초성 검색창 (Expanded)
+              Expanded(
+                child: Container(
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: AppTheme.softShadow,
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    textAlignVertical: TextAlignVertical.center,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: '이름/초성 검색...',
+                      hintStyle: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 17, color: AppTheme.textMuted),
+                      prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 38),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 15),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 38),
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                  _searchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
+                    ),
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val.trim();
+                      });
                     },
                   ),
-                ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 3. 최하단 고정 바: [공식 앱 링크 배너] + [모바일 표준 띠배너 광고 플레이스홀더]
+  Widget _buildStickyBottomSection() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildAppDownloadBanner(),
+        _buildStickyAdBanner(),
+      ],
+    );
+  }
+
+  /// 4. 웹뷰어 최하단 슬림 고정 [앱 다운로드 유도 배너] (Sticky)
+  Widget _buildAppDownloadBanner() {
+    final pagePalette = AppTheme.getPagePalette(3);
+    return Container(
+      key: const Key('web_viewer_app_download_banner'),
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: pagePalette.borderTint.withValues(alpha: 0.8)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            offset: const Offset(0, -2),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: pagePalette.softTint,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: Icon(
+                Icons.sports_tennis_rounded,
+                color: pagePalette.primary,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      AppConstants.appName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppTheme.pastelMint,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '공식 앱',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.pastelMintDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  '홈 화면에 추가하여 앱처럼 빠르게 실행하세요',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: AppTheme.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: pagePalette.softTint,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: pagePalette.borderTint),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.install_mobile_rounded, size: 14, color: pagePalette.primary),
+                const SizedBox(width: 4),
+                Text(
+                  '설치',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: pagePalette.primary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -768,117 +936,46 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     );
   }
 
-  /// 4. 웹뷰어 최하단 [앱 다운로드 유도 배너] (플레이스홀더)
-  Widget _buildAppDownloadBanner() {
-    final pagePalette = AppTheme.getPagePalette(3);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      child: Container(
-        key: const Key('web_viewer_app_download_banner'),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: pagePalette.borderTint),
-          boxShadow: AppTheme.softShadow,
-        ),
-        child: Column(
-          children: [
-            Row(
+  /// 5. 최하단 고정 모바일 웹 광고 띠배너 컨테이너 (Google AdSense / Kakao AdFit 등 플레이스홀더)
+  Widget _buildStickyAdBanner() {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Container(
+          key: const Key('web_viewer_ad_strip_banner'),
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: Colors.grey.shade200, width: 0.8),
+            ),
+          ),
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: pagePalette.softTint,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.sports_tennis_rounded,
-                      color: pagePalette.primary,
-                      size: 24,
-                    ),
-                  ),
+                Icon(
+                  Icons.ad_units_rounded,
+                  size: 15,
+                  color: Colors.grey.shade500,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            AppConstants.appName,
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.textDark,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: AppTheme.pastelMint,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              '공식 앱',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.pastelMintDark,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        '스마트 대진표 자동 편성 · 출석 및 참가비 · 금전출납부',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: AppTheme.textMuted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                const SizedBox(width: 6),
+                Text(
+                  '배너 광고 영역 (320x50)',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade500,
+                    letterSpacing: -0.2,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-              decoration: BoxDecoration(
-                color: pagePalette.softTint,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.install_mobile_rounded, size: 16, color: pagePalette.primary),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      '홈 화면에 추가하여 앱처럼 빠르게 실행하세요 (출시 준비중)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: pagePalette.primary,
-                      ),
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -946,51 +1043,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 6),
-
-          // 내 이름 / 초성 검색바 + 라운드 선택 칩
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: AppTheme.softShadow,
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                    decoration: InputDecoration(
-                      hintText: '내 이름/초성 검색 (출전 코트·대기 순번 강조)',
-                      hintStyle: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                      prefixIcon: const Icon(Icons.search_rounded, size: 19, color: AppTheme.textMuted),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, size: 17),
-                              onPressed: () {
-                                setState(() {
-                                  _searchController.clear();
-                                  _searchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    onChanged: (val) {
-                      setState(() {
-                        _searchQuery = val.trim();
-                      });
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
 
           // 토너먼트 모드일 때 메인 기본 화면으로 InteractiveViewer 기반 토너먼트 브래킷(트리) 자동 전환 노출
           if (session.matchFormat == MatchFormat.tournament) ...[
@@ -1062,29 +1115,30 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
                       key: const Key('live_scoreboard_round_chips_scroll'),
                       scrollDirection: Axis.horizontal,
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: rounds.map((r) {
                           final selected = r == activeRound;
                           return Padding(
                             padding: const EdgeInsets.only(left: 4),
                             child: InkWell(
                               onTap: () => setState(() => _liveSelectedRound = r),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: selected ? pagePalette.primary : Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: selected ? Colors.white : const Color(0xFFE9ECEF),
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
                                   border: Border.all(
-                                    color: selected ? pagePalette.secondary : Colors.grey.shade300,
+                                    color: selected ? pagePalette.primary : Colors.grey.shade300,
+                                    width: selected ? 1.5 : 1.0,
                                   ),
                                 ),
                                 child: Text(
                                   '${r}R',
                                   style: TextStyle(
                                     fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: selected ? Colors.white : AppTheme.textDark,
+                                    fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                                    color: selected ? pagePalette.primary : AppTheme.textMuted,
                                   ),
                                 ),
                               ),
@@ -1098,7 +1152,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
               ],
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
 
           // 코트별 대형 전광판 카드 리스트
           if (currentRoundMatches.isEmpty)
@@ -1746,7 +1800,7 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2812,30 +2866,39 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 상단 라운드 필터 칩 (전체, 1R, 2R, 3R...)
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildRoundFilterChip(
-                label: '전체',
-                isSelected: _scoreFilterRound == null,
-                onTap: () => setState(() => _scoreFilterRound = null),
-              ),
-              ...rounds.map(
-                (r) => Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: _buildRoundFilterChip(
-                    label: '${r}R',
-                    isSelected: _scoreFilterRound == r,
-                    onTap: () => setState(() => _scoreFilterRound = r),
+        // 상단 라운드 필터 칩 (전체, 1R, 2R, 3R...) - 폴더 탭(Folder Tab) 스타일
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade300, width: 1.0),
+            ),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _buildRoundFilterChip(
+                  label: '전체',
+                  isSelected: _scoreFilterRound == null,
+                  onTap: () => setState(() => _scoreFilterRound = null),
+                ),
+                ...rounds.map(
+                  (r) => Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: _buildRoundFilterChip(
+                      label: '${r}R',
+                      isSelected: _scoreFilterRound == r,
+                      onTap: () => setState(() => _scoreFilterRound = r),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 2),
 
         if (filteredMatches.isEmpty)
           Container(
@@ -2872,24 +2935,35 @@ class _LiveViewerScreenState extends ConsumerState<LiveViewerScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final pagePalette = AppTheme.getPagePalette(3);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryDark : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? Colors.white : const Color(0xFFE9ECEF),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
           border: Border.all(
-            color: isSelected ? AppTheme.primaryDark : Colors.grey.shade300,
+            color: isSelected ? pagePalette.primary : Colors.grey.shade300,
+            width: isSelected ? 1.5 : 1.0,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    offset: const Offset(0, -2),
+                    blurRadius: 4,
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12.5,
-            fontWeight: FontWeight.w900,
-            color: isSelected ? Colors.white : AppTheme.textDark,
+            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+            color: isSelected ? pagePalette.primary : AppTheme.textMuted,
           ),
         ),
       ),

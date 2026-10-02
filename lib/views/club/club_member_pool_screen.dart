@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../services/club_service.dart';
+import 'widgets/batch_member_add_dialog.dart';
 
 /// [화면 1] 회원 명부 화면
 /// - 순수 회원 정보(주소록) 관리: 추가, 수정, 삭제, 검색, 3종 드롭다운 필터링
@@ -22,6 +23,7 @@ class ClubMemberPoolScreen extends ConsumerStatefulWidget {
 
 class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   // 롱프레스 다중 선택 문자 발송 모드 상태
   bool _isMultiSelectMode = false;
@@ -51,6 +53,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -67,9 +70,12 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SafeArea(
+          bottom: false,
+          child: Stack(
           children: [
             CustomScrollView(
               slivers: [
@@ -267,7 +273,15 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: TextField(
+                                    key: const Key('member_search_textfield'),
                                     controller: _searchController,
+                                    focusNode: _searchFocusNode,
+                                    onTapOutside: (_) => _searchFocusNode.unfocus(),
+                                    enableInteractiveSelection: true,
+                                    contextMenuBuilder: (context, editableTextState) =>
+                                        AdaptiveTextSelectionToolbar.editableText(
+                                      editableTextState: editableTextState,
+                                    ),
                                     textAlignVertical: TextAlignVertical.center,
                                     style: const TextStyle(fontSize: 13, color: AppTheme.textDark),
                                     decoration: InputDecoration(
@@ -288,8 +302,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                 ),
                                 if (_searchController.text.isNotEmpty)
                                   GestureDetector(
+                                    key: const Key('member_search_clear_btn'),
                                     onTap: () {
                                       _searchController.clear();
+                                      _searchFocusNode.unfocus();
                                       ref.read(memberFilterProvider.notifier).update(
                                             (prev) => prev.copyWith(searchQuery: ''),
                                           );
@@ -641,8 +657,9 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// 회원명부 세부 필터 & 정렬 모달 호출 버튼 위젯 (검색창 우측 배치)
   Widget _buildMemberFilterButton(
@@ -2012,34 +2029,43 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '새로 추가할 회원 등급 또는 직책 명칭을 입력해 주세요.\n입력한 명칭은 선택 목록에 즉시 추가 및 저장됩니다.',
-              style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.4),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: roleCtrl,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: '직책/등급 명칭',
-                hintText: '예: 자문위원, 고문, 학생회원 등',
-                filled: true,
-                fillColor: AppTheme.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+        content: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusScope.of(dialogCtx).unfocus(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '새로 추가할 회원 등급 또는 직책 명칭을 입력해 주세요.\n입력한 명칭은 선택 목록에 즉시 추가 및 저장됩니다.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.4),
               ),
-              onSubmitted: (val) {
-                if (val.trim().isNotEmpty) {
-                  Navigator.pop(dialogCtx, val.trim());
-                }
-              },
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: roleCtrl,
+                autofocus: true,
+                enableInteractiveSelection: true,
+                contextMenuBuilder: (context, editableTextState) =>
+                    AdaptiveTextSelectionToolbar.editableText(
+                  editableTextState: editableTextState,
+                ),
+                decoration: InputDecoration(
+                  labelText: '직책/등급 명칭',
+                  hintText: '예: 자문위원, 고문, 학생회원 등',
+                  filled: true,
+                  fillColor: AppTheme.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onSubmitted: (val) {
+                  if (val.trim().isNotEmpty) {
+                    Navigator.pop(dialogCtx, val.trim());
+                  }
+                },
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -2230,7 +2256,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
             ),
             content: SizedBox(
               width: 480,
-              child: SingleChildScrollView(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => FocusScope.of(ctx).unfocus(),
+                child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2238,6 +2267,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                     // 0. 기본 인적 정보 (이름, 성별, 급수)
                     TextField(
                       controller: nameCtrl,
+                      enableInteractiveSelection: true,
+                      contextMenuBuilder: (context, editableTextState) =>
+                          AdaptiveTextSelectionToolbar.editableText(
+                              editableTextState: editableTextState),
                       decoration: const InputDecoration(
                         labelText: '이름 (필수)',
                         hintText: '예: 홍길동',
@@ -2530,6 +2563,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                 Expanded(
                                   child: TextField(
                                     controller: restingStartCtrl,
+                                    enableInteractiveSelection: true,
+                                    contextMenuBuilder: (context, editableTextState) =>
+                                        AdaptiveTextSelectionToolbar.editableText(
+                                            editableTextState: editableTextState),
                                     onChanged: (_) => setModalState(() {}),
                                     decoration: InputDecoration(
                                       labelText: '휴면 시작일',
@@ -2563,6 +2600,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                 Expanded(
                                   child: TextField(
                                     controller: restingReturnCtrl,
+                                    enableInteractiveSelection: true,
+                                    contextMenuBuilder: (context, editableTextState) =>
+                                        AdaptiveTextSelectionToolbar.editableText(
+                                            editableTextState: editableTextState),
                                     onChanged: (_) => setModalState(() {}),
                                     decoration: InputDecoration(
                                       labelText: '복귀 예정일 (선택)',
@@ -2597,6 +2638,10 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                             const SizedBox(height: 8),
                             TextField(
                               controller: restingReasonCtrl,
+                              enableInteractiveSelection: true,
+                              contextMenuBuilder: (context, editableTextState) =>
+                                  AdaptiveTextSelectionToolbar.editableText(
+                                      editableTextState: editableTextState),
                               onChanged: (_) => setModalState(() {}),
                               decoration: InputDecoration(
                                 labelText: '휴면 사유',
@@ -2722,6 +2767,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                   flex: 5,
                                   child: TextField(
                                     controller: discountLabelCtrl,
+                                    enableInteractiveSelection: true,
+                                    contextMenuBuilder: (context, editableTextState) =>
+                                        AdaptiveTextSelectionToolbar.editableText(
+                                      editableTextState: editableTextState,
+                                    ),
                                     onChanged: (_) => setModalState(() {}),
                                     decoration: InputDecoration(
                                       labelText: '할인 명칭',
@@ -2742,6 +2792,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                     controller: discountAmountCtrl,
                                     keyboardType: TextInputType.number,
                                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                    enableInteractiveSelection: true,
+                                    contextMenuBuilder: (context, editableTextState) =>
+                                        AdaptiveTextSelectionToolbar.editableText(
+                                      editableTextState: editableTextState,
+                                    ),
                                     onChanged: (_) => setModalState(() {}),
                                     decoration: InputDecoration(
                                       labelText: '직접 부과할 금액',
@@ -2847,6 +2902,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                     child: TextField(
                                       key: const Key('member_exempt_start_date_field'),
                                       controller: exemptStartCtrl,
+                                      enableInteractiveSelection: true,
+                                      contextMenuBuilder: (context, editableTextState) =>
+                                          AdaptiveTextSelectionToolbar.editableText(
+                                        editableTextState: editableTextState,
+                                      ),
                                       onChanged: (_) => setModalState(() {}),
                                       decoration: InputDecoration(
                                         labelText: '면제 시작일',
@@ -2894,6 +2954,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                                     child: TextField(
                                       key: const Key('member_exempt_until_date_field'),
                                       controller: exemptUntilCtrl,
+                                      enableInteractiveSelection: true,
+                                      contextMenuBuilder: (context, editableTextState) =>
+                                          AdaptiveTextSelectionToolbar.editableText(
+                                        editableTextState: editableTextState,
+                                      ),
                                       onChanged: (_) => setModalState(() {}),
                                       decoration: InputDecoration(
                                         labelText: '면제 종료일',
@@ -2939,14 +3004,47 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                     // 연락처 & 메모
                     TextField(
                       controller: phoneCtrl,
-                      decoration: const InputDecoration(
+                      keyboardType: TextInputType.phone,
+                      enableInteractiveSelection: true,
+                      contextMenuBuilder: (context, editableTextState) =>
+                          AdaptiveTextSelectionToolbar.editableText(
+                        editableTextState: editableTextState,
+                      ),
+                      onChanged: (_) => setModalState(() {}),
+                      decoration: InputDecoration(
                         labelText: '연락처 (선택)',
                         hintText: '예: 010-1234-5678',
+                        suffixIcon: phoneCtrl.text.isNotEmpty
+                            ? IconButton(
+                                tooltip: '연락처 지우기',
+                                icon: const Icon(Icons.clear_rounded, size: 18, color: AppTheme.textMuted),
+                                onPressed: () {
+                                  phoneCtrl.clear();
+                                  setModalState(() {});
+                                },
+                              )
+                            : IconButton(
+                                tooltip: '클립보드에서 붙여넣기',
+                                icon: const Icon(Icons.content_paste_rounded, size: 18, color: AppTheme.primaryDark),
+                                onPressed: () async {
+                                  final data = await Clipboard.getData(Clipboard.kTextPlain);
+                                  final text = data?.text?.trim();
+                                  if (text != null && text.isNotEmpty) {
+                                    phoneCtrl.text = text;
+                                    setModalState(() {});
+                                  }
+                                },
+                              ),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: memoCtrl,
+                      enableInteractiveSelection: true,
+                      contextMenuBuilder: (context, editableTextState) =>
+                          AdaptiveTextSelectionToolbar.editableText(
+                        editableTextState: editableTextState,
+                      ),
                       decoration: const InputDecoration(
                         labelText: '메모 (선택)',
                         hintText: '예: 오전반 / 가족회원',
@@ -2956,6 +3054,7 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                 ),
               ),
             ),
+          ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -3409,6 +3508,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                     TextField(
                       controller: directCsvCtrl,
                       maxLines: 6,
+                      enableInteractiveSelection: true,
+                      contextMenuBuilder: (context, editableTextState) =>
+                          AdaptiveTextSelectionToolbar.editableText(
+                        editableTextState: editableTextState,
+                      ),
                       style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
                       decoration: InputDecoration(
                         hintText: '이름,전화번호,성별,급수,회원구분,메모\n홍길동,010-1234-5678,남,A조,운영진(회장),창립멤버',
@@ -4310,81 +4414,9 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
 
   /// 텍스트 복사/붙여넣기 대량 등록 다이얼로그
   void _showBatchAddDialog(BuildContext context) {
-    final batchCtrl = TextEditingController(
-      text: '''김영수 남 A 정회원
-이정민 여 B조 010-2345-6789 총무
-박현우 남 C 준회원
-최유나 여 초심''',
-    );
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
-          children: [
-            Icon(Icons.playlist_add_check_rounded, color: AppTheme.primaryMint),
-            SizedBox(width: 8),
-            Text('명단 텍스트 대량 등록', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-          ],
-        ),
-        content: SizedBox(
-          width: 450,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '카카오톡 단체방이나 엑셀에서 복사한 명단을 아래에 붙여넣으세요.\n줄마다 "이름 성별 급수 [전화번호] [정회원/준회원/직책]" 형식으로 자동 인식됩니다.',
-                style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.4),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: batchCtrl,
-                maxLines: 8,
-                decoration: InputDecoration(
-                  hintText: '예:\n홍길동 남 A 정회원\n김민수 여 B 총무\n이초심 남 초심 준회원',
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryMint,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              final text = batchCtrl.text.trim();
-              if (text.isEmpty) return;
-
-              final clubService = ref.read(clubServiceProvider);
-              final parsed = clubService.parseBatchMembersText(text);
-
-              if (parsed.isNotEmpty) {
-                ref.read(membersProvider.notifier).addBatch(parsed);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${parsed.length}명의 회원이 일괄 등록되었습니다!')),
-                );
-              }
-            },
-            child: const Text('일괄 파싱 & 등록'),
-          ),
-        ],
-      ),
+      builder: (ctx) => const BatchMemberAddDialog(),
     );
   }
 
@@ -4602,6 +4634,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
             const SizedBox(height: 14),
             TextField(
               controller: nameCtrl,
+              enableInteractiveSelection: true,
+              contextMenuBuilder: (context, editableTextState) =>
+                  AdaptiveTextSelectionToolbar.editableText(
+                editableTextState: editableTextState,
+              ),
               decoration: InputDecoration(
                 labelText: '클럽 / 모임 이름 (필수)',
                 hintText: '예: 서초 번개콕, 일요 모닝배턴',
@@ -4611,6 +4648,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: descCtrl,
+              enableInteractiveSelection: true,
+              contextMenuBuilder: (context, editableTextState) =>
+                  AdaptiveTextSelectionToolbar.editableText(
+                editableTextState: editableTextState,
+              ),
               decoration: InputDecoration(
                 labelText: '모임 일정 / 설명 (선택)',
                 hintText: '예: 매주 일요일 08시 · 3코트',
@@ -4746,10 +4788,13 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
         builder: (ctx, setModalState) {
           final selectedCount = selectedIds.length;
 
-          return Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-            ),
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => FocusScope.of(ctx).unfocus(),
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+              ),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -4851,6 +4896,11 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                       TextField(
                         controller: messageCtrl,
                         maxLines: 3,
+                        enableInteractiveSelection: true,
+                        contextMenuBuilder: (context, editableTextState) =>
+                            AdaptiveTextSelectionToolbar.editableText(
+                          editableTextState: editableTextState,
+                        ),
                         decoration: InputDecoration(
                           hintText: '전송할 메시지 내용을 입력하세요.',
                           filled: true,
@@ -5098,7 +5148,8 @@ class _ClubMemberPoolScreenState extends ConsumerState<ClubMemberPoolScreen> {
                 ),
               ],
             ),
-          );
+          ),
+        );
         },
       ),
     );

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:uuid/uuid.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
+import 'widgets/guest_add_dialog.dart';
+import 'widgets/unpaid_fee_guide_dialog.dart';
 
 /// [화면 2 / 탭 2] 오늘 모임 준비 & 출석 체크 (출석부 화면)
 /// - 모임 기본 정보 설정 (타이틀 수정, 참가비/콕비 설정, 실시간 총 수납 현황 Bento Grid)
@@ -171,12 +172,12 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     }
   }
 
-  /// [미납자 안내 문자 발송] 현재 회비 상태가 '미납'인 참석자들의 번호를 수신자로 묶어 기본 입금 안내 문구와 함께 문자 앱(sms:) 실행
-  Future<void> _sendUnpaidGuideSms(
+  /// [미납자 안내 메시지] 현재 회비 상태가 '미납'인 참석자 대상 안내 메시지 미리보기/편집 다이얼로그 팝업
+  void _sendUnpaidGuideSms(
     BuildContext context,
     GameSession session,
     List<Member> attendeeMembers,
-  ) async {
+  ) {
     final unpaidMembers = attendeeMembers
         .where((m) => session.getAttendeeFeeStatus(m) == FeeStatus.unpaid)
         .toList();
@@ -191,55 +192,18 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
       return;
     }
 
-    final phones = unpaidMembers
-        .map((m) => (m.phoneNumber ?? '').replaceAll(RegExp(r'[^0-9+]'), ''))
-        .where((p) => p.isNotEmpty)
-        .toList();
+    final currentClub = ref.read(currentClubProvider);
+    final feePolicy = ref.read(currentClubFeePolicyProvider);
 
-    final guideMessage =
-        '[클릭콕 회비 안내] 안녕하세요! \'${session.displayTitle}\' 모임 회비(회원 ${_formatWon(session.memberFee)}원 / 게스트 ${_formatWon(session.guestFee)}원) 미납 안내드립니다. 확인 후 입금 부탁드립니다. 감사합니다!';
-
-    if (phones.isEmpty) {
-      await Clipboard.setData(ClipboardData(text: guideMessage));
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.pastelRoseDark,
-            content: Text('미납자(${unpaidMembers.length}명)의 등록된 전화번호가 없어 안내 문구를 복사했습니다.'),
-          ),
-        );
-      }
-      return;
-    }
-
-    final recipients = phones.join(',');
-    final smsUri = Uri.parse('sms:$recipients?body=${Uri.encodeComponent(guideMessage)}');
-
-    try {
-      final launched = await launchUrl(smsUri, mode: LaunchMode.externalApplication);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.primaryDark,
-            content: Text(
-              launched
-                  ? '미납자 ${unpaidMembers.length}명(${unpaidMembers.map((m) => m.name).join(", ")})에게 입금 안내 문자 앱을 열었습니다.'
-                  : '미납자 ${unpaidMembers.length}명 수신 번호 및 입금 안내 문구를 준비했습니다.',
-            ),
-          ),
-        );
-      }
-    } catch (_) {
-      await Clipboard.setData(ClipboardData(text: '$recipients\n$guideMessage'));
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppTheme.primaryDark,
-            content: Text('미납자 ${unpaidMembers.length}명 번호와 입금 안내 문구가 클립보드에 복사되었습니다.'),
-          ),
-        );
-      }
-    }
+    showDialog(
+      context: context,
+      builder: (ctx) => UnpaidFeeGuideDialog(
+        session: session,
+        currentClub: currentClub,
+        unpaidMembers: unpaidMembers,
+        feePolicy: feePolicy,
+      ),
+    );
   }
 
   /// 다중 선택된 회원(N명)에게 일괄 SMS 발송 (sms:)
@@ -324,11 +288,14 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     final pagePalette = AppTheme.getPagePalette(1);
 
     if (session == null) {
-      return Scaffold(
-        backgroundColor: AppTheme.background,
-        body: SafeArea(
-          bottom: false,
-          child: CustomScrollView(
+      return MediaQuery.removePadding(
+        context: context,
+        removeBottom: true,
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: SafeArea(
+            bottom: false,
+            child: CustomScrollView(
             slivers: [
               // 최상단 AppBar ([☰] + '출석부' + [○ ● ○] 고정 인디케이터)
               SliverToBoxAdapter(
@@ -469,8 +436,9 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
     // 출석부에 등록된 회원 객체 매핑
     final attendeeMembers = session.attendees.map((id) {
@@ -530,14 +498,22 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     final restingCount = session.restingAttendees.length;
     final withdrawnCount = session.withdrawnAttendees.length;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: SafeArea(
-        bottom: false,
+    return MediaQuery.removePadding(
+      context: context,
+      removeBottom: true,
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        resizeToAvoidBottomInset: false,
+        extendBody: true,
+        body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
         child: Stack(
           children: [
-            CustomScrollView(
-              slivers: [
+            SafeArea(
+              bottom: false,
+              child: CustomScrollView(
+                slivers: [
                 // 1. 최상단 AppBar ([☰] + '출석부' + [○ ● ○] 고정 인디케이터) & 모임 기본 정보 카드
                 SliverToBoxAdapter(
                   child: Padding(
@@ -630,7 +606,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   ),
                 ),
 
-                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                const SliverToBoxAdapter(child: SizedBox(height: 2)),
 
                 // 5. 참석자 카드 리스트
                 if (displayedMembers.isEmpty)
@@ -672,8 +648,10 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                       16,
                       0,
                       16,
-                      isKeyboardOpen ? 16 : (_isMultiSelectMode ? 140 : 84),
-                    ), // 하단 플로팅 바 여백
+                      isKeyboardOpen
+                          ? 16
+                          : (_isMultiSelectMode ? 120 : 70),
+                    ), // 하단 액션 바 여백
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -694,13 +672,15 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   ),
               ],
             ),
-
-            // 6. 하단 플로팅 액션 바 (가상 키보드 활성화 시 자동 숨김 처리)
-            if (!isKeyboardOpen)
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 16,
+          ),
+          // 6. 하단 고정 대진표 액션 바 (body Stack 내 최하단 Positioned(bottom: 0, left: 0, right: 0) 강제 고정)
+          if (!isKeyboardOpen)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -722,11 +702,13 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                   ],
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   /// 모임 목록 화면: [진행 모임], [정산 대기 모임], [지난 모임] 구분 리스트
   Widget _buildSessionArchiveSections({
@@ -1738,13 +1720,14 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     required int exemptCount,
     required int filteredCount,
   }) {
+    final pagePalette = AppTheme.getPagePalette(1);
     final bool isAllStatusSelected =
         _selectedAttendanceStatus == null && _selectedFeeStatus == null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // [줄 1] 슬림한 검색창 + 우측 정렬/세부 필터 아이콘 버튼(Icons.tune)
+        // [줄 1] 검색창 + 세부 필터 버튼 (개별 독립 컴포넌트)
         Row(
           children: [
             Expanded(
@@ -1754,7 +1737,14 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: Colors.grey.shade300, width: 1.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -1782,8 +1772,10 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                     ),
                     if (_searchController.text.isNotEmpty)
                       GestureDetector(
+                        key: const Key('attendance_search_clear_btn'),
                         onTap: () {
                           _searchController.clear();
+                          _searchFocusNode.unfocus();
                           setState(() {});
                         },
                         child: Icon(Icons.cancel_rounded, size: 16, color: Colors.grey.shade400),
@@ -1796,122 +1788,10 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             _buildAttendanceFilterButton(context),
           ],
         ),
-        const SizedBox(height: 8),
-
-        // [줄 2] 상태 필터 칩 (가로 1줄 스크롤: [전체 N] [출전 N] [휴식 N] [조퇴 N] [미납 N] [완납 N] [면제 N])
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              // --- 출전 상태 그룹: [전체] | [출전] | [휴식] | [조퇴] ---
-              _buildStatusCountChip(
-                label: '전체',
-                count: attendeeCount,
-                isSelected: isAllStatusSelected,
-                onTap: () {
-                  setState(() {
-                    _selectedAttendanceStatus = null;
-                    _selectedFeeStatus = null;
-                  });
-                },
-              ),
-              const SizedBox(width: 6),
-              _buildStatusCountChip(
-                label: '출전',
-                count: activeCount,
-                isSelected: _selectedAttendanceStatus == AttendanceStatus.active,
-                onTap: () {
-                  setState(() {
-                    _selectedAttendanceStatus =
-                        _selectedAttendanceStatus == AttendanceStatus.active
-                            ? null
-                            : AttendanceStatus.active;
-                  });
-                },
-              ),
-              const SizedBox(width: 6),
-              _buildStatusCountChip(
-                label: '휴식',
-                count: restingCount,
-                isSelected: _selectedAttendanceStatus == AttendanceStatus.resting,
-                onTap: () {
-                  setState(() {
-                    _selectedAttendanceStatus =
-                        _selectedAttendanceStatus == AttendanceStatus.resting
-                            ? null
-                            : AttendanceStatus.resting;
-                  });
-                },
-              ),
-              const SizedBox(width: 6),
-              _buildStatusCountChip(
-                label: '조퇴',
-                count: withdrawnCount,
-                isSelected: _selectedAttendanceStatus == AttendanceStatus.withdrawn,
-                onTap: () {
-                  setState(() {
-                    _selectedAttendanceStatus =
-                        _selectedAttendanceStatus == AttendanceStatus.withdrawn
-                            ? null
-                            : AttendanceStatus.withdrawn;
-                  });
-                },
-              ),
-
-              // --- 구분선 (|) ---
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Container(
-                  width: 1.5,
-                  height: 18,
-                  color: Colors.grey.shade300,
-                ),
-              ),
-
-              // --- 회비 상태 그룹: [미납] | [완납] | [면제] ---
-              _buildStatusCountChip(
-                label: '미납',
-                count: unpaidCount,
-                isSelected: _selectedFeeStatus == FeeStatus.unpaid,
-                isAlert: unpaidCount > 0,
-                onTap: () {
-                  setState(() {
-                    _selectedFeeStatus =
-                        _selectedFeeStatus == FeeStatus.unpaid ? null : FeeStatus.unpaid;
-                  });
-                },
-              ),
-              const SizedBox(width: 6),
-              _buildStatusCountChip(
-                label: '완납',
-                count: paidCount,
-                isSelected: _selectedFeeStatus == FeeStatus.paid,
-                onTap: () {
-                  setState(() {
-                    _selectedFeeStatus =
-                        _selectedFeeStatus == FeeStatus.paid ? null : FeeStatus.paid;
-                  });
-                },
-              ),
-              const SizedBox(width: 6),
-              _buildStatusCountChip(
-                label: '면제',
-                count: exemptCount,
-                isSelected: _selectedFeeStatus == FeeStatus.exempt,
-                onTap: () {
-                  setState(() {
-                    _selectedFeeStatus =
-                        _selectedFeeStatus == FeeStatus.exempt ? null : FeeStatus.exempt;
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
 
         // 복합 필터 활성화 시 [필터 초기화] 및 필터링 결과 인원수 표시 바
         if (_hasActiveFilters) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             children: [
               Text(
@@ -1927,10 +1807,11 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                 onTap: _resetAllFilters,
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1952,6 +1833,132 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
             ],
           ),
         ],
+
+        // 검색창/필터와 바로 아래 [전체/출전/휴식...] 탭 사이의 상하 간격 (약 8~10px)
+        const SizedBox(height: 9),
+
+        // [줄 2] 서류철 폴더(Folder Tab) 스타일 상태 필터 탭 바 (가로 1줄 스크롤: [전체 N] [출전 N] [휴식 N] [조퇴 N] [미납 N] [완납 N] [면제 N])
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: pagePalette.borderTint.withValues(alpha: 0.6),
+                width: 1.0,
+              ),
+            ),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // --- 출전 상태 그룹: [전체] | [출전] | [휴식] | [조퇴] ---
+                _buildStatusCountChip(
+                  label: '전체',
+                  count: attendeeCount,
+                  isSelected: isAllStatusSelected,
+                  onTap: () {
+                    setState(() {
+                      _selectedAttendanceStatus = null;
+                      _selectedFeeStatus = null;
+                    });
+                  },
+                ),
+                const SizedBox(width: 4),
+                _buildStatusCountChip(
+                  label: '출전',
+                  count: activeCount,
+                  isSelected: _selectedAttendanceStatus == AttendanceStatus.active,
+                  onTap: () {
+                    setState(() {
+                      _selectedAttendanceStatus =
+                          _selectedAttendanceStatus == AttendanceStatus.active
+                              ? null
+                              : AttendanceStatus.active;
+                    });
+                  },
+                ),
+                const SizedBox(width: 4),
+                _buildStatusCountChip(
+                  label: '휴식',
+                  count: restingCount,
+                  isSelected: _selectedAttendanceStatus == AttendanceStatus.resting,
+                  onTap: () {
+                    setState(() {
+                      _selectedAttendanceStatus =
+                          _selectedAttendanceStatus == AttendanceStatus.resting
+                              ? null
+                              : AttendanceStatus.resting;
+                    });
+                  },
+                ),
+                const SizedBox(width: 4),
+                _buildStatusCountChip(
+                  label: '조퇴',
+                  count: withdrawnCount,
+                  isSelected: _selectedAttendanceStatus == AttendanceStatus.withdrawn,
+                  onTap: () {
+                    setState(() {
+                      _selectedAttendanceStatus =
+                          _selectedAttendanceStatus == AttendanceStatus.withdrawn
+                              ? null
+                              : AttendanceStatus.withdrawn;
+                    });
+                  },
+                ),
+
+                // --- 구분선 (|) ---
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  child: Container(
+                    width: 1.2,
+                    height: 16,
+                    color: Colors.grey.shade300,
+                  ),
+                ),
+
+                // --- 회비 상태 그룹: [미납] | [완납] | [면제] ---
+                _buildStatusCountChip(
+                  label: '미납',
+                  count: unpaidCount,
+                  isSelected: _selectedFeeStatus == FeeStatus.unpaid,
+                  isAlert: unpaidCount > 0,
+                  onTap: () {
+                    setState(() {
+                      _selectedFeeStatus =
+                          _selectedFeeStatus == FeeStatus.unpaid ? null : FeeStatus.unpaid;
+                    });
+                  },
+                ),
+                const SizedBox(width: 4),
+                _buildStatusCountChip(
+                  label: '완납',
+                  count: paidCount,
+                  isSelected: _selectedFeeStatus == FeeStatus.paid,
+                  onTap: () {
+                    setState(() {
+                      _selectedFeeStatus =
+                          _selectedFeeStatus == FeeStatus.paid ? null : FeeStatus.paid;
+                    });
+                  },
+                ),
+                const SizedBox(width: 4),
+                _buildStatusCountChip(
+                  label: '면제',
+                  count: exemptCount,
+                  isSelected: _selectedFeeStatus == FeeStatus.exempt,
+                  onTap: () {
+                    setState(() {
+                      _selectedFeeStatus =
+                          _selectedFeeStatus == FeeStatus.exempt ? null : FeeStatus.exempt;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -2167,6 +2174,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                               runSpacing: 8,
                               children: [
                                 _buildModalFilterChip(
+                                  key: const Key('attendance_filter_grade_all'),
                                   label: '전체',
                                   isSelected: tempGrade == null,
                                   primaryColor: pagePalette.primary,
@@ -2180,9 +2188,11 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                                   MemberGrade.regular,
                                   MemberGrade.associate,
                                   MemberGrade.executive,
+                                  MemberGrade.guest,
                                 ].map((g) {
                                   final isSelected = tempGrade == g;
                                   return _buildModalFilterChip(
+                                    key: Key('attendance_filter_grade_${g.code}'),
                                     label: g.label,
                                     isSelected: isSelected,
                                     primaryColor: pagePalette.primary,
@@ -2327,12 +2337,14 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
   }
 
   Widget _buildModalFilterChip({
+    Key? key,
     required String label,
     required bool isSelected,
     required Color primaryColor,
     required VoidCallback onTap,
   }) {
     return InkWell(
+      key: key,
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
@@ -2358,7 +2370,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     );
   }
 
-  /// [상단 2단] 상태 필터 칩 + 실시간 인원수 카운트 뱃지 위젯
+  /// [상단 2단] 서류철 폴더 탭(Folder Tab) 스타일 상태 필터 칩 + 실시간 인원수 카운트 뱃지 위젯
   Widget _buildStatusCountChip({
     required String label,
     required int count,
@@ -2371,40 +2383,65 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
     Color textColor;
     Color badgeBg;
     Color badgeText;
+    Color borderColor;
+    double borderWidth;
 
     if (isSelected) {
-      bg = pagePalette.primary;
-      textColor = Colors.white;
-      badgeBg = Colors.white.withValues(alpha: 0.2);
-      badgeText = Colors.white;
+      if (isAlert) {
+        bg = Colors.white;
+        textColor = AppTheme.pastelRoseDark;
+        badgeBg = AppTheme.pastelRose.withValues(alpha: 0.6);
+        badgeText = AppTheme.pastelRoseDark;
+        borderColor = AppTheme.pastelRoseDark;
+        borderWidth = 1.5;
+      } else {
+        bg = Colors.white;
+        textColor = pagePalette.primary;
+        badgeBg = pagePalette.softTint;
+        badgeText = pagePalette.primary;
+        borderColor = pagePalette.primary;
+        borderWidth = 1.5;
+      }
     } else if (isAlert) {
-      bg = AppTheme.pastelRose;
+      bg = AppTheme.pastelRose.withValues(alpha: 0.5);
       textColor = AppTheme.pastelRoseDark;
-      badgeBg = Colors.white.withValues(alpha: 0.75);
+      badgeBg = Colors.white.withValues(alpha: 0.8);
       badgeText = AppTheme.pastelRoseDark;
+      borderColor = AppTheme.pastelRoseDark.withValues(alpha: 0.3);
+      borderWidth = 1.0;
     } else {
-      bg = Colors.white;
-      textColor = AppTheme.textDark;
-      badgeBg = AppTheme.surfaceGrey;
+      bg = const Color(0xFFEAE8F7);
+      textColor = AppTheme.textMuted;
+      badgeBg = Colors.white.withValues(alpha: 0.85);
       badgeText = AppTheme.textMuted;
+      borderColor = pagePalette.borderTint.withValues(alpha: 0.5);
+      borderWidth = 1.0;
     }
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        height: 38,
+        height: isSelected ? 36 : 33,
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
           border: Border.all(
-            color: isSelected
-                ? pagePalette.primary
-                : (isAlert ? AppTheme.pastelRoseDark.withValues(alpha: 0.35) : Colors.grey.shade300),
+            color: borderColor,
+            width: borderWidth,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    offset: const Offset(0, -2),
+                    blurRadius: 4,
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -3055,9 +3092,9 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
       ),
       child: Row(
         children: [
-          // 동적 기본 액션 버튼: 초기 [⚡ 대진 생성 및 시작] ↔ 진행 중 [현재 대진표 확인]
+          // 동적 기본 액션 버튼: 초기 [대진 생성 및 시작] ↔ 진행 중 [현재 대진표 확인]
           Expanded(
-            child: ElevatedButton(
+            child: ElevatedButton.icon(
               key: Key(
                 hasOngoingBracket
                     ? 'bottom_bar_continue_bracket_button'
@@ -3072,7 +3109,7 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                     : Colors.white70,
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -3091,8 +3128,15 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
                           );
                         }
                       : null),
-              child: Text(
-                hasOngoingBracket ? '현재 대진표 확인' : '⚡ 대진 생성 및 시작',
+              icon: Icon(
+                hasOngoingBracket ? Icons.visibility_rounded : Icons.bolt_rounded,
+                size: 20,
+                color: (hasOngoingBracket || canGenerate)
+                    ? pagePalette.primary
+                    : Colors.white70,
+              ),
+              label: Text(
+                hasOngoingBracket ? '현재 대진표 확인' : '대진 생성 및 시작',
                 style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5),
               ),
             ),
@@ -3632,209 +3676,20 @@ class _SessionAttendanceScreenState extends ConsumerState<SessionAttendanceScree
 
   /// [+ 게스트 즉시 추가] 다이얼로그 (일회성 참석자)
   void _showAddGuestDialog(BuildContext context, WidgetRef ref, String clubId) {
-    final nameCtrl = TextEditingController();
-    final clubCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    Gender selectedGender = Gender.male;
-    Tier selectedTier = Tier.novice;
-    FeeStatus selectedFeeStatus = FeeStatus.paid;
-
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
-            children: [
-              Icon(Icons.person_add_rounded, color: AppTheme.primaryMint),
-              SizedBox(width: 8),
-              Text('게스트 즉시 추가', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '오늘 모임에만 참가하는 일회성 게스트입니다.',
-                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(
-                    labelText: '이름 (필수)',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // 성별 선택
-                Row(
-                  children: [
-                    const Text('성별: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('남성', style: TextStyle(fontSize: 12)),
-                      selected: selectedGender == Gender.male,
-                      selectedColor: AppTheme.pastelPeriwinkle,
-                      onSelected: (val) => setDialogState(() => selectedGender = Gender.male),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('여성', style: TextStyle(fontSize: 12)),
-                      selected: selectedGender == Gender.female,
-                      selectedColor: AppTheme.pastelRose,
-                      onSelected: (val) => setDialogState(() => selectedGender = Gender.female),
-                    ),
-                  ],
-                ),
-
-                // 급수 선택 드롭다운 & 빠른 선택 칩 (초심, D조, C조, B조, A조, S조)
-                Row(
-                  children: [
-                    const Text('급수: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 10),
-                    DropdownButton<Tier>(
-                      value: selectedTier,
-                      items: Tier.values.map((t) {
-                        return DropdownMenuItem(value: t, child: Text(t.label));
-                      }).toList(),
-                      onChanged: (val) => setDialogState(() => selectedTier = val!),
-                    ),
-                  ],
-                ),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    Tier.novice,
-                    Tier.d,
-                    Tier.c,
-                    Tier.b,
-                    Tier.a,
-                    Tier.s,
-                  ].map((tierOption) {
-                    final isSelected = selectedTier == tierOption;
-                    return ChoiceChip(
-                      key: Key('guest_form_tier_chip_${tierOption.code}'),
-                      label: Text(
-                        tierOption.label,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          color: isSelected
-                              ? Colors.white
-                              : AppTheme.getTierTextColor(tierOption),
-                        ),
-                      ),
-                      selected: isSelected,
-                      selectedColor: AppTheme.primaryDark,
-                      backgroundColor: AppTheme.getTierBgColor(tierOption),
-                      showCheckmark: false,
-                      visualDensity: VisualDensity.compact,
-                      onSelected: (_) => setDialogState(() => selectedTier = tierOption),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 8),
-
-                TextField(
-                  controller: clubCtrl,
-                  decoration: InputDecoration(
-                    labelText: '원소속 클럽 (선택, 예: 마포콕)',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                TextField(
-                  controller: phoneCtrl,
-                  decoration: InputDecoration(
-                    labelText: '연락처 (선택)',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 참가비 납부 상태 (완납 / 미납 / 면제)
-                const Text('참가비 납부 상태', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Row(
-                  children: FeeStatus.values.map((statusOption) {
-                    final isSelected = selectedFeeStatus == statusOption;
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3),
-                        child: ChoiceChip(
-                          label: Center(
-                            child: Text(
-                              statusOption.label,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected ? Colors.white : AppTheme.textDark,
-                              ),
-                            ),
-                          ),
-                          selected: isSelected,
-                          selectedColor: AppTheme.primaryDark,
-                          backgroundColor: AppTheme.background,
-                          showCheckmark: false,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          onSelected: (val) {
-                            if (val) setDialogState(() => selectedFeeStatus = statusOption);
-                          },
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
+      builder: (ctx) => GuestAddDialog(
+        clubId: clubId,
+        onGuestAdded: (newGuest) {
+          ref.read(membersProvider.notifier).addMember(newGuest);
+          ref.read(sessionProvider.notifier).addAttendee(newGuest.id);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('게스트 ${newGuest.name} 님이 일정/모임에 추가되었습니다!'),
+              behavior: SnackBarBehavior.floating,
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryMint,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () {
-                final name = nameCtrl.text.trim();
-                if (name.isEmpty) return;
-
-                // 새 게스트 멤버 객체 생성
-                final newGuest = Member(
-                  id: 'guest_${const Uuid().v4().substring(0, 8)}',
-                  clubId: clubId,
-                  name: name,
-                  gender: selectedGender,
-                  tier: selectedTier,
-                  isGuest: true,
-                  feeStatus: selectedFeeStatus,
-                  homeClub: clubCtrl.text.trim().isEmpty ? '게스트' : clubCtrl.text.trim(),
-                  phoneNumber: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                  status: MemberStatus.active,
-                );
-
-                // 1. 회원 풀에 추가 (대진 생성 알고리즘이 참조할 수 있도록)
-                ref.read(membersProvider.notifier).addMember(newGuest);
-
-                // 2. 세션 출석부에 즉시 합류
-                ref.read(sessionProvider.notifier).addAttendee(newGuest.id);
-
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('게스트 $name 님이 일정/모임에 추가되었습니다!')),
-                );
-              },
-              child: const Text('추가하기'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

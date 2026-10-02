@@ -618,7 +618,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
               ),
             ),
 
-            // 3-2. 핵심 운영 버튼 외부 상시 노출 바 ([+ 특별 매치 추가] / [남은 라운드 재편성] / [대진표 전체 재편성])
+            // 3-2. 핵심 운영 버튼 외부 상시 노출 바 ([특별 매치 추가] / [남은 라운드 재편성] / [대진표 전체 재편성])
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
@@ -640,7 +640,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                         ),
                         icon: Icon(Icons.add_circle_outline, size: 12, color: pagePalette.primary),
                         label: const Text(
-                          '+ 특별 매치 추가',
+                          '특별 매치 추가',
                           style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -676,7 +676,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                         ),
-                        icon: const Icon(Icons.autorenew_rounded, size: 12),
+                        icon: const Icon(Icons.sync_rounded, size: 12),
                         label: const Text(
                           '남은 라운드 재편성',
                           style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800),
@@ -711,7 +711,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
                         ),
-                        icon: const Icon(Icons.restart_alt_rounded, size: 12),
+                        icon: const Icon(Icons.sync_rounded, size: 12),
                         label: const Text(
                           '대진표 전체 재편성',
                           style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800),
@@ -873,7 +873,7 @@ class _CourtOperationScreenState extends ConsumerState<CourtOperationScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
                             icon: const Icon(Icons.add_circle_outline, size: 16),
-                            label: const Text('+ 특별 매치 추가'),
+                            label: const Text('특별 매치 추가'),
                             onPressed: () => _showAddCustomMatchModal(
                               context,
                               ref,

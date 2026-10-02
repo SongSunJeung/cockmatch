@@ -113,6 +113,34 @@ void main() {
       expect(restored.homeClub, equals('에이스클럽'));
       expect(restored.phoneNumber, equals('010-9999-8888'));
     });
+
+    test('회원 JSON 직렬화 및 역직렬화 (toJson / fromJson) 백엔드 호환성 검증', () {
+      final now = DateTime.now();
+      final member = Member(
+        id: 'm200',
+        clubId: 'club_backend',
+        name: '최총무',
+        gender: Gender.male,
+        tier: Tier.s,
+        role: MemberRole.manager,
+        status: MemberStatus.active,
+        phoneNumber: '010-1234-5678',
+        joinedAt: now,
+      );
+
+      final json = member.toJson();
+      expect(json['id'], equals('m200'));
+      expect(json['name'], equals('최총무'));
+      expect(json['tier'], equals('S'));
+      expect(json['role'], equals('manager'));
+
+      final restored = Member.fromJson(json);
+      expect(restored.id, equals('m200'));
+      expect(restored.name, equals('최총무'));
+      expect(restored.tier, equals(Tier.s));
+      expect(restored.role, equals(MemberRole.manager));
+      expect(restored.phoneNumber, equals('010-1234-5678'));
+    });
   });
 
   group('GameSession Model Test', () {
@@ -1416,6 +1444,94 @@ void main() {
       // 준결승 1경기의 teamA가 빈 슬롯으로 안전하게 롤백됨
       expect(semi1.teamA, isEmpty);
       expect(semi1.teamB, equals(['p7', 'p8']));
+    });
+  });
+
+  group('MemberGrade and Guest Filtering Tests', () {
+    test('MemberGrade.guest code and label are correct', () {
+      expect(MemberGrade.guest.code, equals('guest'));
+      expect(MemberGrade.guest.label, equals('게스트'));
+    });
+
+    test('Member.grade returns MemberGrade.guest when isGuest is true', () {
+      final guestMember = Member(
+        id: 'g1',
+        name: '게스트A',
+        tier: Tier.b,
+        gender: Gender.male,
+        isGuest: true,
+      );
+      expect(guestMember.grade, equals(MemberGrade.guest));
+
+      final regularMember = Member(
+        id: 'm1',
+        name: '정회원A',
+        tier: Tier.a,
+        gender: Gender.female,
+        role: MemberRole.member,
+        isGuest: false,
+      );
+      expect(regularMember.grade, equals(MemberGrade.regular));
+
+      final execMember = Member(
+        id: 'e1',
+        name: '회장A',
+        tier: Tier.a,
+        gender: Gender.male,
+        role: MemberRole.president,
+        isGuest: false,
+      );
+      expect(execMember.grade, equals(MemberGrade.executive));
+
+      final associateMember = Member(
+        id: 'a1',
+        name: '준회원A',
+        tier: Tier.c,
+        gender: Gender.male,
+        role: MemberRole.associate,
+        isGuest: false,
+      );
+      expect(associateMember.grade, equals(MemberGrade.associate));
+    });
+
+    test('MemberFilter filters guest members accurately and supports compound filters', () {
+      final members = [
+        Member(id: '1', name: '김정회', tier: Tier.a, gender: Gender.male, isGuest: false, role: MemberRole.member),
+        Member(id: '2', name: '이운영', tier: Tier.b, gender: Gender.female, isGuest: false, role: MemberRole.president),
+        Member(id: '3', name: '박준회', tier: Tier.c, gender: Gender.male, isGuest: false, role: MemberRole.associate),
+        Member(id: '4', name: '최게스', tier: Tier.b, gender: Gender.female, isGuest: true),
+        Member(id: '5', name: '정게스', tier: Tier.a, gender: Gender.male, isGuest: true),
+      ];
+
+      // 1) 게스트 등급 필터
+      final guestFilter = MemberFilter(grade: MemberGrade.guest);
+      final guestResults = members.where((m) => guestFilter.matches(m)).toList();
+      expect(guestResults.length, equals(2));
+      expect(guestResults.map((m) => m.name), containsAll(['최게스', '정게스']));
+
+      // 2) 정회원 등급 필터 (게스트 제외 확인)
+      final regularFilter = MemberFilter(grade: MemberGrade.regular);
+      final regularResults = members.where((m) => regularFilter.matches(m)).toList();
+      expect(regularResults.length, equals(1));
+      expect(regularResults.first.name, equals('김정회'));
+
+      // 3) 게스트 + 급수(B조) 복합 필터
+      final guestTierFilter = MemberFilter(grade: MemberGrade.guest, tier: Tier.b);
+      final guestTierResults = members.where((m) => guestTierFilter.matches(m)).toList();
+      expect(guestTierResults.length, equals(1));
+      expect(guestTierResults.first.name, equals('최게스'));
+
+      // 4) 게스트 + 성별(남) 복합 필터
+      final guestGenderFilter = MemberFilter(grade: MemberGrade.guest, gender: Gender.male);
+      final guestGenderResults = members.where((m) => guestGenderFilter.matches(m)).toList();
+      expect(guestGenderResults.length, equals(1));
+      expect(guestGenderResults.first.name, equals('정게스'));
+    });
+
+    test('MatchFormat labels match bracket generation option names (로테이션, 풀리그전, 토너먼트)', () {
+      expect(MatchFormat.regular.label, equals('로테이션'));
+      expect(MatchFormat.league.label, equals('풀리그전'));
+      expect(MatchFormat.tournament.label, equals('토너먼트'));
     });
   });
 }

@@ -371,7 +371,13 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: background,
-      fontFamily: 'Pretendard',
+      fontFamily: 'Noto Sans KR',
+      fontFamilyFallback: const [
+        'Noto Sans KR',
+        'Apple SD Gothic Neo',
+        'Malgun Gothic',
+        'sans-serif',
+      ],
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryMint,
         primary: primaryMint,

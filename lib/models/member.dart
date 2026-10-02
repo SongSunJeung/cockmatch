@@ -157,8 +157,9 @@ class Member {
     return null;
   }
 
-  /// 회원 등급(자격) 분류: 운영진 / 정회원 / 준회원
+  /// 회원 등급(자격) 분류: 운영진 / 정회원 / 준회원 / 게스트
   MemberGrade get grade {
+    if (isGuest) return MemberGrade.guest;
     if (role.isExecutive) return MemberGrade.executive;
     if (role == MemberRole.associate) return MemberGrade.associate;
     return MemberGrade.regular;
@@ -221,6 +222,13 @@ class Member {
     };
   }
 
+  /// JSON 호환 Map 변환 (백엔드 REST/Supabase/Firebase/스토리지 연동용)
+  Map<String, dynamic> toJson() {
+    final map = toMap();
+    map['id'] = id;
+    return map;
+  }
+
   /// Firestore 데이터로부터 인스턴스 복원
   factory Member.fromMap(Map<String, dynamic> map, {required String id}) {
     // 상태값 복원: status 필드 우선, 없을 경우 기존 isActive boolean 고려
@@ -279,6 +287,12 @@ class Member {
           ? DateTime.tryParse(map['updatedAt'] as String)
           : null,
     );
+  }
+
+  /// JSON (`Map<String, dynamic>`) 데이터로부터 Member 인스턴스 복원
+  factory Member.fromJson(Map<String, dynamic> json, {String? id}) {
+    final memberId = id ?? (json['id'] as String?) ?? '';
+    return Member.fromMap(json, id: memberId);
   }
 
   Member copyWith({

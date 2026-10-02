@@ -150,7 +150,10 @@ class _MembershipFeeLedgerScreenState
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: SafeArea(
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SafeArea(
         bottom: true,
         child: Column(
           children: [
@@ -254,8 +257,9 @@ class _MembershipFeeLedgerScreenState
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// 0-1. 장부 화면 최상단 '클럽 총 잔액' 금융 앱 스타일 카드
   /// 클럽 총 잔액 = 기초이월 + 월회비 + 운영비 + 행사정산

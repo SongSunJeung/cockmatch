@@ -109,11 +109,12 @@ enum MemberRole {
   }
 }
 
-/// 회원 등급(자격) 필터 구분: [운영진], [정회원], [준회원]
+/// 회원 등급(자격) 필터 구분: [운영진], [정회원], [준회원], [게스트]
 enum MemberGrade {
   executive('executive', '운영진'),
   regular('regular', '정회원'),
-  associate('associate', '준회원');
+  associate('associate', '준회원'),
+  guest('guest', '게스트');
 
   final String code;
   final String label;
@@ -210,10 +211,10 @@ enum PartnerMode {
   }
 }
 
-/// 게임 세션 진행 방식 (일반 모임, 조별 리그, 토너먼트)
+/// 게임 세션 진행 방식 (로테이션, 풀리그전, 토너먼트)
 enum MatchFormat {
-  regular('regular', '일반 모임'),
-  league('league', '조별 리그'),
+  regular('regular', '로테이션'),
+  league('league', '풀리그전'),
   tournament('tournament', '토너먼트');
 
   final String code;
